@@ -1,5 +1,8 @@
 #include "cos.h"
 
+constexpr int workersPerCPU = 2;
+constexpr uint64_t FS_AllowedCPUs = 0b00000001;
+
 CPUs::CPUs()
 	: m_count{ GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) }
 {
@@ -19,6 +22,8 @@ CPUs::CPUs()
 	std::cout << "Available processors mask: " << m_availProcMask << " " << aps << std::endl;
 
 	uint64_t availProcMask = m_availProcMask;
+	availProcMask &= FS_AllowedCPUs;
+
 	for (uint64_t i = 0; availProcMask != 0; ++i, availProcMask >>= 1)
 		if (availProcMask & 1)
 			m_cpus.emplace_back(std::make_unique<CPU>(i, 1 << i));
@@ -34,25 +39,147 @@ void CPUs::Init()
 	}
 }
 
+void CPUs::Execute()
+{
+	m_cpus[0]->ExecuteTasks();
+}
+
 void CPU::InitWorkers()
 {
 	for (int i = 0; i < workersPerCPU; ++i)
 		m_workers.push_back(std::make_unique<Worker>(i, *this));
+
+	// TODO: Remove this and implement it in some sane way.
+	//
+	while (m_scheduler.m_runnableQueue.size() != workersPerCPU)
+		;
 }
 
 void CPU::WorkerEntryPoint(Worker& worker)
 {
+	BindThread();
 	tls_worker = &worker;
-	SetThreadAffinityMask(GetCurrentThread(), m_afinityMask);
 
 	{
 		static std::mutex io_mtx;
 		std::scoped_lock<std::mutex> lock(io_mtx);
 
-		std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << std::endl;
+		std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << " " << "Win32: " << GetCurrentProcessorNumber() <<  std::endl;
 	}
 
 	m_scheduler.Insert(worker);
+	m_scheduler.Main(worker);
+}
+
+// Binds current thread to this CPU.
+//
+void CPU::BindThread()
+{
+#ifdef _WIN32
+	SetThreadAffinityMask(GetCurrentThread(), m_afinityMask);
+#else
+	// linux
+#endif
+}
+
+void CPU::ExecuteTasks()
+{
+	// Simulate some task execution here.
+//
+	for (int i = 0; i < 2; ++i)
+		m_scheduler.m_tasksQueue.push_back(Task{});
+
+	using namespace std::chrono_literals;
+	std::this_thread::sleep_for(5s);
+
+	m_scheduler.m_runnableQueue.front()->WakeUp();
+}
+
+void Scheduler::Insert(Worker& worker)
+{
+	{
+		static std::mutex mtx;
+		std::scoped_lock lock{ mtx };
+		m_runnableQueue.push_front(&worker);
+	}
+}
+
+// Main scheduler loop.
+//
+void Scheduler::Main(Worker& worker)
+{
+	//{
+	//	static std::mutex mtx;
+	//	std::scoped_lock lock{ mtx };
+	//	m_idleQueue.push(&worker);
+	//}
+
+	// Are there some tasks to execute?
+	//
+	for (;;)
+	{
+		worker.Sleep(); // Waiting for work.
+
+		if (!m_tasksQueue.empty())
+		{
+			Task t = m_tasksQueue.front();
+			m_tasksQueue.pop_front();
+
+			// m_runnableQueue.push_front(&worker);
+
+			try
+			{
+				t.function();
+			}
+			catch (std::exception& ex)
+			{
+				std::cout << ex.what() << "\n";
+			}
+
+			// m_runnableQueue.pop_front();
+		}
+	}
+}
+
+void Scheduler::Yielddd(Worker& worker)
+{
+	Worker* w = m_runnableQueue.front();
+	m_runnableQueue.pop_front();
+	m_runnableQueue.push_back(w);
+
+	// Switch to next worker.
+	//
+	Worker* next = m_runnableQueue.front();
+
+	if (w != next)
+	{
+		// It would be good to do this atomically.
+		//
+		next->WakeUp();
+		w->Sleep();
+	}
+}
+
+Task::Task()
+{
+	function = []()
+		{
+			std::vector<int> v;
+			for (int i = 0; i < 1000; ++i)
+				v.push_back(rand());
+
+			int i = 0;
+			while (true)
+			{
+				if (v[rand() % v.size()] == rand() % v.size() && i++ % 100 == 0)
+				{
+					std::cout << "Hit. Yielding worker " << tls_worker->ID() << "\n";
+					tls_worker->Yielddd();
+				}
+			}
+
+			return;
+		};
 }
 
 using namespace std::chrono_literals;
@@ -176,4 +303,6 @@ int main()
 
 	CPUs cpus;
 	cpus.Init();
+
+	cpus.Execute();
 }

@@ -35,16 +35,16 @@
 #include <list>
 #include <queue>
 #include <utility>
+#include <functional>
 
 //
 //B b;
 //A g_a{ b };
 
-constexpr int workersPerCPU = 3;
-
 class Scheduler;
 class CPU;
 class Worker;
+class Task;
 
 thread_local Worker* tls_worker;
 
@@ -57,10 +57,19 @@ public:
 	//
 	void Init();
 
+	void Execute();
+
 private:
 	uint64_t m_count;
 	uint64_t m_availProcMask;
 	std::vector<std::unique_ptr<CPU>> m_cpus;
+};
+
+class Task
+{
+public:
+	Task();
+	std::function<void()> function;
 };
 
 class Scheduler final
@@ -68,26 +77,23 @@ class Scheduler final
 public:
 	Scheduler() = default;
 
+	void Main(Worker& worker);
+
 	//void RunNext(Worker& current, Worker& next)
 	//{
 	//	next.WakeUp();
 	//	current.Sleep();
 	//}
 
-	void Insert(Worker& worker)
-	{
-		m_runnableQueue.push(&worker);
-	}
+	void Insert(Worker& worker);
 
-	void Yielddd()
-	{
-
-	}
+	void Yielddd(Worker& worker);
 
 public:
 
-	std::queue<Worker*> m_runnableQueue;
-	std::queue<Worker*> m_idleQueue;
+	std::deque<Worker*> m_runnableQueue;
+	std::deque<Worker*> m_idleQueue;
+	std::deque<Task> m_tasksQueue;
 };
 
 class CPU final
@@ -106,6 +112,8 @@ public:
 	void InitWorkers();
 
 	void WorkerEntryPoint(Worker& worker);
+	void BindThread();
+	void ExecuteTasks();
 
 public:
 	uint64_t m_id;
@@ -154,18 +162,19 @@ public:
 	void Yielddd()
 	{
 		// m_scheduler.Yielddd();
-		m_scheduler.Yielddd();
+		m_scheduler.Yielddd(*this);
 	}
 
 	void WakeUp()
 	{
-		// m_sync.notify_one();
+		m_sync.notify_one();
 	}
 
 	void Sleep()
 	{
-		// std::unique_lock<std::mutex> lock(m_mtx);
-		// m_sync.wait(lock);
+		std::unique_lock<std::mutex> lock{ m_mtx };
+		m_sync.wait(lock);
+		std::cout << "Waking worker " << tls_worker->ID() << "\n";
 	}
 
 	constexpr uint64_t ID() const { return m_id; }

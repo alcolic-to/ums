@@ -75,7 +75,9 @@ public:
 class Scheduler final
 {
 public:
-	Scheduler() = default;
+	Scheduler(const CPU& cpu)
+		: m_cpu{ cpu }
+	{}
 
 	void Main(Worker& worker);
 
@@ -90,7 +92,7 @@ public:
 	void Yielddd(Worker& worker);
 
 public:
-
+	const CPU& m_cpu;
 	std::deque<Worker*> m_runnableQueue;
 	std::deque<Worker*> m_idleQueue;
 	std::deque<Task> m_tasksQueue;
@@ -102,7 +104,7 @@ public:
 	CPU(uint64_t cpu_id, uint64_t afinityMask)
 		: m_id{ cpu_id }
 		, m_afinityMask{ afinityMask }
-		, m_scheduler{}
+		, m_scheduler{ *this }
 		, m_workers{}
 	{
 	}
@@ -174,7 +176,8 @@ public:
 	{
 		std::unique_lock<std::mutex> lock{ m_mtx };
 		m_sync.wait(lock);
-		std::cout << "Waking worker " << tls_worker->ID() << "\n";
+
+		// std::cout << "Waking worker " << tls_worker->ID() << "\n";
 	}
 
 	constexpr uint64_t ID() const { return m_id; }

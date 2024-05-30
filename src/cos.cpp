@@ -1,7 +1,7 @@
 #include "cos.h"
 
-constexpr int workersPerCPU = 2;
-constexpr uint64_t FS_AllowedCPUs = 0b00000001;
+constexpr int workersPerCPU = 3;
+constexpr uint64_t FS_AllowedCPUs = 0b00001111;
 
 CPUs::CPUs()
 	: m_count{ GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) }
@@ -41,18 +41,14 @@ void CPUs::Init()
 
 void CPUs::Execute()
 {
-	m_cpus[0]->ExecuteTasks();
+	for (auto& cpu : m_cpus)
+		cpu->ExecuteTasks();
 }
 
 void CPU::InitWorkers()
 {
 	for (int i = 0; i < workersPerCPU; ++i)
 		m_workers.push_back(std::make_unique<Worker>(i, *this));
-
-	// TODO: Remove this and implement it in some sane way.
-	//
-	while (m_scheduler.m_runnableQueue.size() != workersPerCPU)
-		;
 }
 
 void CPU::WorkerEntryPoint(Worker& worker)
@@ -86,11 +82,11 @@ void CPU::ExecuteTasks()
 {
 	// Simulate some task execution here.
 //
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < workersPerCPU; ++i)
 		m_scheduler.m_tasksQueue.push_back(Task{});
 
 	using namespace std::chrono_literals;
-	std::this_thread::sleep_for(5s);
+	std::this_thread::sleep_for(1s);
 
 	m_scheduler.m_runnableQueue.front()->WakeUp();
 }
@@ -119,6 +115,8 @@ void Scheduler::Main(Worker& worker)
 	for (;;)
 	{
 		worker.Sleep(); // Waiting for work.
+
+		// std::cout << "Starting worker " << worker.ID() << "\n";
 
 		if (!m_tasksQueue.empty())
 		{
@@ -155,6 +153,8 @@ void Scheduler::Yielddd(Worker& worker)
 	{
 		// It would be good to do this atomically.
 		//
+		std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << w->ID() << "\n";
+		std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << next->ID() << "\n";
 		next->WakeUp();
 		w->Sleep();
 	}
@@ -173,7 +173,6 @@ Task::Task()
 			{
 				if (v[rand() % v.size()] == rand() % v.size() && i++ % 100 == 0)
 				{
-					std::cout << "Hit. Yielding worker " << tls_worker->ID() << "\n";
 					tls_worker->Yielddd();
 				}
 			}

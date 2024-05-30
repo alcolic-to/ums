@@ -74,6 +74,11 @@ public:
 	//	current.Sleep();
 	//}
 
+	void Insert(Worker& worker)
+	{
+		m_runnableQueue.push(&worker);
+	}
+
 	void Yielddd()
 	{
 
@@ -122,7 +127,7 @@ public:
 
 	enum StateE : int { IDLE, RUNNING };
 
-	// Create worker object and start worker thread on a CPU.
+	// Create worker object and start worker thread on a provided CPU.
 	//
 	Worker(uint64_t id, CPU& cpu)
 		: m_id{ id }

@@ -37,10 +37,7 @@ void CPUs::Init()
 void CPU::InitWorkers()
 {
 	for (int i = 0; i < workersPerCPU; ++i)
-	{
 		m_workers.push_back(std::make_unique<Worker>(i, *this));
-		m_scheduler.m_runnableQueue.push(m_workers.back().get());
-	}
 }
 
 void CPU::WorkerEntryPoint(Worker& worker)
@@ -54,6 +51,8 @@ void CPU::WorkerEntryPoint(Worker& worker)
 
 		std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << std::endl;
 	}
+
+	m_scheduler.Insert(worker);
 }
 
 using namespace std::chrono_literals;

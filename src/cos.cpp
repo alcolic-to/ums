@@ -1,206 +1,60 @@
-#include <vector>
-#include <windows.h>
-#include <bitset>
-#include <iostream>
-#include <thread>
-#include <chrono>
-#include <condition_variable>
-#include <mutex>
-#include <list>
-#include <queue>
-
 #include "cos.h"
+
+CPUs::CPUs()
+	: m_count{ GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) }
+{
+	uint64_t thisProcessAfinityMask = 0;
+	uint64_t systemAfinityMask = 0;
+
+	GetProcessAffinityMask(GetCurrentProcess(), &thisProcessAfinityMask, &systemAfinityMask);
+
+	std::bitset<32> bsp{ thisProcessAfinityMask };
+	std::bitset<32> bss{ systemAfinityMask };
+
+	std::bitset<32> aps{ thisProcessAfinityMask & systemAfinityMask };
+
+	m_availProcMask = thisProcessAfinityMask & systemAfinityMask;
+
+	std::cout << bsp << " " << bss << "\n";
+	std::cout << "Available processors mask: " << m_availProcMask << " " << aps << std::endl;
+
+	uint64_t availProcMask = m_availProcMask;
+	for (uint64_t i = 0; availProcMask != 0; ++i, availProcMask >>= 1)
+		if (availProcMask & 1)
+			m_cpus.emplace_back(std::make_unique<CPU>(i, 1 << i));
+}
+
+// Start workers on every available CPU.
 //
-//B b;
-//A g_a{ b };
-
-constexpr int workersPerCPU = 3;
-
-class Scheduler;
-class Worker;
-
-const thread_local Worker* tls_worker;
-
-class Scheduler final
+void CPUs::Init()
 {
-public:
-	Scheduler() = default;
-
-	//void RunNext(Worker& current, Worker& next)
-	//{
-	//	next.WakeUp();
-	//	current.Sleep();
-	//}
-
-	void Yielddd()
+	for (auto& it : m_cpus)
 	{
-
+		it->InitWorkers();
 	}
+}
 
-public:
-
-	std::queue<Worker*> m_runnableQueue;
-	std::queue<Worker*> m_idleQueue;
-};
-
-
-// TODO: Check whether worker should be placed on std::hardware_constructive_interference_size alignment,
-// to avoid false sharing.
-//
-class Worker final
+void CPU::InitWorkers()
 {
-public:
-
-	enum StateE : int { IDLE, RUNNING };
-
-	Worker(uint64_t id, uint64_t cpu_id, uint64_t afinityMask, Scheduler& scheduler)
-		: m_id{ id }
-		, m_cpu_id{ cpu_id }
-		, m_afinityMask{ afinityMask }
-		, m_state{ IDLE }
-		, m_thread{ &Worker::EntryPoint, this }
-		, m_sync{}
-		, m_mtx{}
-		, m_scheduler{ scheduler }
+	for (int i = 0; i < workersPerCPU; ++i)
 	{
+		m_workers.push_back(std::make_unique<Worker>(i, *this));
+		m_scheduler.m_runnableQueue.push(m_workers.back().get());
 	}
+}
 
-	~Worker()
-	{
-		if (m_thread.joinable())
-			m_thread.join();
-	};
-
-	void EntryPoint()
-	{
-		tls_worker = this;
-		SetThreadAffinityMask(GetCurrentThread(), m_afinityMask);
-
-		{
-			static std::mutex io_mtx;
-			std::scoped_lock<std::mutex> lock(io_mtx);
-
-			std::cout << "Started thread: " << m_id << " on CPU " << m_cpu_id << std::endl;
-		}
-
-		Yielddd();
-	}
-
-	void Yielddd()
-	{
-		// m_scheduler.Yielddd();
-		m_scheduler.Yielddd();
-	}
-
-	void WakeUp()
-	{
-		// m_sync.notify_one();
-	}
-
-	void Sleep()
-	{
-		// std::unique_lock<std::mutex> lock(m_mtx);
-		// m_sync.wait(lock);
-	}
-
-	constexpr uint64_t ID() const { return m_id; }
-	constexpr uint64_t CpuID() const { return m_cpu_id; }
-	constexpr uint64_t AfinityMask() const { return m_afinityMask; }
-	constexpr StateE State() const { return m_state; }
-
-private:
-
-	// TODO: reorganize data members for quick access.
-	//
-	uint64_t m_id;
-	uint64_t m_cpu_id;
-	uint64_t m_afinityMask;
-	StateE m_state;
-
-	std::thread m_thread;
-	std::condition_variable m_sync;
-	std::mutex m_mtx;
-
-	Scheduler& m_scheduler;
-};
-
-
-
-class CPU final
+void CPU::WorkerEntryPoint(Worker& worker)
 {
-public:
-	CPU(uint64_t cpu_id, uint64_t afinityMask)
-		: m_id{ cpu_id }
-		, m_afinityMask{ afinityMask }
-		, m_scheduler{}
-		, m_workers{}
+	tls_worker = &worker;
+	SetThreadAffinityMask(GetCurrentThread(), m_afinityMask);
+
 	{
+		static std::mutex io_mtx;
+		std::scoped_lock<std::mutex> lock(io_mtx);
+
+		std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << std::endl;
 	}
-
-public:
-
-	void InitWorkers()
-	{
-		for (int i = 0; i < workersPerCPU; ++i)
-		{
-			m_workers.push_back(std::make_unique<Worker>(i, m_id, m_afinityMask, m_scheduler));
-			m_scheduler.m_runnableQueue.push(m_workers.back().get());
-		}
-	}
-
-private:
-	uint64_t m_id;
-	uint64_t m_afinityMask;
-
-	Scheduler m_scheduler;
-
-	// TODO: Create workers in place next to each other.
-	//
-	std::vector<std::unique_ptr<Worker>> m_workers;
-};
-
-class CPUs final
-{
-public:
-	CPUs()
-		: m_count{GetActiveProcessorCount(ALL_PROCESSOR_GROUPS)}
-	{
-		uint64_t thisProcessAfinityMask = 0;
-		uint64_t systemAfinityMask = 0;
-
-		GetProcessAffinityMask(GetCurrentProcess(), &thisProcessAfinityMask, &systemAfinityMask);
-
-		std::bitset<32> bsp{ thisProcessAfinityMask };
-		std::bitset<32> bss{ systemAfinityMask };
-
-		std::bitset<32> aps{ thisProcessAfinityMask & systemAfinityMask };
-
-		m_availProcMask = thisProcessAfinityMask & systemAfinityMask;
-
-		std::cout << bsp << " " << bss << "\n";
-		std::cout << "Available processors mask: " << m_availProcMask << " " << aps << std::endl;
-
-		uint64_t availProcMask = m_availProcMask;
-		for (uint64_t i = 0; availProcMask != 0; ++i, availProcMask >>= 1)
-			if (availProcMask & 1)
-				m_cpus.emplace_back(std::make_unique<CPU>(i, 1 << i));
-	}
-
-	// Start workers on every available CPU.
-	//
-	void Init()
-	{
-		for (auto& it : m_cpus)
-		{
-			it->InitWorkers();
-		}
-	}
-
-private:
-	uint64_t m_count;
-	uint64_t m_availProcMask;
-	std::vector<std::unique_ptr<CPU>> m_cpus;
-};
+}
 
 using namespace std::chrono_literals;
 
@@ -255,7 +109,7 @@ void hardwork()
 
 void entryPoint()
 {
-	
+
 }
 
 int main()
@@ -320,7 +174,7 @@ int main()
 	//t.join();
 
 	// std::cout << GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
-	
+
 	CPUs cpus;
 	cpus.Init();
 }

@@ -1,22 +1,186 @@
 #pragma once
 
-class B;
+#ifndef COS_H
+#define COS_H
 
-class A
+//class B;
+//
+//class A
+//{
+//public:
+//	A(B& b)
+//		: m_bref{ b }
+//	{
+//	
+//	}
+//
+//	B& m_bref;
+//};
+//
+//class B
+//{
+//public:
+//	B() = default;
+//	int a;
+//};
+
+#include <vector>
+#include <windows.h>
+#include <bitset>
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <list>
+#include <queue>
+#include <utility>
+
+//
+//B b;
+//A g_a{ b };
+
+constexpr int workersPerCPU = 3;
+
+class Scheduler;
+class CPU;
+class Worker;
+
+thread_local Worker* tls_worker;
+
+class CPUs final
 {
 public:
-	A(B& b)
-		: m_bref{ b }
+	CPUs();
+
+	// Start workers on every available CPU.
+	//
+	void Init();
+
+private:
+	uint64_t m_count;
+	uint64_t m_availProcMask;
+	std::vector<std::unique_ptr<CPU>> m_cpus;
+};
+
+class Scheduler final
+{
+public:
+	Scheduler() = default;
+
+	//void RunNext(Worker& current, Worker& next)
+	//{
+	//	next.WakeUp();
+	//	current.Sleep();
+	//}
+
+	void Yielddd()
 	{
-	
+
 	}
 
-	B& m_bref;
+public:
+
+	std::queue<Worker*> m_runnableQueue;
+	std::queue<Worker*> m_idleQueue;
 };
 
-class B
+class CPU final
 {
 public:
-	B() = default;
-	int a;
+	CPU(uint64_t cpu_id, uint64_t afinityMask)
+		: m_id{ cpu_id }
+		, m_afinityMask{ afinityMask }
+		, m_scheduler{}
+		, m_workers{}
+	{
+	}
+
+public:
+
+	void InitWorkers();
+
+	void WorkerEntryPoint(Worker& worker);
+
+public:
+	uint64_t m_id;
+	uint64_t m_afinityMask;
+
+	Scheduler m_scheduler;
+
+	// TODO: Create workers in place next to each other.
+	//
+	std::vector<std::unique_ptr<Worker>> m_workers;
 };
+
+// TODO: Check whether worker should be placed on std::hardware_constructive_interference_size alignment,
+// to avoid false sharing.
+//
+class Worker final
+{
+public:
+
+	enum StateE : int { IDLE, RUNNING };
+
+	// Create worker object and start worker thread on a CPU.
+	//
+	Worker(uint64_t id, CPU& cpu)
+		: m_id{ id }
+		, m_state{ IDLE }
+		, m_sync{}
+		, m_mtx{}
+		, m_cpu{ cpu }
+		, m_scheduler{ cpu.m_scheduler }
+		, m_thread{ &CPU::WorkerEntryPoint, &cpu, std::ref(*this) }
+	{
+	}
+
+	~Worker()
+	{
+		if (m_thread.joinable())
+			m_thread.join();
+	};
+
+	Worker(const Worker& other) = delete;
+	Worker(const Worker&& other) = delete;
+
+	Worker& operator=(const Worker& other) = delete;
+
+	void Yielddd()
+	{
+		// m_scheduler.Yielddd();
+		m_scheduler.Yielddd();
+	}
+
+	void WakeUp()
+	{
+		// m_sync.notify_one();
+	}
+
+	void Sleep()
+	{
+		// std::unique_lock<std::mutex> lock(m_mtx);
+		// m_sync.wait(lock);
+	}
+
+	constexpr uint64_t ID() const { return m_id; }
+	constexpr CPU& CPUg() const { return m_cpu; }
+	constexpr StateE State() const { return m_state; }
+
+private:
+
+	// TODO: reorganize data members for quick access.
+	//
+	uint64_t m_id;
+	StateE m_state;
+
+	std::condition_variable m_sync;
+	std::mutex m_mtx;
+
+	CPU& m_cpu;
+	Scheduler& m_scheduler;
+
+	std::thread m_thread;
+};
+
+#endif

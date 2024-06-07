@@ -21,7 +21,7 @@ void f1()
 		auto end = std::chrono::high_resolution_clock::now();
 
 		std::chrono::duration<double, std::milli> duration = end - start;
-		if (duration.count() > 4000)
+		if (duration.count() > 1000)
 		{
 			std::cerr << "Task execution exceeded time limit of 4ms: " << duration.count() << "ms." << std::endl;
 			break;
@@ -36,8 +36,9 @@ void f1()
 	return;
 }
 
-constexpr int workersPerCPU = 1;
 constexpr uint64_t FS_AllowedCPUs = 0b00000001;
+constexpr int workersPerCPU = 5;
+constexpr int tasksPerCPU = 100;
 
 CPUs::CPUs()
 	: m_systemCpusCount{ CpusCount() }
@@ -99,7 +100,7 @@ void CPU::ExecuteTasks()
 	/*for (auto& worker : m_workers)
 		worker->ExecuteTask(Task{});*/
 
-	for (int i = 0; i < 10; ++i)
+	for (int i = 0; i < tasksPerCPU; ++i)
 		m_scheduler.ExecuteTask();
 }
 
@@ -108,11 +109,14 @@ void Scheduler::ExecuteTask()
 	static int i = 0;
 	g_tasksQueue.push_back(Task{ f1 });
 
-	Schedule();
-
-	if (i++ == 0)
+	if (i == 0)
+	{
+		Schedule();
 		WakeUpNext();
-	// WakeUpNextIdle();
+	}
+
+	if (++i == tasksPerCPU)
+		i = 0;
 }
 
 bool Scheduler::HasIdleWorkers() { return !m_idleQueue.empty(); }
@@ -217,26 +221,6 @@ void Scheduler::Schedule()
 //
 bool Worker::SyncYield()
 {
-	// This is not correct, since we should start next runnable worker
-	// before starting idle for new task. We should only enque idle.
-	//
-	//if (m_scheduler.HasTasks() && m_scheduler.HasIdleWorkers())
-	//{
-	//	m_scheduler.SaveRunnable();
-	//	m_scheduler.WakeUpNextIdle();
-	//	return true; // go to sleep.
-	//}
-	//else if (m_scheduler.HasRunnableWorkers())
-	//{
-	//	std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << this->ID() << "\n";
-	//	std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.m_runnableQueue.front()->ID() << "\n";
-	//	m_scheduler.SaveRunnable();
-	//	m_scheduler.WakeUpNext();
-	//	return true; // go to sleep.
-	//}
-	//else
-	//	return false; // continue with execution.
-
 	m_scheduler.Schedule();
 
 	if (m_scheduler.HasRunnableWorkers())
@@ -256,21 +240,12 @@ bool Worker::SyncYield()
 //
 void Worker::yield()
 {
-	// Worker* thisWorker = m_scheduler.m_runnableQueue.front();
-	// m_scheduler.m_runnableQueue.pop_front();
-	// m_scheduler.m_runnableQueue.push_back(thisWorker);
-
-	// std::unique_lock<std::mutex> lock{ m_mtx };
-	// m_sync.wait(lock, [this] { return SyncYield(); });
-
-	std::unique_lock<std::mutex> lock{ m_mtx };
-	if (SyncYield())
-		m_sync.wait(lock);
+	Sync<YIELD>();
 }
 
 // Synchronization point for the workers.
 //
-bool Worker::Sync()
+bool Worker::SyncMain()
 {
 	m_scheduler.SaveIdle();
 
@@ -293,6 +268,25 @@ bool Worker::Sync()
 	return true; // go to sleep.
 }
 
+template<SyncType type>
+void Worker::Sync()
+{
+	// Synchronize workers.
+	//
+	std::unique_lock<std::mutex> lock{ m_mtx };
+
+	if constexpr (type == MAIN)
+	{
+		if (SyncMain())
+			m_sync.wait(lock);
+	}
+	else if constexpr (type == YIELD)
+	{
+		if (SyncYield())
+			m_sync.wait(lock);;
+	}
+}
+
 void Worker::Main()
 {
 	m_sync.notify_one();
@@ -300,16 +294,10 @@ void Worker::Main()
 
 	while (true)
 	{
-		{
-			// Synchronize workers.
-			//
-			std::unique_lock<std::mutex> lock{ m_mtx };
-			if (Sync())
-				m_sync.wait(lock);
+		Sync<MAIN>();
 
-			if (false);
+		if (false);
 			// Exit code -> !m_scheduler.Running() && g_tasksQueue.empty();
-		}
 
 		try
 		{

@@ -150,6 +150,8 @@ public:
 	std::vector<std::unique_ptr<Worker>> m_workers;
 };
 
+enum SyncType : int { MAIN, YIELD };
+
 // TODO: Check whether worker should be placed on std::hardware_constructive_interference_size alignment,
 // to avoid false sharing.
 //
@@ -200,7 +202,11 @@ public:
 		m_sync.notify_one();
 	}
 
+	bool SyncMain();
 	bool SyncYield();
+
+	template<SyncType type>
+	void Sync();
 
 	void Sleep()
 	{
@@ -209,8 +215,6 @@ public:
 
 		// std::cout << "Waking worker " << tls_worker->ID() << "\n";
 	}
-
-	bool Sync();
 
 	constexpr uint64_t ID() const { return m_id; }
 	constexpr CPU& CPUg() const { return m_cpu; }

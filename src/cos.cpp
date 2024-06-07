@@ -1,32 +1,25 @@
+#include <cstdint>
+
+#include "os_specific.h"
 #include "cos.h"
 
+thread_local Worker* tls_worker;
+std::deque<Task> g_tasksQueue;
+
 constexpr int workersPerCPU = 3;
-constexpr uint64_t FS_AllowedCPUs = 0b00001111;
+constexpr uint64_t FS_AllowedCPUs = 0b00000001;
 
 CPUs::CPUs()
-	: m_count{ GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) }
+	: m_systemCpusCount{ CpusCount() }
+	, m_availCpusMask{ CpusAvailMask() }
 {
-	uint64_t thisProcessAfinityMask = 0;
-	uint64_t systemAfinityMask = 0;
+	m_availCpusMask &= FS_AllowedCPUs;
 
-	GetProcessAffinityMask(GetCurrentProcess(), &thisProcessAfinityMask, &systemAfinityMask);
-
-	std::bitset<32> bsp{ thisProcessAfinityMask };
-	std::bitset<32> bss{ systemAfinityMask };
-
-	std::bitset<32> aps{ thisProcessAfinityMask & systemAfinityMask };
-
-	m_availProcMask = thisProcessAfinityMask & systemAfinityMask;
-
-	std::cout << bsp << " " << bss << "\n";
-	std::cout << "Available processors mask: " << m_availProcMask << " " << aps << std::endl;
-
-	uint64_t availProcMask = m_availProcMask;
-	availProcMask &= FS_AllowedCPUs;
-
-	for (uint64_t i = 0; availProcMask != 0; ++i, availProcMask >>= 1)
-		if (availProcMask & 1)
-			m_cpus.emplace_back(std::make_unique<CPU>(i, 1 << i));
+	// Create new CPU for each bit available in available CPUs mask.
+	//
+	for (uint64_t cpu_id = 0, cpusMask = m_availCpusMask; cpusMask != 0; ++cpu_id, cpusMask >>= 1)
+		if (cpusMask & 1)
+			m_cpus.emplace_back(std::make_unique<CPU>(cpu_id, 1 << cpu_id));
 }
 
 // Start workers on every available CPU.
@@ -56,107 +49,184 @@ void CPU::WorkerEntryPoint(Worker& worker)
 	BindThread();
 	tls_worker = &worker;
 
-	{
-		static std::mutex io_mtx;
-		std::scoped_lock<std::mutex> lock(io_mtx);
+	std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << " " << "Win32: " << GetCurrentProcessorNumber() <<  std::endl;
 
-		std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << " " << "Win32: " << GetCurrentProcessorNumber() <<  std::endl;
-	}
-
-	m_scheduler.Insert(worker);
-	m_scheduler.Main(worker);
-}
-
-// Binds current thread to this CPU.
-//
-void CPU::BindThread()
-{
-#ifdef _WIN32
-	SetThreadAffinityMask(GetCurrentThread(), m_afinityMask);
-#else
-	// linux
-#endif
+	worker.Main();
 }
 
 void CPU::ExecuteTasks()
 {
 	// Simulate some task execution here.
 //
-	for (int i = 0; i < workersPerCPU; ++i)
+	/*for (int i = 0; i < workersPerCPU; ++i)
 		m_scheduler.m_tasksQueue.push_back(Task{});
 
 	using namespace std::chrono_literals;
 	std::this_thread::sleep_for(1s);
 
-	m_scheduler.m_runnableQueue.front()->WakeUp();
+	m_scheduler.m_runnableQueue.front()->WakeUp();*/
+
+	/*for (auto& worker : m_workers)
+		worker->ExecuteTask(Task{});*/
+
+	for (int i = 0; i < 10; ++i)
+		m_scheduler.ExecuteTask(Task{});
 }
 
-void Scheduler::Insert(Worker& worker)
+void Scheduler::ExecuteTask(Task task)
 {
+	g_tasksQueue.push_back(task);
+
+	if (m_state == IDLE)
 	{
-		static std::mutex mtx;
-		std::scoped_lock lock{ mtx };
-		m_runnableQueue.push_front(&worker);
+		m_idleQueue.front()->m_sync.notify_one();
+		m_state = RUNNING;
 	}
 }
 
-// Main scheduler loop.
+bool Scheduler::HasIdleWorkers() { return !m_idleQueue.empty(); }
+bool Scheduler::HasRunnableWorkers() { return !m_runnableQueue.empty(); }
+
+void Scheduler::WakeUpNext() { m_runnableQueue.front()->m_sync.notify_one(); }
+void Scheduler::WakeUpNextIdle() { m_idleQueue.front()->m_sync.notify_one(); }
+
+Worker* Scheduler::RunningWorker() { return !m_runnableQueue.empty() ? m_runnableQueue.front() : nullptr; }
+
+Worker* Scheduler::NextFreeWorker()
+{
+	Worker* worker = nullptr;
+
+	if (m_idleQueue.size() > 0)
+	{
+		worker = m_idleQueue.front();
+		m_idleQueue.pop_front();
+	}
+
+	return worker;
+}
+
+bool Scheduler::HasTasks()
+{
+	return !g_tasksQueue.empty();
+}
+
+void Scheduler::ScheduleWorker(Worker& worker)
+{
+	m_runnableQueue.push_back(&worker);
+}
+
+Worker* Scheduler::NextRunWorker()
+{
+	Worker* worker = nullptr;
+
+	if (m_runnableQueue.size() > 0)
+	{
+		worker = m_runnableQueue.front();
+		m_runnableQueue.pop_front();
+	}
+
+	return worker;
+}
+
+Task Scheduler::NextTask()
+{
+	Task t = g_tasksQueue.front();
+	g_tasksQueue.pop_front();
+
+	return t;
+}
+
+// Synchronization point for the workers in yield.
+// If there are pending tasks in tasks queue, wake up next worker and go to sleep.
+// Otherwise, just continue with execution.
 //
-void Scheduler::Main(Worker& worker)
+bool Worker::SyncYield()
 {
-	//{
-	//	static std::mutex mtx;
-	//	std::scoped_lock lock{ mtx };
-	//	m_idleQueue.push(&worker);
-	//}
-
-	// Are there some tasks to execute?
-	//
-	for (;;)
+	if (m_scheduler.HasTasks() && m_scheduler.HasIdleWorkers())
 	{
-		worker.Sleep(); // Waiting for work.
-
-		// std::cout << "Starting worker " << worker.ID() << "\n";
-
-		if (!m_tasksQueue.empty())
-		{
-			Task t = m_tasksQueue.front();
-			m_tasksQueue.pop_front();
-
-			// m_runnableQueue.push_front(&worker);
-
-			try
-			{
-				t.function();
-			}
-			catch (std::exception& ex)
-			{
-				std::cout << ex.what() << "\n";
-			}
-
-			// m_runnableQueue.pop_front();
-		}
+		m_scheduler.WakeUpNextIdle();
+		return false; // go to sleep.
 	}
+	else if (m_scheduler.RunningWorker() != this)
+	{
+		std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << this->ID() << "\n";
+		std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.m_runnableQueue.front()->ID() << "\n";
+		m_scheduler.WakeUpNext();
+		return false; // go to sleep.
+	}
+	else
+		return true; // continue with execution.
 }
 
-void Scheduler::Yielddd(Worker& worker)
+// Yields current worker and wakes up next worker for execution.
+//
+void Worker::yield()
 {
-	Worker* w = m_runnableQueue.front();
-	m_runnableQueue.pop_front();
-	m_runnableQueue.push_back(w);
+	Worker* thisWorker = m_scheduler.m_runnableQueue.front();
+	m_scheduler.m_runnableQueue.pop_front();
+	m_scheduler.m_runnableQueue.push_back(thisWorker);
 
-	// Switch to next worker.
-	//
-	Worker* next = m_runnableQueue.front();
+	std::unique_lock<std::mutex> lock{ m_mtx };
+	m_sync.wait(lock, [this] { return SyncYield(); });
+}
 
-	if (w != next)
+// Synchronization point for the workers.
+// If there are no pending tasks in tasks queue, try to wake up next worker and go to sleep.
+// Otherwise, just continue with execution.
+//
+bool Worker::Sync()
+{
+	if (!m_scheduler.HasTasks())
 	{
-		// It would be good to do this atomically.
+		if (m_scheduler.HasRunnableWorkers())
+			m_scheduler.WakeUpNext();
+
+		return false; // go to sleep.
+	}
+	else
+		return true; // continue with execution.
+}
+
+void Worker::Main()
+{
+	m_sync.notify_one();
+	m_scheduler.m_idleQueue.push_front(this);
+
+	while (true)
+	{
+		Task t;
+
+		{
+			// Synchronize workers.
+			//
+			std::unique_lock<std::mutex> lock{ m_mtx };
+			m_sync.wait(lock, [this] { return Sync(); });
+
+			if (false);
+			// Exit code -> !m_scheduler.Running() && g_tasksQueue.empty();
+
+			t = g_tasksQueue.front();
+			g_tasksQueue.pop_front();
+		}
+
+		// Moving this worker to runnable queue.
 		//
-		std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << w->ID() << "\n";
-		std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << next->ID() << "\n";
-		next->WakeUp();
-		w->Sleep();
+		m_scheduler.m_idleQueue.pop_front();
+		m_scheduler.m_runnableQueue.push_front(this);
+
+		try
+		{
+			t.function();
+		}
+		catch (std::exception& ex)
+		{
+			std::cout << ex.what() << "\n";
+		}
+
+		// Moving this worker to idle queue.
+		//
+		m_scheduler.m_runnableQueue.pop_front();
+		m_scheduler.m_idleQueue.push_front(this);
 	}
 }
 
@@ -164,6 +234,8 @@ Task::Task()
 {
 	function = []()
 		{
+			auto start = std::chrono::high_resolution_clock::now();
+
 			std::vector<int> v;
 			for (int i = 0; i < 1000; ++i)
 				v.push_back(rand());
@@ -171,9 +243,18 @@ Task::Task()
 			int i = 0;
 			while (true)
 			{
+				auto end = std::chrono::high_resolution_clock::now();
+
+				std::chrono::duration<double, std::milli> duration = end - start;
+				if (duration.count() > 4000)
+				{
+					std::cerr << "Task execution exceeded time limit of 4ms: " << duration.count() << "ms." << std::endl;
+					break;
+				}
+
 				if (v[rand() % v.size()] == rand() % v.size() && i++ % 100 == 0)
 				{
-					tls_worker->Yielddd();
+					tls_worker->yield();
 				}
 			}
 

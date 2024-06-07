@@ -4,7 +4,37 @@
 #include "cos.h"
 
 thread_local Worker* tls_worker;
+
 std::deque<Task> g_tasksQueue;
+
+void f1()
+{
+	auto start = std::chrono::high_resolution_clock::now();
+
+	std::vector<int> v;
+	for (int i = 0; i < 1000; ++i)
+		v.push_back(rand());
+
+	int i = 0;
+	while (true)
+	{
+		auto end = std::chrono::high_resolution_clock::now();
+
+		std::chrono::duration<double, std::milli> duration = end - start;
+		if (duration.count() > 4000)
+		{
+			std::cerr << "Task execution exceeded time limit of 4ms: " << duration.count() << "ms." << std::endl;
+			break;
+		}
+
+		if (v[rand() % v.size()] == rand() % v.size() && i++ % 100 == 0)
+		{
+			tls_worker->yield();
+		}
+	}
+
+	return;
+}
 
 constexpr int workersPerCPU = 3;
 constexpr uint64_t FS_AllowedCPUs = 0b00000001;
@@ -70,27 +100,51 @@ void CPU::ExecuteTasks()
 		worker->ExecuteTask(Task{});*/
 
 	for (int i = 0; i < 10; ++i)
-		m_scheduler.ExecuteTask(Task{});
+		m_scheduler.ExecuteTask();
 }
 
-void Scheduler::ExecuteTask(Task task)
+void Scheduler::ExecuteTask()
 {
-	g_tasksQueue.push_back(task);
+	static int i = 0;
+	g_tasksQueue.push_back(Task{ f1 });
 
-	if (m_state == IDLE)
-	{
-		m_idleQueue.front()->m_sync.notify_one();
-		m_state = RUNNING;
-	}
+	Schedule();
+
+	if (i++ == 0)
+		WakeUpNext();
+	// WakeUpNextIdle();
 }
 
 bool Scheduler::HasIdleWorkers() { return !m_idleQueue.empty(); }
 bool Scheduler::HasRunnableWorkers() { return !m_runnableQueue.empty(); }
 
-void Scheduler::WakeUpNext() { m_runnableQueue.front()->m_sync.notify_one(); }
-void Scheduler::WakeUpNextIdle() { m_idleQueue.front()->m_sync.notify_one(); }
+void Scheduler::WakeUpNext()
+{
+	m_worker = m_runnableQueue.front();
+	m_runnableQueue.pop_front();
+	m_worker->m_sync.notify_one();
+}
 
-Worker* Scheduler::RunningWorker() { return !m_runnableQueue.empty() ? m_runnableQueue.front() : nullptr; }
+void Scheduler::WakeUpNextIdle()
+{
+	m_worker = m_idleQueue.front();
+	m_idleQueue.pop_front();
+	m_worker->m_sync.notify_one();
+}
+
+void Scheduler::SaveRunnable()
+{
+	m_runnableQueue.push_back(m_worker);
+	m_worker = nullptr;
+}
+
+void Scheduler::SaveIdle()
+{
+	m_idleQueue.push_back(m_worker);
+	m_worker = nullptr;
+}
+
+Worker* Scheduler::NextRunnableWorker() { return !m_runnableQueue.empty() ? m_runnableQueue.front() : nullptr; }
 
 Worker* Scheduler::NextFreeWorker()
 {
@@ -136,38 +190,78 @@ Task Scheduler::NextTask()
 	return t;
 }
 
+void Scheduler::ScheduleNextIdle()
+{
+	Worker* idle = m_idleQueue.front();
+	m_idleQueue.pop_front();
+
+	idle->m_task = NextTask();
+	m_runnableQueue.push_back(idle);
+}
+
+void Scheduler::Schedule()
+{
+	while (HasTasks() && HasIdleWorkers())
+	{
+		ScheduleNextIdle();
+	}
+}
+
 // Synchronization point for the workers in yield.
 // If there are pending tasks in tasks queue, wake up next worker and go to sleep.
 // Otherwise, just continue with execution.
 //
 bool Worker::SyncYield()
 {
-	if (m_scheduler.HasTasks() && m_scheduler.HasIdleWorkers())
-	{
-		m_scheduler.WakeUpNextIdle();
-		return false; // go to sleep.
-	}
-	else if (m_scheduler.RunningWorker() != this)
+	// This is not correct, since we should start next runnable worker
+	// before starting idle for new task. We should only enque idle.
+	//
+	//if (m_scheduler.HasTasks() && m_scheduler.HasIdleWorkers())
+	//{
+	//	m_scheduler.SaveRunnable();
+	//	m_scheduler.WakeUpNextIdle();
+	//	return true; // go to sleep.
+	//}
+	//else if (m_scheduler.HasRunnableWorkers())
+	//{
+	//	std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << this->ID() << "\n";
+	//	std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.m_runnableQueue.front()->ID() << "\n";
+	//	m_scheduler.SaveRunnable();
+	//	m_scheduler.WakeUpNext();
+	//	return true; // go to sleep.
+	//}
+	//else
+	//	return false; // continue with execution.
+
+	m_scheduler.Schedule();
+
+	if (m_scheduler.HasRunnableWorkers())
 	{
 		std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << this->ID() << "\n";
 		std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.m_runnableQueue.front()->ID() << "\n";
+
+		m_scheduler.SaveRunnable(); // Push current worker at the end of runnable queue.
 		m_scheduler.WakeUpNext();
-		return false; // go to sleep.
+		return true; // go to sleep.
 	}
 	else
-		return true; // continue with execution.
+		return false; // continue with execution.
 }
 
 // Yields current worker and wakes up next worker for execution.
 //
 void Worker::yield()
 {
-	Worker* thisWorker = m_scheduler.m_runnableQueue.front();
-	m_scheduler.m_runnableQueue.pop_front();
-	m_scheduler.m_runnableQueue.push_back(thisWorker);
+	// Worker* thisWorker = m_scheduler.m_runnableQueue.front();
+	// m_scheduler.m_runnableQueue.pop_front();
+	// m_scheduler.m_runnableQueue.push_back(thisWorker);
+
+	// std::unique_lock<std::mutex> lock{ m_mtx };
+	// m_sync.wait(lock, [this] { return SyncYield(); });
 
 	std::unique_lock<std::mutex> lock{ m_mtx };
-	m_sync.wait(lock, [this] { return SyncYield(); });
+	if (SyncYield())
+		m_sync.wait(lock);
 }
 
 // Synchronization point for the workers.
@@ -176,90 +270,43 @@ void Worker::yield()
 //
 bool Worker::Sync()
 {
-	if (!m_scheduler.HasTasks())
-	{
-		if (m_scheduler.HasRunnableWorkers())
-			m_scheduler.WakeUpNext();
+	m_scheduler.Schedule();
 
-		return false; // go to sleep.
-	}
-	else
-		return true; // continue with execution.
+	m_scheduler.SaveIdle();
+
+	if (m_scheduler.HasRunnableWorkers())
+		m_scheduler.WakeUpNext();
+
+	return true;  // go to sleep.
 }
 
 void Worker::Main()
 {
 	m_sync.notify_one();
-	m_scheduler.m_idleQueue.push_front(this);
+	m_scheduler.m_worker = this;
 
 	while (true)
 	{
-		Task t;
-
 		{
 			// Synchronize workers.
 			//
 			std::unique_lock<std::mutex> lock{ m_mtx };
-			m_sync.wait(lock, [this] { return Sync(); });
+			if (Sync())
+				m_sync.wait(lock);
 
 			if (false);
 			// Exit code -> !m_scheduler.Running() && g_tasksQueue.empty();
-
-			t = g_tasksQueue.front();
-			g_tasksQueue.pop_front();
 		}
-
-		// Moving this worker to runnable queue.
-		//
-		m_scheduler.m_idleQueue.pop_front();
-		m_scheduler.m_runnableQueue.push_front(this);
 
 		try
 		{
-			t.function();
+			m_task();
 		}
 		catch (std::exception& ex)
 		{
 			std::cout << ex.what() << "\n";
 		}
-
-		// Moving this worker to idle queue.
-		//
-		m_scheduler.m_runnableQueue.pop_front();
-		m_scheduler.m_idleQueue.push_front(this);
 	}
-}
-
-Task::Task()
-{
-	function = []()
-		{
-			auto start = std::chrono::high_resolution_clock::now();
-
-			std::vector<int> v;
-			for (int i = 0; i < 1000; ++i)
-				v.push_back(rand());
-
-			int i = 0;
-			while (true)
-			{
-				auto end = std::chrono::high_resolution_clock::now();
-
-				std::chrono::duration<double, std::milli> duration = end - start;
-				if (duration.count() > 4000)
-				{
-					std::cerr << "Task execution exceeded time limit of 4ms: " << duration.count() << "ms." << std::endl;
-					break;
-				}
-
-				if (v[rand() % v.size()] == rand() % v.size() && i++ % 100 == 0)
-				{
-					tls_worker->yield();
-				}
-			}
-
-			return;
-		};
 }
 
 using namespace std::chrono_literals;

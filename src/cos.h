@@ -38,10 +38,6 @@
 #include <utility>
 #include <functional>
 
-//
-//B b;
-//A g_a{ b };
-
 class Scheduler;
 class CPU;
 class Worker;
@@ -70,8 +66,14 @@ private:
 class Task
 {
 public:
-	Task();
-	std::function<void()> function;
+
+	Task() = default;
+	Task(const std::function<void()> function)
+		: m_function{ function } {}
+
+	void operator()() { m_function();}
+
+	std::function<void()> m_function;
 };
 
 class Scheduler final
@@ -85,7 +87,7 @@ public:
 		, m_state{ IDLE }
 	{}
 
-	void ExecuteTask(Task task);
+	void ExecuteTask();
 
 	bool HasIdleWorkers();
 	bool HasRunnableWorkers();
@@ -93,13 +95,19 @@ public:
 	void WakeUpNext();
 	void WakeUpNextIdle();
 
-	Worker* RunningWorker();
+	void SaveRunnable();
+	void SaveIdle();
+
+	Worker* NextRunnableWorker();
 
 	Worker* NextFreeWorker();
 	bool HasTasks();
 	void ScheduleWorker(Worker& worker);
 	Worker* NextRunWorker();
 	Task NextTask();
+
+	void Schedule();
+	void ScheduleNextIdle();
 
 public:
 	const CPU& m_cpu;

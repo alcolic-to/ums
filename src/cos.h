@@ -98,6 +98,8 @@ public:
 	void SaveRunnable();
 	void SaveIdle();
 
+	void ContinueRunnable();
+
 	Worker* NextRunnableWorker();
 
 	Worker* NextFreeWorker();

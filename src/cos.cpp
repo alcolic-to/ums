@@ -36,7 +36,7 @@ void f1()
 	return;
 }
 
-constexpr int workersPerCPU = 3;
+constexpr int workersPerCPU = 1;
 constexpr uint64_t FS_AllowedCPUs = 0b00000001;
 
 CPUs::CPUs()
@@ -144,6 +144,12 @@ void Scheduler::SaveIdle()
 	m_worker = nullptr;
 }
 
+void Scheduler::ContinueRunnable()
+{
+	m_worker = m_runnableQueue.front();
+	m_runnableQueue.pop_front();
+}
+
 Worker* Scheduler::NextRunnableWorker() { return !m_runnableQueue.empty() ? m_runnableQueue.front() : nullptr; }
 
 Worker* Scheduler::NextFreeWorker()
@@ -202,9 +208,7 @@ void Scheduler::ScheduleNextIdle()
 void Scheduler::Schedule()
 {
 	while (HasTasks() && HasIdleWorkers())
-	{
 		ScheduleNextIdle();
-	}
 }
 
 // Synchronization point for the workers in yield.
@@ -265,19 +269,28 @@ void Worker::yield()
 }
 
 // Synchronization point for the workers.
-// If there are no pending tasks in tasks queue, try to wake up next worker and go to sleep.
-// Otherwise, just continue with execution.
 //
 bool Worker::Sync()
 {
-	m_scheduler.Schedule();
-
 	m_scheduler.SaveIdle();
 
-	if (m_scheduler.HasRunnableWorkers())
-		m_scheduler.WakeUpNext();
+	m_scheduler.Schedule();
 
-	return true;  // go to sleep.
+	if (m_scheduler.HasRunnableWorkers())
+	{
+		if (m_scheduler.NextRunnableWorker() != this)
+		{
+			m_scheduler.WakeUpNext();
+			return true; // go to sleep.
+		}
+		else
+		{
+			m_scheduler.ContinueRunnable();
+			return false; // continue with execution.
+		}
+	}
+
+	return true; // go to sleep.
 }
 
 void Worker::Main()

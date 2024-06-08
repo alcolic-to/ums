@@ -111,6 +111,8 @@ public:
 	void Schedule();
 	void ScheduleNextIdle();
 
+	bool Idle();
+
 public:
 	const CPU& m_cpu;
 	std::deque<Worker*> m_runnableQueue;

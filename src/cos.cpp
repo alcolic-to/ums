@@ -87,36 +87,20 @@ void CPU::WorkerEntryPoint(Worker& worker)
 
 void CPU::ExecuteTasks()
 {
-	// Simulate some task execution here.
-//
-	/*for (int i = 0; i < workersPerCPU; ++i)
-		m_scheduler.m_tasksQueue.push_back(Task{});
-
-	using namespace std::chrono_literals;
-	std::this_thread::sleep_for(1s);
-
-	m_scheduler.m_runnableQueue.front()->WakeUp();*/
-
-	/*for (auto& worker : m_workers)
-		worker->ExecuteTask(Task{});*/
-
 	for (int i = 0; i < tasksPerCPU; ++i)
 		m_scheduler.ExecuteTask();
 }
 
 void Scheduler::ExecuteTask()
 {
-	static int i = 0;
-	g_tasksQueue.push_back(Task{ f1 });
-
-	if (i == 0)
+	if (Idle())
 	{
+		g_tasksQueue.push_back(Task{ f1 });
 		Schedule();
 		WakeUpNext();
 	}
-
-	if (++i == tasksPerCPU)
-		i = 0;
+	else
+		g_tasksQueue.push_back(Task{ f1 });
 }
 
 bool Scheduler::HasIdleWorkers() { return !m_idleQueue.empty(); }
@@ -215,6 +199,8 @@ void Scheduler::Schedule()
 		ScheduleNextIdle();
 }
 
+bool Scheduler::Idle() { return m_worker == nullptr; }
+
 // Synchronization point for the workers in yield.
 // If there are pending tasks in tasks queue, wake up next worker and go to sleep.
 // Otherwise, just continue with execution.
@@ -283,7 +269,7 @@ void Worker::Sync()
 	else if constexpr (type == YIELD)
 	{
 		if (SyncYield())
-			m_sync.wait(lock);;
+			m_sync.wait(lock);
 	}
 }
 

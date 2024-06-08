@@ -1,7 +1,15 @@
 #include <cstdint>
+#include <cassert>
 
 #include "os_specific.h"
 #include "cos.h"
+
+using namespace std::chrono_literals;
+
+constexpr uint64_t FS_AllowedCPUs = 0b00000001;
+constexpr int workersPerCPU = 5;
+constexpr int tasksPerCPU = 100;
+constexpr auto workerSleepTime = 1ms;
 
 thread_local Worker* tls_worker;
 
@@ -36,10 +44,6 @@ void f1()
 	return;
 }
 
-constexpr uint64_t FS_AllowedCPUs = 0b00000001;
-constexpr int workersPerCPU = 5;
-constexpr int tasksPerCPU = 100;
-
 CPUs::CPUs()
 	: m_systemCpusCount{ CpusCount() }
 	, m_availCpusMask{ CpusAvailMask() }
@@ -63,12 +67,6 @@ void CPUs::Init()
 	}
 }
 
-void CPUs::Execute()
-{
-	for (auto& cpu : m_cpus)
-		cpu->ExecuteTasks();
-}
-
 void CPU::InitWorkers()
 {
 	for (int i = 0; i < workersPerCPU; ++i)
@@ -85,22 +83,42 @@ void CPU::WorkerEntryPoint(Worker& worker)
 	worker.Main();
 }
 
+void CPUs::Execute()
+{
+	while (true)
+	{
+		for (auto& cpu : m_cpus)
+			cpu->ExecuteTasks();
+	}
+}
+
 void CPU::ExecuteTasks()
 {
-	for (int i = 0; i < tasksPerCPU; ++i)
+	// for (int i = 0; i < tasksPerCPU; ++i)
+	// 	m_scheduler.ExecuteTask();
+	
+	// while (true)
+	{
 		m_scheduler.ExecuteTask();
+	}
 }
 
 void Scheduler::ExecuteTask()
 {
 	if (Idle())
 	{
+		/*for (int i = 0; i < 1000; ++i)
+			assert(m_worker == nullptr);*/
 		g_tasksQueue.push_back(Task{ f1 });
 		Schedule();
 		WakeUpNext();
 	}
 	else
+	{
+		assert(m_worker != nullptr);
+		std::scoped_lock<std::mutex> lock{ m_worker->m_mtx };
 		g_tasksQueue.push_back(Task{ f1 });
+	}
 }
 
 bool Scheduler::HasIdleWorkers() { return !m_idleQueue.empty(); }
@@ -233,25 +251,24 @@ void Worker::yield()
 //
 bool Worker::SyncMain()
 {
-	m_scheduler.SaveIdle();
-
 	m_scheduler.Schedule();
 
 	if (m_scheduler.HasRunnableWorkers())
 	{
-		if (m_scheduler.NextRunnableWorker() != this)
-		{
-			m_scheduler.WakeUpNext();
-			return true; // go to sleep.
-		}
-		else
-		{
-			m_scheduler.ContinueRunnable();
-			return false; // continue with execution.
-		}
+		m_scheduler.SaveIdle();
+		m_scheduler.WakeUpNext();
+		return true; // go to sleep.
 	}
-
-	return true; // go to sleep.
+	else if (m_scheduler.HasTasks())
+	{
+		m_task = m_scheduler.NextTask();
+		return false; // continue with execution.
+	}
+	else
+	{
+		m_scheduler.SaveIdle();
+		return true; // go to sleep.
+	}
 }
 
 template<SyncType type>
@@ -414,6 +431,9 @@ int main()
 	//t.join();
 
 	// std::cout << GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+
+	/*while (true)
+		std::this_thread::sleep_for(workerSleepTime);*/
 
 	CPUs cpus;
 	cpus.Init();

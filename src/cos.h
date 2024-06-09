@@ -79,13 +79,15 @@ public:
 class Scheduler final
 {
 public:
-	enum StateE : int { IDLE, RUNNING };
+	enum StateE : int { INITIALIZING, IDLE, RUNNING };
 
 	Scheduler(const CPU& cpu)
 		: m_cpu{ cpu }
 		, m_worker{ nullptr }
-		, m_state{ IDLE }
+		, m_state{ INITIALIZING }
 	{}
+
+	void Start();
 
 	void ExecuteTask();
 
@@ -97,6 +99,9 @@ public:
 
 	void SaveRunnable();
 	void SaveIdle();
+
+	void PrepareRunningWorker();
+	void ContinueIdleLooping();
 
 	void ContinueRunnable();
 
@@ -125,13 +130,7 @@ public:
 class CPU final
 {
 public:
-	CPU(uint64_t cpu_id, uint64_t cpu_mask)
-		: m_id{ cpu_id }
-		, m_mask{ cpu_mask }
-		, m_scheduler{ *this }
-		, m_workers{}
-	{
-	}
+	CPU(uint64_t cpu_id, uint64_t cpu_mask);
 
 public:
 
@@ -161,25 +160,11 @@ class Worker final
 {
 public:
 
-	enum StateE : int { IDLE, RUNNABLE, RUNNING };
+	enum StateE : int { IDLE, IDLE_LOOPING, RUNNABLE, RUNNING };
 
 	// Create worker object and start worker thread on a provided CPU.
 	//
-	Worker(uint64_t id, CPU& cpu)
-		: m_id{ id }
-		, m_state{ IDLE }
-		, m_mtx{}
-		, m_sync{}
-		, m_cpu{ cpu }
-		, m_task{}
-		, m_scheduler{ cpu.m_scheduler }
-		, m_thread{ &CPU::WorkerEntryPoint, &cpu, std::ref(*this) }
-	{
-		// Wait for a signal from created thread, so we can continue when it is ready.
-		//
-		std::unique_lock<std::mutex> lock{ m_mtx };
-		m_sync.wait(lock);
-	}
+	Worker(uint64_t id, CPU& cpu);
 
 	~Worker()
 	{
@@ -209,6 +194,8 @@ public:
 
 	template<SyncType type>
 	void Sync();
+
+	void SetState(StateE state);
 
 	void Sleep()
 	{

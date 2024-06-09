@@ -6,13 +6,14 @@
 
 using namespace std::chrono_literals;
 
-constexpr uint64_t FS_AllowedCPUs = 0b00000001;
+constexpr uint64_t FS_AllowedCPUs = 0b00001111;
 constexpr int workersPerCPU = 5;
 constexpr int tasksPerCPU = 100;
 constexpr auto workerSleepTime = 1ms;
 
 thread_local Worker* tls_worker;
 
+std::mutex g_tasksMtx;
 std::deque<Task> g_tasksQueue;
 
 void f1()
@@ -57,26 +58,21 @@ CPUs::CPUs()
 			m_cpus.emplace_back(std::make_unique<CPU>(cpu_id, 1 << cpu_id));
 }
 
-// Start workers on every available CPU.
-//
-void CPUs::Init()
-{
-	for (auto& it : m_cpus)
-	{
-		it->InitWorkers();
-	}
-}
-
-void CPU::InitWorkers()
+CPU::CPU(uint64_t cpu_id, uint64_t cpu_mask)
+	: m_id{ cpu_id }
+	, m_mask{ cpu_mask }
+	, m_scheduler{ *this }
+	, m_workers{}
 {
 	for (int i = 0; i < workersPerCPU; ++i)
 		m_workers.push_back(std::make_unique<Worker>(i, *this));
+
+	m_scheduler.Start();
 }
 
 void CPU::WorkerEntryPoint(Worker& worker)
 {
 	BindThread();
-	tls_worker = &worker;
 
 	std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << " " << "Win32: " << GetCurrentProcessorNumber() <<  std::endl;
 
@@ -85,7 +81,7 @@ void CPU::WorkerEntryPoint(Worker& worker)
 
 void CPUs::Execute()
 {
-	while (true)
+	for (int i = 0; i < tasksPerCPU; ++i)
 	{
 		for (auto& cpu : m_cpus)
 			cpu->ExecuteTasks();
@@ -103,22 +99,23 @@ void CPU::ExecuteTasks()
 	}
 }
 
+// Start scheduler.
+//
+void Scheduler::Start()
+{
+	m_state = RUNNING;
+
+	m_worker = m_idleQueue.front();
+	m_idleQueue.pop_front();
+
+	m_worker->SetState(Worker::IDLE_LOOPING);
+	m_worker->m_sync.notify_one();
+}
+
 void Scheduler::ExecuteTask()
 {
-	if (Idle())
-	{
-		/*for (int i = 0; i < 1000; ++i)
-			assert(m_worker == nullptr);*/
-		g_tasksQueue.push_back(Task{ f1 });
-		Schedule();
-		WakeUpNext();
-	}
-	else
-	{
-		assert(m_worker != nullptr);
-		std::scoped_lock<std::mutex> lock{ m_worker->m_mtx };
-		g_tasksQueue.push_back(Task{ f1 });
-	}
+	std::scoped_lock<std::mutex> lock{ g_tasksMtx };
+	g_tasksQueue.push_back(Task{ f1 });
 }
 
 bool Scheduler::HasIdleWorkers() { return !m_idleQueue.empty(); }
@@ -128,6 +125,8 @@ void Scheduler::WakeUpNext()
 {
 	m_worker = m_runnableQueue.front();
 	m_runnableQueue.pop_front();
+
+	m_worker->SetState(Worker::RUNNING);
 	m_worker->m_sync.notify_one();
 }
 
@@ -135,28 +134,26 @@ void Scheduler::WakeUpNextIdle()
 {
 	m_worker = m_idleQueue.front();
 	m_idleQueue.pop_front();
+
+	m_worker->SetState(Worker::RUNNING);
 	m_worker->m_sync.notify_one();
 }
 
 void Scheduler::SaveRunnable()
 {
 	m_runnableQueue.push_back(m_worker);
+
+	m_worker->SetState(Worker::RUNNABLE);
 	m_worker = nullptr;
 }
 
 void Scheduler::SaveIdle()
 {
 	m_idleQueue.push_back(m_worker);
+
+	m_worker->SetState(Worker::IDLE);
 	m_worker = nullptr;
 }
-
-void Scheduler::ContinueRunnable()
-{
-	m_worker = m_runnableQueue.front();
-	m_runnableQueue.pop_front();
-}
-
-Worker* Scheduler::NextRunnableWorker() { return !m_runnableQueue.empty() ? m_runnableQueue.front() : nullptr; }
 
 Worker* Scheduler::NextFreeWorker()
 {
@@ -173,6 +170,9 @@ Worker* Scheduler::NextFreeWorker()
 
 bool Scheduler::HasTasks()
 {
+	// TODO: Check whether we should lock here.
+	//
+	std::scoped_lock<std::mutex> lock{ g_tasksMtx };
 	return !g_tasksQueue.empty();
 }
 
@@ -181,21 +181,20 @@ void Scheduler::ScheduleWorker(Worker& worker)
 	m_runnableQueue.push_back(&worker);
 }
 
-Worker* Scheduler::NextRunWorker()
+void Scheduler::PrepareRunningWorker()
 {
-	Worker* worker = nullptr;
+	m_worker->m_task = NextTask();
+	m_worker->SetState(Worker::RUNNING);
+}
 
-	if (m_runnableQueue.size() > 0)
-	{
-		worker = m_runnableQueue.front();
-		m_runnableQueue.pop_front();
-	}
-
-	return worker;
+void Scheduler::ContinueIdleLooping()
+{
+	m_worker->SetState(Worker::IDLE_LOOPING);
 }
 
 Task Scheduler::NextTask()
 {
+	std::scoped_lock<std::mutex> lock{ g_tasksMtx };
 	Task t = g_tasksQueue.front();
 	g_tasksQueue.pop_front();
 
@@ -204,11 +203,12 @@ Task Scheduler::NextTask()
 
 void Scheduler::ScheduleNextIdle()
 {
-	Worker* idle = m_idleQueue.front();
+	Worker* worker = m_idleQueue.front();
 	m_idleQueue.pop_front();
 
-	idle->m_task = NextTask();
-	m_runnableQueue.push_back(idle);
+	worker->m_task = NextTask();
+	worker->SetState(Worker::RUNNABLE);
+	m_runnableQueue.push_back(worker);
 }
 
 void Scheduler::Schedule()
@@ -218,6 +218,29 @@ void Scheduler::Schedule()
 }
 
 bool Scheduler::Idle() { return m_worker == nullptr; }
+
+// Creates worker object and starts worker thread on a provided CPU.
+//
+Worker::Worker(uint64_t id, CPU& cpu)
+	: m_id{ id }
+	, m_state{ IDLE }
+	, m_mtx{}
+	, m_sync{}
+	, m_cpu{ cpu }
+	, m_task{}
+	, m_scheduler{ cpu.m_scheduler }
+	, m_thread{ &CPU::WorkerEntryPoint, &cpu, std::ref(*this) }
+{
+	// Wait for a signal from created thread, so we can continue when it is ready.
+	//
+	std::unique_lock<std::mutex> lock{ m_mtx };
+	m_sync.wait(lock);
+}
+
+void Worker::SetState(Worker::StateE state)
+{
+	m_state = state;
+}
 
 // Synchronization point for the workers in yield.
 // If there are pending tasks in tasks queue, wake up next worker and go to sleep.
@@ -251,6 +274,15 @@ void Worker::yield()
 //
 bool Worker::SyncMain()
 {
+	// Park all new threads before scheduler is initialized.
+	//
+	if (m_scheduler.m_state == Scheduler::INITIALIZING)
+	{
+		m_scheduler.SaveIdle();
+		m_sync.notify_one();
+		return true; // go to sleep.
+	}
+
 	m_scheduler.Schedule();
 
 	if (m_scheduler.HasRunnableWorkers())
@@ -261,13 +293,13 @@ bool Worker::SyncMain()
 	}
 	else if (m_scheduler.HasTasks())
 	{
-		m_task = m_scheduler.NextTask();
+		m_scheduler.PrepareRunningWorker();
 		return false; // continue with execution.
 	}
 	else
 	{
-		m_scheduler.SaveIdle();
-		return true; // go to sleep.
+		m_scheduler.ContinueIdleLooping();
+		return false; // continue with idle looping.
 	}
 }
 
@@ -292,15 +324,22 @@ void Worker::Sync()
 
 void Worker::Main()
 {
-	m_sync.notify_one();
-	m_scheduler.m_worker = this;
+	tls_worker = m_scheduler.m_worker = this;
 
+	// Main worker loop.
+	//
 	while (true)
 	{
 		Sync<MAIN>();
 
 		if (false);
 			// Exit code -> !m_scheduler.Running() && g_tasksQueue.empty();
+
+		if (m_state == IDLE_LOOPING)
+		{
+			std::this_thread::sleep_for(workerSleepTime);
+			continue;
+		}
 
 		try
 		{
@@ -436,7 +475,6 @@ int main()
 		std::this_thread::sleep_for(workerSleepTime);*/
 
 	CPUs cpus;
-	cpus.Init();
 
 	cpus.Execute();
 }

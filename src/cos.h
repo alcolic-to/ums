@@ -3,27 +3,6 @@
 #ifndef COS_H
 #define COS_H
 
-//class B;
-//
-//class A
-//{
-//public:
-//	A(B& b)
-//		: m_bref{ b }
-//	{
-//	
-//	}
-//
-//	B& m_bref;
-//};
-//
-//class B
-//{
-//public:
-//	B() = default;
-//	int a;
-//};
-
 #include <cstdint>
 #include <vector>
 #include <windows.h>
@@ -51,10 +30,6 @@ class CPUs final
 public:
 	CPUs();
 
-	// Start workers on every available CPU.
-	//
-	void Init();
-
 	void Execute();
 
 private:
@@ -71,7 +46,7 @@ public:
 	Task(const std::function<void()> function)
 		: m_function{ function } {}
 
-	void operator()() { m_function();}
+	void operator()() { m_function(); }
 
 	std::function<void()> m_function;
 };
@@ -79,13 +54,9 @@ public:
 class Scheduler final
 {
 public:
-	enum StateE : int { INITIALIZING, IDLE, RUNNING };
+	enum StateE : int { INITIALIZING, RUNNING };
 
-	Scheduler(const CPU& cpu)
-		: m_cpu{ cpu }
-		, m_worker{ nullptr }
-		, m_state{ INITIALIZING }
-	{}
+	Scheduler(const CPU& cpu);
 
 	void Start();
 
@@ -101,22 +72,15 @@ public:
 	void SaveIdle();
 
 	void PrepareRunningWorker();
-	void ContinueIdleLooping();
-
-	void ContinueRunnable();
-
-	Worker* NextRunnableWorker();
+	void IdleLooping();
 
 	Worker* NextFreeWorker();
 	bool HasTasks();
 	void ScheduleWorker(Worker& worker);
-	Worker* NextRunWorker();
 	Task NextTask();
 
 	void Schedule();
 	void ScheduleNextIdle();
-
-	bool Idle();
 
 public:
 	const CPU& m_cpu;
@@ -124,7 +88,6 @@ public:
 	std::deque<Worker*> m_idleQueue;
 	Worker* m_worker;
 	StateE m_state;
-	// std::vector<Worker*> m_vec;
 };
 
 class CPU final
@@ -133,8 +96,6 @@ public:
 	CPU(uint64_t cpu_id, uint64_t cpu_mask);
 
 public:
-
-	void InitWorkers();
 
 	void WorkerEntryPoint(Worker& worker);
 	void BindThread();
@@ -166,11 +127,7 @@ public:
 	//
 	Worker(uint64_t id, CPU& cpu);
 
-	~Worker()
-	{
-		if (m_thread.joinable())
-			m_thread.join();
-	};
+	~Worker();
 
 	Worker(const Worker& other) = delete;
 	Worker(const Worker&& other) = delete;
@@ -179,15 +136,7 @@ public:
 
 	void Main();
 
-	void WaitForTask();
-	void ExecuteTask(Task task);
-
 	void yield();
-
-	void WakeUp()
-	{
-		m_sync.notify_one();
-	}
 
 	bool SyncMain();
 	bool SyncYield();
@@ -196,14 +145,6 @@ public:
 	void Sync();
 
 	void SetState(StateE state);
-
-	void Sleep()
-	{
-		std::unique_lock<std::mutex> lock{ m_mtx };
-		m_sync.wait(lock);
-
-		// std::cout << "Waking worker " << tls_worker->ID() << "\n";
-	}
 
 	constexpr uint64_t ID() const { return m_id; }
 	constexpr CPU& CPUg() const { return m_cpu; }

@@ -8,7 +8,7 @@ using namespace std::chrono_literals;
 
 constexpr uint64_t FS_AllowedCPUs = 0b00001111;
 constexpr int workersPerCPU = 5;
-constexpr int tasksPerCPU = 100;
+constexpr int tasksPerCPU = 100000;
 constexpr auto workerSleepTime = 1ms;
 
 thread_local Worker* tls_worker;
@@ -17,6 +17,12 @@ std::mutex g_tasksMtx;
 std::deque<Task> g_tasksQueue;
 
 void f1()
+{
+	tls_worker->yield();
+	return;
+}
+
+void f2()
 {
 	auto start = std::chrono::high_resolution_clock::now();
 
@@ -81,7 +87,7 @@ void CPU::WorkerEntryPoint(Worker& worker)
 
 void CPUs::Execute()
 {
-	for (int i = 0; i < tasksPerCPU; ++i)
+	// for (int i = 0; i < tasksPerCPU; ++i)
 	{
 		for (auto& cpu : m_cpus)
 			cpu->ExecuteTasks();
@@ -93,11 +99,20 @@ void CPU::ExecuteTasks()
 	// for (int i = 0; i < tasksPerCPU; ++i)
 	// 	m_scheduler.ExecuteTask();
 	
-	// while (true)
+	for (int i = 0; i < tasksPerCPU; ++i)
 	{
+		// if (i % 10 == 0)
+		// 	std::this_thread::sleep_for(1ms);
+
 		m_scheduler.ExecuteTask();
 	}
 }
+
+Scheduler::Scheduler(const CPU& cpu)
+	: m_cpu{ cpu }
+	, m_worker{ nullptr }
+	, m_state{ INITIALIZING }
+{ }
 
 // Start scheduler.
 //
@@ -172,7 +187,7 @@ bool Scheduler::HasTasks()
 {
 	// TODO: Check whether we should lock here.
 	//
-	std::scoped_lock<std::mutex> lock{ g_tasksMtx };
+	// std::scoped_lock<std::mutex> lock{ g_tasksMtx };
 	return !g_tasksQueue.empty();
 }
 
@@ -187,7 +202,7 @@ void Scheduler::PrepareRunningWorker()
 	m_worker->SetState(Worker::RUNNING);
 }
 
-void Scheduler::ContinueIdleLooping()
+void Scheduler::IdleLooping()
 {
 	m_worker->SetState(Worker::IDLE_LOOPING);
 }
@@ -217,8 +232,6 @@ void Scheduler::Schedule()
 		ScheduleNextIdle();
 }
 
-bool Scheduler::Idle() { return m_worker == nullptr; }
-
 // Creates worker object and starts worker thread on a provided CPU.
 //
 Worker::Worker(uint64_t id, CPU& cpu)
@@ -237,14 +250,27 @@ Worker::Worker(uint64_t id, CPU& cpu)
 	m_sync.wait(lock);
 }
 
+Worker::~Worker()
+{
+	if (m_thread.joinable())
+		m_thread.join();
+}
+
 void Worker::SetState(Worker::StateE state)
 {
+	// TODO: Collect some statistics here.
+	//
 	m_state = state;
 }
 
+// Yields current worker and wakes up next worker for execution.
+//
+void Worker::yield()
+{
+	Sync<YIELD>();
+}
+
 // Synchronization point for the workers in yield.
-// If there are pending tasks in tasks queue, wake up next worker and go to sleep.
-// Otherwise, just continue with execution.
 //
 bool Worker::SyncYield()
 {
@@ -261,13 +287,6 @@ bool Worker::SyncYield()
 	}
 	else
 		return false; // continue with execution.
-}
-
-// Yields current worker and wakes up next worker for execution.
-//
-void Worker::yield()
-{
-	Sync<YIELD>();
 }
 
 // Synchronization point for the workers.
@@ -298,7 +317,7 @@ bool Worker::SyncMain()
 	}
 	else
 	{
-		m_scheduler.ContinueIdleLooping();
+		m_scheduler.IdleLooping();
 		return false; // continue with idle looping.
 	}
 }
@@ -337,6 +356,7 @@ void Worker::Main()
 
 		if (m_state == IDLE_LOOPING)
 		{
+			std::cout << "CPU " << m_cpu.m_id << ": idle looping worker " << this->ID() << "\n";
 			std::this_thread::sleep_for(workerSleepTime);
 			continue;
 		}
@@ -344,6 +364,7 @@ void Worker::Main()
 		try
 		{
 			m_task();
+			std::cout << "CPU " << m_cpu.m_id << ": worker id " << this->ID() << " task done.\n";
 		}
 		catch (std::exception& ex)
 		{

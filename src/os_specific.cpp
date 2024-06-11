@@ -46,7 +46,7 @@ uint64_t CpusAvailMask()
 
 // Binds current thread to this CPU.
 //
-void CPU::BindThread()
+void CPU::BindThread() const
 {
 	SetThreadAffinityMask(GetCurrentThread(), m_mask);
 }
@@ -68,7 +68,7 @@ uint64_t CpusAvailMask()
 
 // Binds current thread to this CPU.
 //
-void CPU::BindThread()
+void CPU::BindThread() const
 {
 	throw std::logic_error("Not implemented.");
 }

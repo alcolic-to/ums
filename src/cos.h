@@ -30,7 +30,7 @@ class CPUs final
 public:
 	CPUs();
 
-	void Execute();
+	void Execute() const;
 
 private:
 	uint32_t m_systemCpusCount;
@@ -60,10 +60,10 @@ public:
 
 	void Start();
 
-	void ExecuteTask();
+	void ExecuteTask() const;
 
-	bool HasIdleWorkers();
-	bool HasRunnableWorkers();
+	bool HasIdleWorkers() const;
+	bool HasRunnableWorkers() const;
 
 	void WakeUpNext();
 	void WakeUpNextIdle();
@@ -71,13 +71,12 @@ public:
 	void SaveRunnable();
 	void SaveIdle();
 
-	void PrepareRunningWorker();
-	void IdleLooping();
+	void PrepareRunningWorker() const;
+	void IdleLooping() const;
 
-	Worker* NextFreeWorker();
-	bool HasTasks();
+	bool HasTasks() const;
 	void ScheduleWorker(Worker& worker);
-	Task NextTask();
+	Task NextTask() const;
 
 	void Schedule();
 	void ScheduleNextIdle();
@@ -97,9 +96,9 @@ public:
 
 public:
 
-	void WorkerEntryPoint(Worker& worker);
-	void BindThread();
-	void ExecuteTasks();
+	void WorkerEntryPoint(Worker& worker) const;
+	void BindThread() const;
+	void ExecuteTasks() const;
 
 public:
 	uint64_t m_id;
@@ -121,7 +120,7 @@ class Worker final
 {
 public:
 
-	enum StateE : int { IDLE, IDLE_LOOPING, RUNNABLE, RUNNING };
+	enum StateE : int { IDLE, RUNNABLE, IDLE_LOOPING, RUNNING };
 
 	// Create worker object and start worker thread on a provided CPU.
 	//
@@ -144,6 +143,7 @@ public:
 	template<SyncType type>
 	void Sync();
 
+	bool IdleLoop() const;
 	void SetState(StateE state);
 
 	constexpr uint64_t ID() const { return m_id; }

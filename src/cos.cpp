@@ -1,13 +1,21 @@
 #include <cstdint>
 #include <cassert>
 
+// Rnadom
+#include <cstdlib>
+#include <random>
+
+std::random_device rd;     // only used once to initialise (seed) engine
+std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in this case)
+
+
 #include "os_specific.h"
 #include "cos.h"
 
 using namespace std::chrono_literals;
 
 constexpr uint64_t FS_AllowedCPUs = 0b00001111;
-constexpr int workersPerCPU = 5;
+constexpr int workersPerCPU = 20;
 constexpr int tasksPerCPU = 100000;
 constexpr auto workerSleepTime = 1ms;
 
@@ -16,19 +24,22 @@ thread_local Worker* tls_worker;
 std::mutex g_tasksMtx;
 std::deque<Task> g_tasksQueue;
 
-void f1()
+void f2()
 {
 	tls_worker->yield();
 	return;
 }
 
-void f2()
+void f1()
 {
 	auto start = std::chrono::high_resolution_clock::now();
 
 	std::vector<int> v;
 	for (int i = 0; i < 1000; ++i)
 		v.push_back(rand());
+	
+	std::uniform_int_distribution<int> uni(0, 6);
+	int funcDur = uni(rng);
 
 	int i = 0;
 	while (true)
@@ -36,9 +47,9 @@ void f2()
 		auto end = std::chrono::high_resolution_clock::now();
 
 		std::chrono::duration<double, std::milli> duration = end - start;
-		if (duration.count() > 1000)
+		if (duration.count() > funcDur * 1000)
 		{
-			std::cerr << "Task execution exceeded time limit of 4ms: " << duration.count() << "ms." << std::endl;
+			std::cerr << "Task execution exceeded time limit of " << duration.count() << "ms." << std::endl;
 			break;
 		}
 
@@ -76,7 +87,7 @@ CPU::CPU(uint64_t cpu_id, uint64_t cpu_mask)
 	m_scheduler.Start();
 }
 
-void CPU::WorkerEntryPoint(Worker& worker)
+void CPU::WorkerEntryPoint(Worker& worker) const
 {
 	BindThread();
 
@@ -85,7 +96,7 @@ void CPU::WorkerEntryPoint(Worker& worker)
 	worker.Main();
 }
 
-void CPUs::Execute()
+void CPUs::Execute() const
 {
 	// for (int i = 0; i < tasksPerCPU; ++i)
 	{
@@ -94,7 +105,7 @@ void CPUs::Execute()
 	}
 }
 
-void CPU::ExecuteTasks()
+void CPU::ExecuteTasks() const
 {
 	// for (int i = 0; i < tasksPerCPU; ++i)
 	// 	m_scheduler.ExecuteTask();
@@ -127,14 +138,14 @@ void Scheduler::Start()
 	m_worker->m_sync.notify_one();
 }
 
-void Scheduler::ExecuteTask()
+void Scheduler::ExecuteTask() const
 {
 	std::scoped_lock<std::mutex> lock{ g_tasksMtx };
 	g_tasksQueue.push_back(Task{ f1 });
 }
 
-bool Scheduler::HasIdleWorkers() { return !m_idleQueue.empty(); }
-bool Scheduler::HasRunnableWorkers() { return !m_runnableQueue.empty(); }
+bool Scheduler::HasIdleWorkers() const { return !m_idleQueue.empty(); }
+bool Scheduler::HasRunnableWorkers() const { return !m_runnableQueue.empty(); }
 
 void Scheduler::WakeUpNext()
 {
@@ -170,20 +181,7 @@ void Scheduler::SaveIdle()
 	m_worker = nullptr;
 }
 
-Worker* Scheduler::NextFreeWorker()
-{
-	Worker* worker = nullptr;
-
-	if (m_idleQueue.size() > 0)
-	{
-		worker = m_idleQueue.front();
-		m_idleQueue.pop_front();
-	}
-
-	return worker;
-}
-
-bool Scheduler::HasTasks()
+bool Scheduler::HasTasks() const
 {
 	// TODO: Check whether we should lock here.
 	//
@@ -196,18 +194,18 @@ void Scheduler::ScheduleWorker(Worker& worker)
 	m_runnableQueue.push_back(&worker);
 }
 
-void Scheduler::PrepareRunningWorker()
+void Scheduler::PrepareRunningWorker() const
 {
 	m_worker->m_task = NextTask();
 	m_worker->SetState(Worker::RUNNING);
 }
 
-void Scheduler::IdleLooping()
+void Scheduler::IdleLooping() const
 {
 	m_worker->SetState(Worker::IDLE_LOOPING);
 }
 
-Task Scheduler::NextTask()
+Task Scheduler::NextTask() const
 {
 	std::scoped_lock<std::mutex> lock{ g_tasksMtx };
 	Task t = g_tasksQueue.front();
@@ -341,6 +339,18 @@ void Worker::Sync()
 	}
 }
 
+bool Worker::IdleLoop() const
+{
+	if (m_state == IDLE_LOOPING)
+	{
+		std::cout << "CPU " << m_cpu.m_id << ": idle looping worker " << this->ID() << "\n";
+		std::this_thread::sleep_for(workerSleepTime);
+		return true;
+	}
+	else
+		return false;
+}
+
 void Worker::Main()
 {
 	tls_worker = m_scheduler.m_worker = this;
@@ -354,12 +364,8 @@ void Worker::Main()
 		if (false);
 			// Exit code -> !m_scheduler.Running() && g_tasksQueue.empty();
 
-		if (m_state == IDLE_LOOPING)
-		{
-			std::cout << "CPU " << m_cpu.m_id << ": idle looping worker " << this->ID() << "\n";
-			std::this_thread::sleep_for(workerSleepTime);
+		if (IdleLoop())
 			continue;
-		}
 
 		try
 		{

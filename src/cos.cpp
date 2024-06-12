@@ -14,9 +14,9 @@ std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in thi
 
 using namespace std::chrono_literals;
 
-constexpr uint64_t FS_AllowedCPUs = 0b00001111;
+constexpr uint64_t FS_AllowedCPUs = 0b00000001;
 constexpr int workersPerCPU = 20;
-constexpr int tasksPerCPU = 100000;
+constexpr int tasksPerCPU = 40;
 constexpr auto workerSleepTime = 1ms;
 
 thread_local Worker* tls_worker;
@@ -94,6 +94,8 @@ void CPU::WorkerEntryPoint(Worker& worker) const
 	std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << " " << "Win32: " << GetCurrentProcessorNumber() <<  std::endl;
 
 	worker.Main();
+
+	std::cout << "Ended thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << " " << "Win32: " << GetCurrentProcessorNumber() <<  std::endl;
 }
 
 void CPUs::Execute() const
@@ -230,6 +232,32 @@ void Scheduler::Schedule()
 		ScheduleNextIdle();
 }
 
+bool Scheduler::Initializing() const
+{
+	return m_state == INITIALIZING;
+}
+
+bool Scheduler::Exiting() const
+{
+	return m_state == EXITING;
+}
+
+void Scheduler::SetState(StateE state)
+{
+	m_state = state;
+}
+
+void Scheduler::ExitWorkers() const
+{
+	m_worker->SetState(Worker::EXITING);
+
+	for (Worker* worker : m_idleQueue)
+	{
+		worker->SetState(Worker::EXITING);
+		worker->m_sync.notify_one();
+	}
+}
+
 // Creates worker object and starts worker thread on a provided CPU.
 //
 Worker::Worker(uint64_t id, CPU& cpu)
@@ -250,6 +278,8 @@ Worker::Worker(uint64_t id, CPU& cpu)
 
 Worker::~Worker()
 {
+	m_scheduler.SetState(Scheduler::EXITING);
+
 	if (m_thread.joinable())
 		m_thread.join();
 }
@@ -259,6 +289,11 @@ void Worker::SetState(Worker::StateE state)
 	// TODO: Collect some statistics here.
 	//
 	m_state = state;
+}
+
+bool Worker::Exiting() const
+{
+	return m_state == EXITING;
 }
 
 // Yields current worker and wakes up next worker for execution.
@@ -292,8 +327,9 @@ bool Worker::SyncYield()
 bool Worker::SyncMain()
 {
 	// Park all new threads before scheduler is initialized.
+	// Notify thread that created us to continue.
 	//
-	if (m_scheduler.m_state == Scheduler::INITIALIZING)
+	if (m_scheduler.Initializing())
 	{
 		m_scheduler.SaveIdle();
 		m_sync.notify_one();
@@ -312,6 +348,11 @@ bool Worker::SyncMain()
 	{
 		m_scheduler.PrepareRunningWorker();
 		return false; // continue with execution.
+	}
+	else if (m_scheduler.Exiting())
+	{
+		m_scheduler.ExitWorkers();
+		return false; // continue with exit.
 	}
 	else
 	{
@@ -351,18 +392,18 @@ bool Worker::IdleLoop() const
 		return false;
 }
 
+// Main worker loop.
+//
 void Worker::Main()
 {
 	tls_worker = m_scheduler.m_worker = this;
 
-	// Main worker loop.
-	//
 	while (true)
 	{
 		Sync<MAIN>();
 
-		if (false);
-			// Exit code -> !m_scheduler.Running() && g_tasksQueue.empty();
+		if (Exiting())
+			return;
 
 		if (IdleLoop())
 			continue;
@@ -502,6 +543,6 @@ int main()
 		std::this_thread::sleep_for(workerSleepTime);*/
 
 	CPUs cpus;
-
+	
 	cpus.Execute();
 }

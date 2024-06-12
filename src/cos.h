@@ -54,7 +54,7 @@ public:
 class Scheduler final
 {
 public:
-	enum StateE : int { INITIALIZING, RUNNING };
+	enum StateE : int { INITIALIZING, RUNNING, EXITING };
 
 	Scheduler(const CPU& cpu);
 
@@ -80,6 +80,12 @@ public:
 
 	void Schedule();
 	void ScheduleNextIdle();
+
+	void ExitWorkers() const;
+	bool Exiting() const;
+	bool Initializing() const;
+
+	void SetState(StateE state);
 
 public:
 	const CPU& m_cpu;
@@ -120,7 +126,7 @@ class Worker final
 {
 public:
 
-	enum StateE : int { IDLE, RUNNABLE, IDLE_LOOPING, RUNNING };
+	enum StateE : int { IDLE, RUNNABLE, IDLE_LOOPING, RUNNING, EXITING };
 
 	// Create worker object and start worker thread on a provided CPU.
 	//
@@ -145,6 +151,7 @@ public:
 
 	bool IdleLoop() const;
 	void SetState(StateE state);
+	bool Exiting() const;
 
 	constexpr uint64_t ID() const { return m_id; }
 	constexpr CPU& CPUg() const { return m_cpu; }

@@ -30,7 +30,7 @@ class CPUs final
 public:
 	CPUs();
 
-	void Execute() const;
+	CPU& MinLoadCPU() const;
 
 private:
 	uint32_t m_systemCpusCount;
@@ -60,7 +60,7 @@ public:
 
 	void Start();
 
-	void ExecuteTask() const;
+	void EnqueueTask(const Task& task);
 
 	bool HasIdleWorkers() const;
 	bool HasRunnableWorkers() const;
@@ -71,12 +71,12 @@ public:
 	void SaveRunnable();
 	void SaveIdle();
 
-	void PrepareRunningWorker() const;
-	void IdleLooping() const;
+	void PrepareWorker();
+	void IdleLooping();
 
 	bool HasTasks() const;
 	void ScheduleWorker(Worker& worker);
-	Task NextTask() const;
+	Task NextTask();
 
 	void Schedule();
 	void ScheduleNextIdle();
@@ -84,6 +84,7 @@ public:
 	void ExitWorkers() const;
 	bool Exiting() const;
 	bool Initializing() const;
+	Worker* worker() const;
 
 	void SetState(StateE state);
 
@@ -92,6 +93,8 @@ public:
 	std::deque<Worker*> m_runnableQueue;
 	std::deque<Worker*> m_idleQueue;
 	Worker* m_worker;
+	std::mutex m_tasksMtx;
+	std::deque<Task> m_tasks;
 	StateE m_state;
 };
 
@@ -104,11 +107,15 @@ public:
 
 	void WorkerEntryPoint(Worker& worker) const;
 	void BindThread() const;
-	void ExecuteTasks() const;
+	void ExecuteTask(const Task& task);
+	void IncLoad();
+	void DecLoad();
+	uint64_t Load() const;
 
 public:
 	uint64_t m_id;
 	uint64_t m_mask;
+	uint64_t m_load;
 
 	Scheduler m_scheduler;
 
@@ -126,7 +133,10 @@ class Worker final
 {
 public:
 
-	enum StateE : int { IDLE, RUNNABLE, IDLE_LOOPING, RUNNING, EXITING };
+	enum StateE : int { INITIALIZING, IDLE, IDLE_LOOPING, RUNNABLE, RUNNING, EXITING };
+
+	static bool StateIdle(StateE state) { return state == IDLE || state == IDLE_LOOPING; }
+	static bool StateRunnable(StateE state) { return state == RUNNABLE || state == RUNNING; }
 
 	// Create worker object and start worker thread on a provided CPU.
 	//
@@ -172,5 +182,21 @@ public:
 	CPU& m_cpu;
 	Scheduler& m_scheduler;
 };
+
+class TaskManager final
+{
+public:
+	TaskManager(const CPUs& cpus)
+		: m_cpus{ cpus }
+	{
+	}
+
+	void ExecuteTask(Task task);
+
+	const CPUs& m_cpus;
+};
+
+extern CPUs cpus;
+extern TaskManager taskManager;
 
 #endif

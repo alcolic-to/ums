@@ -1,13 +1,12 @@
 #include <cstdint>
 #include <cassert>
+#include <memory>
 
-// Rnadom
-#include <cstdlib>
+// Random
 #include <random>
 
 std::random_device rd;     // only used once to initialise (seed) engine
 std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in this case)
-
 
 #include "os_specific.h"
 #include "cos.h"
@@ -15,14 +14,14 @@ std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in thi
 using namespace std::chrono_literals;
 
 constexpr uint64_t FS_AllowedCPUs = 0b00000001;
-constexpr int workersPerCPU = 20;
+constexpr int workersPerCPU = 10;
 constexpr int tasksPerCPU = 40;
 constexpr auto workerSleepTime = 1ms;
 
 thread_local Worker* tls_worker;
 
-std::mutex g_tasksMtx;
-std::deque<Task> g_tasksQueue;
+CPUs cpus;
+TaskManager taskManager{ cpus };
 
 void f2()
 {
@@ -39,7 +38,8 @@ void f1()
 		v.push_back(rand());
 	
 	std::uniform_int_distribution<int> uni(0, 6);
-	int funcDur = uni(rng);
+	// int funcDur = uni(rng);
+	int funcDur = 1;
 
 	int i = 0;
 	while (true)
@@ -78,6 +78,7 @@ CPUs::CPUs()
 CPU::CPU(uint64_t cpu_id, uint64_t cpu_mask)
 	: m_id{ cpu_id }
 	, m_mask{ cpu_mask }
+	, m_load{ 0 }
 	, m_scheduler{ *this }
 	, m_workers{}
 {
@@ -98,28 +99,20 @@ void CPU::WorkerEntryPoint(Worker& worker) const
 	std::cout << "Ended thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << " " << "Win32: " << GetCurrentProcessorNumber() <<  std::endl;
 }
 
-void CPUs::Execute() const
+CPU& CPUs::MinLoadCPU() const
 {
-	// for (int i = 0; i < tasksPerCPU; ++i)
-	{
-		for (auto& cpu : m_cpus)
-			cpu->ExecuteTasks();
-	}
+	constexpr auto cmp = [](const std::unique_ptr<CPU>& left, const std::unique_ptr<CPU>& right) { return left->Load() < right->Load(); };
+	return **std::min_element(m_cpus.begin(), m_cpus.end(), cmp);
 }
 
-void CPU::ExecuteTasks() const
+void CPU::ExecuteTask(const Task& task)
 {
-	// for (int i = 0; i < tasksPerCPU; ++i)
-	// 	m_scheduler.ExecuteTask();
-	
-	for (int i = 0; i < tasksPerCPU; ++i)
-	{
-		// if (i % 10 == 0)
-		// 	std::this_thread::sleep_for(1ms);
-
-		m_scheduler.ExecuteTask();
-	}
+	m_scheduler.EnqueueTask(task);
 }
+
+void CPU::IncLoad() { ++m_load; }
+void CPU::DecLoad() { --m_load; }
+uint64_t CPU::Load() const { return m_load + m_scheduler.m_tasks.size(); }
 
 Scheduler::Scheduler(const CPU& cpu)
 	: m_cpu{ cpu }
@@ -133,17 +126,14 @@ void Scheduler::Start()
 {
 	m_state = RUNNING;
 
-	m_worker = m_idleQueue.front();
-	m_idleQueue.pop_front();
-
-	m_worker->SetState(Worker::IDLE_LOOPING);
+	IdleLooping();
 	m_worker->m_sync.notify_one();
 }
 
-void Scheduler::ExecuteTask() const
+void Scheduler::EnqueueTask(const Task& task)
 {
-	std::scoped_lock<std::mutex> lock{ g_tasksMtx };
-	g_tasksQueue.push_back(Task{ f1 });
+	std::scoped_lock<std::mutex> lock{ m_tasksMtx };
+	m_tasks.push_back(task);
 }
 
 bool Scheduler::HasIdleWorkers() const { return !m_idleQueue.empty(); }
@@ -187,8 +177,8 @@ bool Scheduler::HasTasks() const
 {
 	// TODO: Check whether we should lock here.
 	//
-	// std::scoped_lock<std::mutex> lock{ g_tasksMtx };
-	return !g_tasksQueue.empty();
+	// std::scoped_lock<std::mutex> lock{ m_tasksMtx };
+	return !m_tasks.empty();
 }
 
 void Scheduler::ScheduleWorker(Worker& worker)
@@ -196,22 +186,27 @@ void Scheduler::ScheduleWorker(Worker& worker)
 	m_runnableQueue.push_back(&worker);
 }
 
-void Scheduler::PrepareRunningWorker() const
+void Scheduler::PrepareWorker()
 {
-	m_worker->m_task = NextTask();
+	m_worker = m_runnableQueue.front();
+	m_runnableQueue.pop_front();
+
 	m_worker->SetState(Worker::RUNNING);
 }
 
-void Scheduler::IdleLooping() const
+void Scheduler::IdleLooping()
 {
+	m_worker = m_idleQueue.back();
+	m_idleQueue.pop_back();
+
 	m_worker->SetState(Worker::IDLE_LOOPING);
 }
 
-Task Scheduler::NextTask() const
+Task Scheduler::NextTask()
 {
-	std::scoped_lock<std::mutex> lock{ g_tasksMtx };
-	Task t = g_tasksQueue.front();
-	g_tasksQueue.pop_front();
+	std::scoped_lock<std::mutex> lock{ m_tasksMtx };
+	Task t = m_tasks.front();
+	m_tasks.pop_front();
 
 	return t;
 }
@@ -247,10 +242,13 @@ void Scheduler::SetState(StateE state)
 	m_state = state;
 }
 
+Worker* Scheduler::worker() const
+{
+	return m_worker;
+}
+
 void Scheduler::ExitWorkers() const
 {
-	m_worker->SetState(Worker::EXITING);
-
 	for (Worker* worker : m_idleQueue)
 	{
 		worker->SetState(Worker::EXITING);
@@ -262,7 +260,7 @@ void Scheduler::ExitWorkers() const
 //
 Worker::Worker(uint64_t id, CPU& cpu)
 	: m_id{ id }
-	, m_state{ IDLE }
+	, m_state{ INITIALIZING }
 	, m_mtx{}
 	, m_sync{}
 	, m_cpu{ cpu }
@@ -286,6 +284,11 @@ Worker::~Worker()
 
 void Worker::SetState(Worker::StateE state)
 {
+	if (StateIdle(m_state) && StateRunnable(state))
+		m_cpu.IncLoad();
+	else if (StateRunnable(m_state) && StateIdle(state))
+		m_cpu.DecLoad();
+
 	// TODO: Collect some statistics here.
 	//
 	m_state = state;
@@ -307,16 +310,18 @@ void Worker::yield()
 //
 bool Worker::SyncYield()
 {
+	m_scheduler.SaveRunnable(); // Push current worker at the end of runnable queue.
 	m_scheduler.Schedule();
 
-	if (m_scheduler.HasRunnableWorkers())
+	m_scheduler.PrepareWorker();
+
+	if (m_scheduler.worker() != this)
 	{
 		std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << this->ID() << "\n";
-		std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.m_runnableQueue.front()->ID() << "\n";
+		std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.worker()->ID() << "\n";
 
-		m_scheduler.SaveRunnable(); // Push current worker at the end of runnable queue.
-		m_scheduler.WakeUpNext();
-		return true; // go to sleep.
+		m_scheduler.worker()->m_sync.notify_one(); // wake up next.
+		return true; // go to sleep
 	}
 	else
 		return false; // continue with execution.
@@ -336,47 +341,46 @@ bool Worker::SyncMain()
 		return true; // go to sleep.
 	}
 
+	m_scheduler.SaveIdle();
 	m_scheduler.Schedule();
 
 	if (m_scheduler.HasRunnableWorkers())
 	{
-		m_scheduler.SaveIdle();
-		m_scheduler.WakeUpNext();
-		return true; // go to sleep.
-	}
-	else if (m_scheduler.HasTasks())
-	{
-		m_scheduler.PrepareRunningWorker();
-		return false; // continue with execution.
+		m_scheduler.PrepareWorker();
+
+		if (m_scheduler.worker() != this)
+		{
+			std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << this->ID() << "\n";
+			std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.worker()->ID() << "\n";
+
+			m_scheduler.worker()->m_sync.notify_one(); // wake up next.
+			return true; // go to sleep
+		}
 	}
 	else if (m_scheduler.Exiting())
-	{
 		m_scheduler.ExitWorkers();
-		return false; // continue with exit.
-	}
 	else
-	{
 		m_scheduler.IdleLooping();
-		return false; // continue with idle looping.
-	}
+
+	return false; // continue with execution.
 }
 
+// Synchronization point for the workers.
+// We will call sync function  based on provided sync type and go to sleep if sync function returned true.
+// There is no atomic way to go to sleep and signal at the same time, so we must relly on OS that it will not start
+// our next worker that we woke up while we are going to sleep.
+//
 template<SyncType type>
 void Worker::Sync()
 {
-	// Synchronize workers.
+	// Pointer to sync member function.
 	//
-	std::unique_lock<std::mutex> lock{ m_mtx };
+	constexpr bool (Worker::*sync)(void) = type == MAIN ? &Worker::SyncMain : &Worker::SyncYield;
 
-	if constexpr (type == MAIN)
+	if ((this->*sync)())
 	{
-		if (SyncMain())
-			m_sync.wait(lock);
-	}
-	else if constexpr (type == YIELD)
-	{
-		if (SyncYield())
-			m_sync.wait(lock);
+		std::unique_lock<std::mutex> lock{ m_mtx };
+		m_sync.wait(lock);
 	}
 }
 
@@ -418,6 +422,12 @@ void Worker::Main()
 			std::cout << ex.what() << "\n";
 		}
 	}
+}
+
+void TaskManager::ExecuteTask(Task task)
+{
+	CPU& bestCPU = m_cpus.MinLoadCPU();
+	bestCPU.ExecuteTask(task);
 }
 
 using namespace std::chrono_literals;
@@ -474,6 +484,22 @@ void hardwork()
 void entryPoint()
 {
 
+}
+
+class A
+{
+public:
+	A(int& i)
+		: m_i{ i }
+	{
+	}
+
+	int& m_i;
+};
+
+std::string strfunc()
+{
+	return std::string("Op");
 }
 
 int main()
@@ -542,7 +568,6 @@ int main()
 	/*while (true)
 		std::this_thread::sleep_for(workerSleepTime);*/
 
-	CPUs cpus;
-	
-	cpus.Execute();
+	for (int i = 0; i < 100; ++i)
+		taskManager.ExecuteTask(Task{ f1 });
 }

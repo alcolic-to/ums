@@ -13,8 +13,8 @@ std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in thi
 
 using namespace std::chrono_literals;
 
-constexpr uint64_t FS_AllowedCPUs = 0b00000001;
-constexpr int workersPerCPU = 10;
+constexpr uint64_t FS_AllowedCPUs = 0b00001111;
+constexpr int workersPerCPU = 256;
 constexpr int tasksPerCPU = 40;
 constexpr auto workerSleepTime = 1ms;
 
@@ -127,7 +127,7 @@ void Scheduler::Start()
 	m_state = RUNNING;
 
 	IdleLooping();
-	m_worker->m_sync.notify_one();
+	m_worker->m_cv.notify_one();
 }
 
 void Scheduler::EnqueueTask(const Task& task)
@@ -145,7 +145,7 @@ void Scheduler::WakeUpNext()
 	m_runnableQueue.pop_front();
 
 	m_worker->SetState(Worker::RUNNING);
-	m_worker->m_sync.notify_one();
+	m_worker->m_cv.notify_one();
 }
 
 void Scheduler::WakeUpNextIdle()
@@ -154,7 +154,7 @@ void Scheduler::WakeUpNextIdle()
 	m_idleQueue.pop_front();
 
 	m_worker->SetState(Worker::RUNNING);
-	m_worker->m_sync.notify_one();
+	m_worker->m_cv.notify_one();
 }
 
 void Scheduler::SaveRunnable()
@@ -252,7 +252,7 @@ void Scheduler::ExitWorkers() const
 	for (Worker* worker : m_idleQueue)
 	{
 		worker->SetState(Worker::EXITING);
-		worker->m_sync.notify_one();
+		worker->m_cv.notify_one();
 	}
 }
 
@@ -261,8 +261,7 @@ void Scheduler::ExitWorkers() const
 Worker::Worker(uint64_t id, CPU& cpu)
 	: m_id{ id }
 	, m_state{ INITIALIZING }
-	, m_mtx{}
-	, m_sync{}
+	, m_cv{}
 	, m_cpu{ cpu }
 	, m_task{}
 	, m_scheduler{ cpu.m_scheduler }
@@ -270,8 +269,8 @@ Worker::Worker(uint64_t id, CPU& cpu)
 {
 	// Wait for a signal from created thread, so we can continue when it is ready.
 	//
-	std::unique_lock<std::mutex> lock{ m_mtx };
-	m_sync.wait(lock);
+	std::unique_lock<std::mutex> lock{ m_scheduler.m_workersMtx };
+	m_cv.wait(lock);
 }
 
 Worker::~Worker()
@@ -319,8 +318,7 @@ bool Worker::SyncYield()
 	{
 		std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << this->ID() << "\n";
 		std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.worker()->ID() << "\n";
-
-		m_scheduler.worker()->m_sync.notify_one(); // wake up next.
+		m_scheduler.worker()->m_cv.notify_one(); // wake up next.
 		return true; // go to sleep
 	}
 	else
@@ -337,7 +335,7 @@ bool Worker::SyncMain()
 	if (m_scheduler.Initializing())
 	{
 		m_scheduler.SaveIdle();
-		m_sync.notify_one();
+		m_cv.notify_one();
 		return true; // go to sleep.
 	}
 
@@ -352,8 +350,7 @@ bool Worker::SyncMain()
 		{
 			std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << this->ID() << "\n";
 			std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.worker()->ID() << "\n";
-
-			m_scheduler.worker()->m_sync.notify_one(); // wake up next.
+			m_scheduler.worker()->m_cv.notify_one(); // wake up next.
 			return true; // go to sleep
 		}
 	}
@@ -366,22 +363,30 @@ bool Worker::SyncMain()
 }
 
 // Synchronization point for the workers.
-// We will call sync function  based on provided sync type and go to sleep if sync function returned true.
-// There is no atomic way to go to sleep and signal at the same time, so we must relly on OS that it will not start
-// our next worker that we woke up while we are going to sleep.
+// We will call sync function based on provided sync type and go to sleep if sync function returns true.
+// Sync function will wake up new worker if needed.
+// Notes:
+// There is a single mutex on scheduler used for workers synchronization and every worker has it's own condition variable.
+// In order to atomically suspend single worker thread (go to sleep by calling wait) and wake up next,
+// we will take lock on mutex before notifying another thread to wake up. Condition_variable::wait function
+// guarantees that it will unlock mutex and go to sleep atomically and it also guarantees that it will take lock on mutex
+// when wait is done. So when we notify another thread to wake up we are already holding lock on mutex
+// (and notified thread can not wake up until we release lock) and mutex will be unlocked only when we call wait on this thread,
+// which will release lock and wake another thread.
 //
-template<SyncType type>
+template<Worker::SyncType type>
 void Worker::Sync()
 {
-	// Pointer to sync member function.
+	// Pointer to sync member function. Horrible syntax.
 	//
 	constexpr bool (Worker::*sync)(void) = type == MAIN ? &Worker::SyncMain : &Worker::SyncYield;
 
+	// Take lock on mutex before calling sync to ensure that other worker won't wake up immediatelly when notified,
+	// but only when we call wait on this thread.
+	//
+	std::unique_lock<std::mutex> lock{ m_scheduler.m_workersMtx };
 	if ((this->*sync)())
-	{
-		std::unique_lock<std::mutex> lock{ m_mtx };
-		m_sync.wait(lock);
-	}
+		m_cv.wait(lock);
 }
 
 bool Worker::IdleLoop() const
@@ -568,6 +573,6 @@ int main()
 	/*while (true)
 		std::this_thread::sleep_for(workerSleepTime);*/
 
-	for (int i = 0; i < 100; ++i)
+	for (int i = 0; i < 100000; ++i)
 		taskManager.ExecuteTask(Task{ f1 });
 }

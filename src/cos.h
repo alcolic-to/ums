@@ -90,6 +90,7 @@ public:
 
 public:
 	const CPU& m_cpu;
+	std::mutex m_workersMtx;
 	std::deque<Worker*> m_runnableQueue;
 	std::deque<Worker*> m_idleQueue;
 	Worker* m_worker;
@@ -124,15 +125,13 @@ public:
 	std::vector<std::unique_ptr<Worker>> m_workers;
 };
 
-enum SyncType : int { MAIN, YIELD };
-
 // TODO: Check whether worker should be placed on std::hardware_constructive_interference_size alignment,
 // to avoid false sharing.
 //
 class Worker final
 {
 public:
-
+	enum SyncType : int { MAIN, YIELD };
 	enum StateE : int { INITIALIZING, IDLE, IDLE_LOOPING, RUNNABLE, RUNNING, EXITING };
 
 	static bool StateIdle(StateE state) { return state == IDLE || state == IDLE_LOOPING; }
@@ -171,8 +170,7 @@ public:
 
 	// TODO: reorganize data members for quick access.
 	//
-	std::mutex m_mtx;
-	std::condition_variable m_sync;
+	std::condition_variable m_cv;
 	std::thread m_thread;
 
 	uint64_t m_id;

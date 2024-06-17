@@ -48,6 +48,6 @@ void f1()
 
 int main(int argc, char* argv[])
 {
-	for (int i = 0; i < 1000; ++i)
+	for (int i = 0; i < 10000; ++i)
 		taskManager.ExecuteTask(Task{ f1 });
 }

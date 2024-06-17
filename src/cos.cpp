@@ -249,23 +249,23 @@ bool Worker::Exiting() const
 //
 void Worker::yield()
 {
-	Sync<YIELD>();
+	m_scheduler.Sync<YIELD>(*this);
 }
 
 // Synchronization point for the workers in yield.
 //
-bool Worker::SyncYield()
+bool Scheduler::SyncYield(Worker& worker)
 {
-	m_scheduler.SaveRunnable(); // Push current worker at the end of runnable queue.
-	m_scheduler.Schedule();
+	SaveRunnable(); // Push current worker at the end of runnable queue.
+	Schedule();
 
-	m_scheduler.PrepareWorker();
+	PrepareWorker();
 
-	if (m_scheduler.worker() != this)
+	if (m_worker != &worker)
 	{
-		std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << this->ID() << "\n";
-		std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.worker()->ID() << "\n";
-		m_scheduler.worker()->m_cv.notify_one(); // wake up next.
+		std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << worker.ID() << "\n";
+		std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_worker->ID() << "\n";
+		m_worker->m_cv.notify_one(); // wake up next.
 		return true; // go to sleep
 	}
 	else
@@ -274,37 +274,37 @@ bool Worker::SyncYield()
 
 // Synchronization point for the workers.
 //
-bool Worker::SyncMain()
+bool Scheduler::SyncMain(Worker& worker)
 {
 	// Park all new threads before scheduler is initialized.
 	// Notify thread that created us to continue.
 	//
-	if (m_scheduler.Initializing())
+	if (Initializing())
 	{
-		m_scheduler.SaveIdle();
-		m_cv.notify_one();
+		SaveIdle();
+		worker.m_cv.notify_one();
 		return true; // go to sleep.
 	}
 
-	m_scheduler.SaveIdle();
-	m_scheduler.Schedule();
+	SaveIdle();
+	Schedule();
 
-	if (m_scheduler.HasRunnableWorkers())
+	if (HasRunnableWorkers())
 	{
-		m_scheduler.PrepareWorker();
+		PrepareWorker();
 
-		if (m_scheduler.worker() != this)
+		if (m_worker != &worker)
 		{
-			std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << this->ID() << "\n";
-			std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_scheduler.worker()->ID() << "\n";
-			m_scheduler.worker()->m_cv.notify_one(); // wake up next.
+			std::cout << "CPU " << m_cpu.m_id << ": Yielding worker " << worker.ID() << "\n";
+			std::cout << "CPU " << m_cpu.m_id << ": Waking worker   " << m_worker->ID() << "\n";
+			m_worker->m_cv.notify_one(); // wake up next.
 			return true; // go to sleep
 		}
 	}
-	else if (m_scheduler.Exiting())
-		m_scheduler.ExitWorkers();
+	else if (Exiting())
+		ExitWorkers();
 	else
-		m_scheduler.IdleLooping();
+		IdleLooping();
 
 	return false; // continue with execution.
 }
@@ -321,23 +321,23 @@ bool Worker::SyncMain()
 // (and notified thread can not wake up until we release lock) and mutex will be unlocked only when we call wait on this thread,
 // which will release lock and wake another thread.
 //
-template<Worker::SyncType type>
-void Worker::Sync()
+template<SyncCtx ctx>
+void Scheduler::Sync(Worker& worker)
 {
 	// Pointer to sync member function. Horrible syntax.
 	//
-	constexpr bool (Worker::*sync)(void) = type == MAIN ? &Worker::SyncMain : &Worker::SyncYield;
+	constexpr bool (Scheduler::*sync)(Worker&) = ctx == MAIN ? &Scheduler::SyncMain : &Scheduler::SyncYield;
 
-	std::unique_lock<std::mutex> lock{ m_scheduler.m_workersMtx };
-	if ((this->*sync)())
-		m_cv.wait(lock);
+	std::unique_lock<std::mutex> lock{ m_workersMtx };
+	if ((this->*sync)(worker))
+		worker.m_cv.wait(lock);
 }
 
 bool Worker::IdleLoop() const
 {
 	if (m_state == IDLE_LOOPING)
 	{
-		std::cout << "CPU " << m_cpu.m_id << ": idle looping worker " << this->ID() << "\n";
+		std::cout << "CPU " << m_cpu.m_id << ": idle looping worker " << ID() << "\n";
 		std::this_thread::sleep_for(CFG_idleSleepDuration);
 		return true;
 	}
@@ -353,7 +353,7 @@ void Worker::Main()
 
 	while (true)
 	{
-		Sync<MAIN>();
+		m_scheduler.Sync<MAIN>(*this);
 
 		if (Exiting())
 			return;
@@ -364,7 +364,7 @@ void Worker::Main()
 		try
 		{
 			m_task();
-			std::cout << "CPU " << m_cpu.m_id << ": worker id " << this->ID() << " task done.\n";
+			std::cout << "CPU " << m_cpu.m_id << ": worker id " << ID() << " task done.\n";
 		}
 		catch (std::exception& ex)
 		{

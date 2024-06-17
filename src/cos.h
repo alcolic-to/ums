@@ -42,6 +42,10 @@ private:
 	std::vector<std::unique_ptr<CPU>> m_cpus;
 };
 
+// Synchronization context for scheduler.
+//
+enum SyncCtx : int { MAIN, YIELD };
+
 class Scheduler final
 {
 public:
@@ -78,6 +82,12 @@ public:
 	Worker* worker() const;
 
 	void SetState(StateE state);
+
+	bool SyncMain(Worker& worker);
+	bool SyncYield(Worker& worker);
+
+	template<SyncCtx ctx>
+	void Sync(Worker& worker);
 
 public:
 	const CPU& m_cpu;
@@ -122,7 +132,6 @@ public:
 class Worker final
 {
 public:
-	enum SyncType : int { MAIN, YIELD };
 	enum StateE : int { INITIALIZING, IDLE, IDLE_LOOPING, RUNNABLE, RUNNING, EXITING };
 
 	static bool StateIdle(StateE state) { return state == IDLE || state == IDLE_LOOPING; }
@@ -142,12 +151,6 @@ public:
 	void Main();
 
 	void yield();
-
-	bool SyncMain();
-	bool SyncYield();
-
-	template<SyncType type>
-	void Sync();
 
 	bool IdleLoop() const;
 	void SetState(StateE state);

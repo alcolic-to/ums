@@ -2,77 +2,35 @@
 #include <cassert>
 #include <memory>
 
-// Random
-#include <random>
-
-std::random_device rd;     // only used once to initialise (seed) engine
-std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in this case)
+#include <iostream>
+#include <chrono>
 
 #include "os_specific.h"
 #include "cos.h"
 
 using namespace std::chrono_literals;
 
-constexpr uint64_t FS_AllowedCPUs = 0b00001111;
-constexpr int workersPerCPU = 256;
-constexpr int tasksPerCPU = 40;
-constexpr auto workerSleepTime = 1ms;
-
-thread_local Worker* tls_worker;
-
-CPUs cpus;
-TaskManager taskManager{ cpus };
-
-void f2()
-{
-	tls_worker->yield();
-	return;
-}
-
-void f1()
-{
-	auto start = std::chrono::high_resolution_clock::now();
-
-	std::vector<int> v;
-	for (int i = 0; i < 1000; ++i)
-		v.push_back(rand());
-	
-	std::uniform_int_distribution<int> uni(0, 6);
-	// int funcDur = uni(rng);
-	int funcDur = 1;
-
-	int i = 0;
-	while (true)
-	{
-		auto end = std::chrono::high_resolution_clock::now();
-
-		std::chrono::duration<double, std::milli> duration = end - start;
-		if (duration.count() > funcDur * 1000)
-		{
-			std::cerr << "Task execution exceeded time limit of " << duration.count() << "ms." << std::endl;
-			break;
-		}
-
-		if (v[rand() % v.size()] == rand() % v.size() && i++ % 100 == 0)
-		{
-			tls_worker->yield();
-		}
-	}
-
-	return;
-}
+constexpr uint64_t CFG_allowedCpus = 0b00001111;
+constexpr int CFG_workersPerCPU = 16;
+constexpr auto CFG_idleSleepDuration = 1ms;
 
 CPUs::CPUs()
 	: m_systemCpusCount{ CpusCount() }
 	, m_availCpusMask{ CpusAvailMask() }
 {
-	m_availCpusMask &= FS_AllowedCPUs;
+	m_availCpusMask &= CFG_allowedCpus;
 
 	// Create new CPU for each bit available in available CPUs mask.
 	//
 	for (uint64_t cpu_id = 0, cpusMask = m_availCpusMask; cpusMask != 0; ++cpu_id, cpusMask >>= 1)
 		if (cpusMask & 1)
 			m_cpus.emplace_back(std::make_unique<CPU>(cpu_id, 1 << cpu_id));
+}
+
+CPU& CPUs::MinLoadCPU() const
+{
+	constexpr auto cmp = [](const std::unique_ptr<CPU>& left, const std::unique_ptr<CPU>& right) { return left->Load() < right->Load(); };
+	return **std::min_element(m_cpus.begin(), m_cpus.end(), cmp);
 }
 
 CPU::CPU(uint64_t cpu_id, uint64_t cpu_mask)
@@ -82,7 +40,7 @@ CPU::CPU(uint64_t cpu_id, uint64_t cpu_mask)
 	, m_scheduler{ *this }
 	, m_workers{}
 {
-	for (int i = 0; i < workersPerCPU; ++i)
+	for (int i = 0; i < CFG_workersPerCPU; ++i)
 		m_workers.push_back(std::make_unique<Worker>(i, *this));
 
 	m_scheduler.Start();
@@ -92,17 +50,11 @@ void CPU::WorkerEntryPoint(Worker& worker) const
 {
 	BindThread();
 
-	std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << " " << "Win32: " << GetCurrentProcessorNumber() <<  std::endl;
+	std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << std::endl;
 
 	worker.Main();
 
-	std::cout << "Ended thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << " " << "Win32: " << GetCurrentProcessorNumber() <<  std::endl;
-}
-
-CPU& CPUs::MinLoadCPU() const
-{
-	constexpr auto cmp = [](const std::unique_ptr<CPU>& left, const std::unique_ptr<CPU>& right) { return left->Load() < right->Load(); };
-	return **std::min_element(m_cpus.begin(), m_cpus.end(), cmp);
+	std::cout << "Ended thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << std::endl;
 }
 
 void CPU::ExecuteTask(const Task& task)
@@ -175,9 +127,6 @@ void Scheduler::SaveIdle()
 
 bool Scheduler::HasTasks() const
 {
-	// TODO: Check whether we should lock here.
-	//
-	// std::scoped_lock<std::mutex> lock{ m_tasksMtx };
 	return !m_tasks.empty();
 }
 
@@ -288,8 +237,6 @@ void Worker::SetState(Worker::StateE state)
 	else if (StateRunnable(m_state) && StateIdle(state))
 		m_cpu.DecLoad();
 
-	// TODO: Collect some statistics here.
-	//
 	m_state = state;
 }
 
@@ -381,9 +328,6 @@ void Worker::Sync()
 	//
 	constexpr bool (Worker::*sync)(void) = type == MAIN ? &Worker::SyncMain : &Worker::SyncYield;
 
-	// Take lock on mutex before calling sync to ensure that other worker won't wake up immediatelly when notified,
-	// but only when we call wait on this thread.
-	//
 	std::unique_lock<std::mutex> lock{ m_scheduler.m_workersMtx };
 	if ((this->*sync)())
 		m_cv.wait(lock);
@@ -394,7 +338,7 @@ bool Worker::IdleLoop() const
 	if (m_state == IDLE_LOOPING)
 	{
 		std::cout << "CPU " << m_cpu.m_id << ": idle looping worker " << this->ID() << "\n";
-		std::this_thread::sleep_for(workerSleepTime);
+		std::this_thread::sleep_for(CFG_idleSleepDuration);
 		return true;
 	}
 	else
@@ -435,144 +379,6 @@ void TaskManager::ExecuteTask(Task task)
 	bestCPU.ExecuteTask(task);
 }
 
-using namespace std::chrono_literals;
-
-std::condition_variable cv;
-std::mutex cv_m;
-
-std::mutex io_mtx;
-
-void fun()
-{
-	SetThreadAffinityMask(GetCurrentThread(), 1);
-	std::this_thread::sleep_for(1s);
-
-	{
-		std::scoped_lock<std::mutex> io_lock{ io_mtx };
-		std::cout << "Thread " << std::this_thread::get_id() << " running on " << GetCurrentProcessorNumber() << std::endl;
-	}
-
-	{
-		std::unique_lock<std::mutex> lock(cv_m);
-		std::cout << "Thread " << std::this_thread::get_id() << " waiting on conditional lock. \n";
-		cv.wait(lock);
-		std::cout << "Thread " << std::this_thread::get_id() << " resuming with lock. \n";
-	}
-
-	std::cout << "Thread " << std::this_thread::get_id() << " released lock and notifying one. \n";
-	cv.notify_one();
-	for (int i = 0; i < 100000000; ++i)
-		if (i % 100000 == 0)
-			std::cout << "I (" << std::this_thread::get_id() << ") am doing some really hard work.\n";
-	// std::cout << "I (" << std::this_thread::get_id() << ") am doing to sleep.\n";
-	std::this_thread::sleep_for(1s);
-	std::cout << "Thread " << std::this_thread::get_id() << " resumed on " << GetCurrentProcessorNumber() << ". \n";
-}
-
-void hardwork()
-{
-	SetThreadAffinityMask(GetCurrentThread(), 1);
-	std::this_thread::sleep_for(1s);
-
-	std::vector<int> v;
-	for (int i = 0; i < 1000; ++i)
-		v.push_back(rand());
-
-	int i = 0;
-	while (true)
-	{
-		if (v[rand() % v.size()] == rand() % v.size() && i++ % 10000 == 0)
-			std::cout << "Hit\n";
-	}
-}
-
-void entryPoint()
-{
-
-}
-
-class A
-{
-public:
-	A(int& i)
-		: m_i{ i }
-	{
-	}
-
-	int& m_i;
-};
-
-std::string strfunc()
-{
-	return std::string("Op");
-}
-
-int main()
-{
-	//unsigned __int64 thisProcessAfinityMask = 0;
-	//unsigned __int64 systemAfinityMask = 0;
-	//GetProcessAffinityMask(GetCurrentProcess(), &thisProcessAfinityMask, &systemAfinityMask);
-	//std::bitset<32> bsp{ thisProcessAfinityMask };
-	//std::bitset<32> bss{ systemAfinityMask };
-
-	//std::cout << bsp << "\n" << bss << "\n";
-
-	//std::cout << "Thread " << std::this_thread::get_id() << " running on " << GetCurrentProcessorNumber();
-
-	//unsigned __int64 newThreadAfinityMask = 1 << 0;
-
-	//auto res = SetThreadAffinityMask(GetCurrentThread(), newThreadAfinityMask);
-	//std::cout << res << "\n";
-
-	//std::this_thread::sleep_for(1s);
-	//std::cout << "Thread " << std::this_thread::get_id() << " running on " << GetCurrentProcessorNumber();
-
-	//std::vector<std::thread> v;
-
-	//for (int i = 0; i < 3; ++i)
-	//	v.push_back(std::thread{ fun });
-
-	//std::this_thread::sleep_for(3s);
-
-	//std::cout << "Main thread notifying one. \n";
-	//cv.notify_one();
-
-	//for (auto it = v.begin(); it != v.end(); ++it)
-	//	it->join();
-
-	//SetThreadAffinityMask(GetCurrentThread(), 1);
-	//std::this_thread::sleep_for(1s);
-
-	//std::thread hardthread{ hardwork };
-
-	//for (int i = 0; true; ++i)
-	//{
-	//	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-	//	// std::this_thread::yield();
-	//	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-
-	//	auto res = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-	//	if (res > 1)
-	//		std::cout << res << "ms\n";
-
-	//	// std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[µs]" << std::endl;
-	//	// std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count() << "[ns]" << std::endl;
-	//}
-
-	//hardthread.join();
-	//return 0;
-
-	// TODO: Izmeriti koliko traje kontext switch sa notify and wait: pustiti 2 thread-a na istom koru i startovati jedan sa tajmerom.
-	// SIgnal drugom i on odmah hvata vreme i stampa.
-
-	//std::thread t{ entryPoint };
-	//t.join();
-
-	// std::cout << GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
-
-	/*while (true)
-		std::this_thread::sleep_for(workerSleepTime);*/
-
-	for (int i = 0; i < 100000; ++i)
-		taskManager.ExecuteTask(Task{ f1 });
-}
+CPUs cpus;
+TaskManager taskManager{ cpus };
+thread_local Worker* tls_worker;

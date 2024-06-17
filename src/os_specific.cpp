@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <stdexcept>
+#include <iostream>
 
 #include "cos.h"
 

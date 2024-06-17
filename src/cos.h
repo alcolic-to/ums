@@ -5,38 +5,16 @@
 
 #include <cstdint>
 #include <vector>
-#include <windows.h>
-#include <bitset>
-#include <iostream>
 #include <thread>
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
-#include <list>
 #include <queue>
-#include <utility>
 #include <functional>
 
 class Scheduler;
 class CPU;
 class Worker;
-class Task;
-
-extern thread_local Worker* tls_worker;
-extern std::deque<Task> g_tasksQueue;
-
-class CPUs final
-{
-public:
-	CPUs();
-
-	CPU& MinLoadCPU() const;
-
-private:
-	uint32_t m_systemCpusCount;
-	uint64_t m_availCpusMask;
-	std::vector<std::unique_ptr<CPU>> m_cpus;
-};
 
 class Task
 {
@@ -49,6 +27,19 @@ public:
 	void operator()() { m_function(); }
 
 	std::function<void()> m_function;
+};
+
+class CPUs final
+{
+public:
+	CPUs();
+
+	CPU& MinLoadCPU() const;
+
+private:
+	uint32_t m_systemCpusCount;
+	uint64_t m_availCpusMask;
+	std::vector<std::unique_ptr<CPU>> m_cpus;
 };
 
 class Scheduler final
@@ -196,5 +187,6 @@ public:
 
 extern CPUs cpus;
 extern TaskManager taskManager;
+extern thread_local Worker* tls_worker;
 
 #endif

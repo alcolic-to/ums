@@ -10,7 +10,7 @@
 
 using namespace std::chrono_literals;
 
-constexpr uint64_t CFG_allowedCpus = 0b00001111;
+constexpr uint64_t CFG_allowedCpus = 0b00000001;
 constexpr int CFG_workersPerCPU = 16;
 constexpr auto CFG_idleSleepDuration = 1ms;
 
@@ -50,11 +50,11 @@ void CPU::WorkerEntryPoint(Worker& worker) const
 {
 	BindThread();
 
-	std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << std::endl;
+	std::cout << "Started thread: " << worker.ID() << " on CPU " << worker.cpu().m_id << std::endl;
 
 	worker.Main();
 
-	std::cout << "Ended thread: " << worker.ID() << " on CPU " << worker.CPUg().m_id << std::endl;
+	std::cout << "Ended thread: " << worker.ID() << " on CPU " << worker.cpu().m_id << std::endl;
 }
 
 void CPU::ExecuteTask(const Task& task)
@@ -91,24 +91,6 @@ void Scheduler::EnqueueTask(const Task& task)
 bool Scheduler::HasIdleWorkers() const { return !m_idleQueue.empty(); }
 bool Scheduler::HasRunnableWorkers() const { return !m_runnableQueue.empty(); }
 
-void Scheduler::WakeUpNext()
-{
-	m_worker = m_runnableQueue.front();
-	m_runnableQueue.pop_front();
-
-	m_worker->SetState(Worker::RUNNING);
-	m_worker->m_cv.notify_one();
-}
-
-void Scheduler::WakeUpNextIdle()
-{
-	m_worker = m_idleQueue.front();
-	m_idleQueue.pop_front();
-
-	m_worker->SetState(Worker::RUNNING);
-	m_worker->m_cv.notify_one();
-}
-
 void Scheduler::SaveRunnable()
 {
 	m_runnableQueue.push_back(m_worker);
@@ -128,11 +110,6 @@ void Scheduler::SaveIdle()
 bool Scheduler::HasTasks() const
 {
 	return !m_tasks.empty();
-}
-
-void Scheduler::ScheduleWorker(Worker& worker)
-{
-	m_runnableQueue.push_back(&worker);
 }
 
 void Scheduler::PrepareWorker()
@@ -160,7 +137,7 @@ Task Scheduler::NextTask()
 	return t;
 }
 
-void Scheduler::ScheduleNextIdle()
+void Scheduler::ScheduleIdleWorker()
 {
 	Worker* worker = m_idleQueue.front();
 	m_idleQueue.pop_front();
@@ -173,7 +150,7 @@ void Scheduler::ScheduleNextIdle()
 void Scheduler::Schedule()
 {
 	while (HasTasks() && HasIdleWorkers())
-		ScheduleNextIdle();
+		ScheduleIdleWorker();
 }
 
 bool Scheduler::Initializing() const

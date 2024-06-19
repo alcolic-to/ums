@@ -60,9 +60,6 @@ public:
 	bool HasIdleWorkers() const;
 	bool HasRunnableWorkers() const;
 
-	void WakeUpNext();
-	void WakeUpNextIdle();
-
 	void SaveRunnable();
 	void SaveIdle();
 
@@ -70,11 +67,10 @@ public:
 	void IdleLooping();
 
 	bool HasTasks() const;
-	void ScheduleWorker(Worker& worker);
 	Task NextTask();
 
 	void Schedule();
-	void ScheduleNextIdle();
+	void ScheduleIdleWorker();
 
 	void ExitWorkers() const;
 	bool Exiting() const;
@@ -157,7 +153,7 @@ public:
 	bool Exiting() const;
 
 	constexpr uint64_t ID() const { return m_id; }
-	constexpr CPU& CPUg() const { return m_cpu; }
+	constexpr CPU& cpu() const { return m_cpu; }
 	constexpr StateE State() const { return m_state; }
 
 public:

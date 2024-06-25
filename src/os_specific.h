@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-uint32_t CpusCount(); // maybe just std::thread::hardware_concurrency?
-uint64_t CpusAvailMask();
+uint32_t cpus_count(); // maybe just std::thread::hardware_concurrency?
+uint64_t cpus_avail_mask();
 
 #endif // OS_SPECIFIC_H

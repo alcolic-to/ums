@@ -37,8 +37,8 @@ public:
 	CPU& MinLoadCPU() const;
 
 private:
-	uint32_t m_systemCpusCount;
-	uint64_t m_availCpusMask;
+	uint32_t m_system_cpus_count;
+	uint64_t m_avail_cpus_mask;
 	std::vector<std::unique_ptr<CPU>> m_cpus;
 };
 
@@ -49,51 +49,51 @@ enum SyncCtx : int { MAIN, YIELD };
 class Scheduler final
 {
 public:
-	enum StateE : int { INITIALIZING, RUNNING, EXITING };
+	enum State : int { INITIALIZING, RUNNING, EXITING };
 
 	Scheduler(const CPU& cpu);
 
-	void Start();
+	void start();
 
-	void EnqueueTask(const Task& task);
+	void enqueue_task(const Task& task);
 
-	bool HasIdleWorkers() const;
-	bool HasRunnableWorkers() const;
+	bool has_idle_workers() const;
+	bool has_runnable_workers() const;
 
-	void SaveRunnable();
-	void SaveIdle();
+	void save_runnable();
+	void save_idle();
 
-	void PrepareWorker();
-	void IdleLooping();
+	void prepare_worker();
+	void idle_looping();
 
-	bool HasTasks() const;
-	Task NextTask();
+	bool has_tasks() const;
+	Task next_task();
 
-	void Schedule();
-	void ScheduleIdleWorker();
+	void schedule();
+	void schedule_idle_worker();
 
-	void ExitWorkers() const;
-	bool Exiting() const;
-	bool Initializing() const;
+	void exit_workers() const;
+	bool exiting() const;
+	bool initializing() const;
 	Worker* worker() const;
 
-	void SetState(StateE state);
+	void set_state(State state);
 
-	bool SyncMain(Worker& worker);
-	bool SyncYield(Worker& worker);
+	bool sync_main(Worker& worker);
+	bool sync_yield(Worker& worker);
 
 	template<SyncCtx ctx>
-	void Sync(Worker& worker);
+	void sync(Worker& worker);
 
 public:
 	const CPU& m_cpu;
-	std::mutex m_workersMtx;
-	std::deque<Worker*> m_runnableQueue;
-	std::deque<Worker*> m_idleQueue;
+	std::mutex m_workers_mtx;
+	std::deque<Worker*> m_runnable_queue;
+	std::deque<Worker*> m_idle_queue;
 	Worker* m_worker;
-	std::mutex m_tasksMtx;
+	std::mutex m_tasks_mtx;
 	std::deque<Task> m_tasks;
-	StateE m_state;
+	State m_state;
 };
 
 class CPU final
@@ -103,12 +103,12 @@ public:
 
 public:
 
-	void WorkerEntryPoint(Worker& worker) const;
-	void BindThread() const;
-	void ExecuteTask(const Task& task);
-	void IncLoad();
-	void DecLoad();
-	uint64_t Load() const;
+	void worker_entry_point(Worker& worker) const;
+	void bind_thread() const;
+	void execute_task(const Task& task);
+	void inc_load();
+	void dec_load();
+	uint64_t load() const;
 
 public:
 	uint64_t m_id;
@@ -128,10 +128,10 @@ public:
 class Worker final
 {
 public:
-	enum StateE : int { INITIALIZING, IDLE, IDLE_LOOPING, RUNNABLE, RUNNING, EXITING };
+	enum State : int { INITIALIZING, IDLE, IDLE_LOOPING, RUNNABLE, RUNNING, EXITING };
 
-	static bool StateIdle(StateE state) { return state == IDLE || state == IDLE_LOOPING; }
-	static bool StateRunnable(StateE state) { return state == RUNNABLE || state == RUNNING; }
+	static bool StateIdle(State state) { return state == IDLE || state == IDLE_LOOPING; }
+	static bool StateRunnable(State state) { return state == RUNNABLE || state == RUNNING; }
 
 	// Create worker object and start worker thread on a provided CPU.
 	//
@@ -144,17 +144,17 @@ public:
 
 	Worker& operator=(const Worker& other) = delete;
 
-	void Main();
+	void main_loop();
 
 	void yield();
 
-	bool IdleLoop() const;
-	void SetState(StateE state);
-	bool Exiting() const;
+	bool idle_loop() const;
+	void set_state(State state);
+	bool exiting() const;
 
-	constexpr uint64_t ID() const { return m_id; }
+	constexpr uint64_t id() const { return m_id; }
 	constexpr CPU& cpu() const { return m_cpu; }
-	constexpr StateE State() const { return m_state; }
+	constexpr State state() const { return m_state; }
 
 public:
 
@@ -164,7 +164,7 @@ public:
 	std::thread m_thread;
 
 	uint64_t m_id;
-	StateE m_state;
+	State m_state;
 
 	Task m_task;
 	CPU& m_cpu;
@@ -185,7 +185,7 @@ public:
 };
 
 extern CPUs cpus;
-extern TaskManager taskManager;
+extern TaskManager task_manager;
 extern thread_local Worker* tls_worker;
 
 #endif

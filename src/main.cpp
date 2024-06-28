@@ -33,7 +33,7 @@ void f1()
 		std::chrono::duration<double, std::milli> duration = end - start;
 		if (duration.count() > funcDur)
 		{
-			std::cerr << "Task execution exceeded time limit of " << duration.count() << "ms." << std::endl;
+			std::cout << "Task execution exceeded time limit of " << duration.count() << "ms." << std::endl;
 			break;
 		}
 
@@ -48,6 +48,6 @@ void f1()
 
 int main(int argc, char* argv[])
 {
-	for (int i = 0; i < 50000; ++i)
-		task_manager.ExecuteTask(Task{ f1 });
+	for (int i = 0; i < 100000; ++i)
+		task_manager.execute_task(Task{ f1 });
 }

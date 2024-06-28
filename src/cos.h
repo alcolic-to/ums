@@ -34,7 +34,7 @@ class CPUs final
 public:
 	CPUs();
 
-	CPU& MinLoadCPU() const;
+	CPU& min_load_cpu() const;
 
 private:
 	uint32_t m_system_cpus_count;
@@ -44,12 +44,12 @@ private:
 
 // Synchronization context for scheduler.
 //
-enum SyncCtx : int { MAIN, YIELD };
+enum class SyncCtx : int { main, yield };
 
 class Scheduler final
 {
 public:
-	enum State : int { INITIALIZING, RUNNING, EXITING };
+	enum class State : int { initializing, running, exiting };
 
 	Scheduler(const CPU& cpu);
 
@@ -128,10 +128,10 @@ public:
 class Worker final
 {
 public:
-	enum State : int { INITIALIZING, IDLE, IDLE_LOOPING, RUNNABLE, RUNNING, EXITING };
+	enum class State : int { initializing, idle, idle_looping, runnable, running, exiting };
 
-	static bool StateIdle(State state) { return state == IDLE || state == IDLE_LOOPING; }
-	static bool StateRunnable(State state) { return state == RUNNABLE || state == RUNNING; }
+	static bool state_idle(State state) { return state == State::idle || state == State::idle_looping; }
+	static bool state_runnable(State state) { return state == State::runnable || state == State::running; }
 
 	// Create worker object and start worker thread on a provided CPU.
 	//
@@ -171,21 +171,21 @@ public:
 	Scheduler& m_scheduler;
 };
 
-class TaskManager final
+class Task_manager final
 {
 public:
-	TaskManager(const CPUs& cpus)
+	Task_manager(const CPUs& cpus)
 		: m_cpus{ cpus }
 	{
 	}
 
-	void ExecuteTask(Task task);
+	void execute_task(Task task);
 
 	const CPUs& m_cpus;
 };
 
 extern CPUs cpus;
-extern TaskManager task_manager;
+extern Task_manager task_manager;
 extern thread_local Worker* tls_worker;
 
 #endif

@@ -10,7 +10,7 @@
 
 using namespace std::chrono_literals;
 
-constexpr uint64_t CFG_allowed_cpus = 0b00000001;
+constexpr uint64_t CFG_allowed_cpus = 0b0000'1111;
 constexpr int CFG_workers_per_cpu = 16;
 constexpr auto CFG_idle_sleep = 1ms;
 
@@ -27,7 +27,7 @@ CPUs::CPUs()
 			m_cpus.emplace_back(std::make_unique<CPU>(cpu_id, 1 << cpu_id));
 }
 
-CPU& CPUs::MinLoadCPU() const
+CPU& CPUs::min_load_cpu() const
 {
 	constexpr auto cmp = [](const std::unique_ptr<CPU>& left, const std::unique_ptr<CPU>& right) { return left->load() < right->load(); };
 	return **std::min_element(m_cpus.begin(), m_cpus.end(), cmp);
@@ -69,14 +69,14 @@ uint64_t CPU::load() const { return m_load + m_scheduler.m_tasks.size(); }
 Scheduler::Scheduler(const CPU& cpu)
 	: m_cpu{ cpu }
 	, m_worker{ nullptr }
-	, m_state{ INITIALIZING }
+	, m_state{ State::initializing }
 { }
 
 // start scheduler.
 //
 void Scheduler::start()
 {
-	m_state = RUNNING;
+	m_state = State::running;
 
 	idle_looping();
 	m_worker->m_cv.notify_one();
@@ -95,7 +95,7 @@ void Scheduler::save_runnable()
 {
 	m_runnable_queue.push_back(m_worker);
 
-	m_worker->set_state(Worker::RUNNABLE);
+	m_worker->set_state(Worker::State::runnable);
 	m_worker = nullptr;
 }
 
@@ -103,7 +103,7 @@ void Scheduler::save_idle()
 {
 	m_idle_queue.push_back(m_worker);
 
-	m_worker->set_state(Worker::IDLE);
+	m_worker->set_state(Worker::State::idle);
 	m_worker = nullptr;
 }
 
@@ -117,7 +117,7 @@ void Scheduler::prepare_worker()
 	m_worker = m_runnable_queue.front();
 	m_runnable_queue.pop_front();
 
-	m_worker->set_state(Worker::RUNNING);
+	m_worker->set_state(Worker::State::running);
 }
 
 void Scheduler::idle_looping()
@@ -125,7 +125,7 @@ void Scheduler::idle_looping()
 	m_worker = m_idle_queue.back();
 	m_idle_queue.pop_back();
 
-	m_worker->set_state(Worker::IDLE_LOOPING);
+	m_worker->set_state(Worker::State::idle_looping);
 }
 
 Task Scheduler::next_task()
@@ -143,7 +143,7 @@ void Scheduler::schedule_idle_worker()
 	m_idle_queue.pop_front();
 
 	worker->m_task = next_task();
-	worker->set_state(Worker::RUNNABLE);
+	worker->set_state(Worker::State::runnable);
 	m_runnable_queue.push_back(worker);
 }
 
@@ -153,8 +153,8 @@ void Scheduler::schedule()
 		schedule_idle_worker();
 }
 
-bool Scheduler::initializing() const { return m_state == INITIALIZING; }
-bool Scheduler::exiting() const { return m_state == EXITING; }
+bool Scheduler::initializing() const { return m_state == State::initializing; }
+bool Scheduler::exiting() const { return m_state == State::exiting; }
 void Scheduler::set_state(State state) { m_state = state; }
 Worker* Scheduler::worker() const { return m_worker; }
 
@@ -162,7 +162,7 @@ void Scheduler::exit_workers() const
 {
 	for (Worker* worker : m_idle_queue)
 	{
-		worker->set_state(Worker::EXITING);
+		worker->set_state(Worker::State::exiting);
 		worker->m_cv.notify_one();
 	}
 }
@@ -171,7 +171,7 @@ void Scheduler::exit_workers() const
 //
 Worker::Worker(uint64_t id, CPU& cpu)
 	: m_id{ id }
-	, m_state{ INITIALIZING }
+	, m_state{ State::initializing }
 	, m_cv{}
 	, m_cpu{ cpu }
 	, m_task{}
@@ -186,7 +186,7 @@ Worker::Worker(uint64_t id, CPU& cpu)
 
 Worker::~Worker()
 {
-	m_scheduler.set_state(Scheduler::EXITING);
+	m_scheduler.set_state(Scheduler::State::exiting);
 
 	if (m_thread.joinable())
 		m_thread.join();
@@ -194,9 +194,9 @@ Worker::~Worker()
 
 void Worker::set_state(Worker::State state)
 {
-	if (StateIdle(m_state) && StateRunnable(state))
+	if (state_idle(m_state) && state_runnable(state))
 		m_cpu.inc_load();
-	else if (StateRunnable(m_state) && StateIdle(state))
+	else if (state_runnable(m_state) && state_idle(state))
 		m_cpu.dec_load();
 
 	m_state = state;
@@ -204,14 +204,14 @@ void Worker::set_state(Worker::State state)
 
 bool Worker::exiting() const
 {
-	return m_state == EXITING;
+	return m_state == State::exiting;
 }
 
 // Yields current worker and wakes up next worker for execution.
 //
 void Worker::yield()
 {
-	m_scheduler.sync<YIELD>(*this);
+	m_scheduler.sync<SyncCtx::yield>(*this);
 }
 
 // Synchronization point for the workers in yield.
@@ -288,7 +288,7 @@ void Scheduler::sync(Worker& worker)
 {
 	// Pointer to sync member function. Horrible syntax.
 	//
-	constexpr bool (Scheduler::*sync)(Worker&) = ctx == MAIN ? &Scheduler::sync_main : &Scheduler::sync_yield;
+	constexpr bool (Scheduler::*sync)(Worker&) = ctx == SyncCtx::main ? &Scheduler::sync_main : &Scheduler::sync_yield;
 
 	std::unique_lock<std::mutex> lock{ m_workers_mtx };
 	if ((this->*sync)(worker))
@@ -297,7 +297,7 @@ void Scheduler::sync(Worker& worker)
 
 bool Worker::idle_loop() const
 {
-	if (m_state == IDLE_LOOPING)
+	if (m_state == State::idle_looping)
 	{
 		std::cout << "CPU " << m_cpu.m_id << ": idle looping worker " << id() << "\n";
 		std::this_thread::sleep_for(CFG_idle_sleep);
@@ -315,7 +315,7 @@ void Worker::main_loop()
 
 	while (true)
 	{
-		m_scheduler.sync<MAIN>(*this);
+		m_scheduler.sync<SyncCtx::main>(*this);
 
 		if (exiting())
 			return;
@@ -335,12 +335,12 @@ void Worker::main_loop()
 	}
 }
 
-void TaskManager::ExecuteTask(Task task)
+void Task_manager::execute_task(Task task)
 {
-	CPU& best_cpu = m_cpus.MinLoadCPU();
+	CPU& best_cpu = m_cpus.min_load_cpu();
 	best_cpu.execute_task(task);
 }
 
 CPUs cpus;
-TaskManager task_manager{ cpus };
+Task_manager task_manager{ cpus };
 thread_local Worker* tls_worker;

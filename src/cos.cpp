@@ -271,6 +271,15 @@ bool Scheduler::sync_main(Worker& worker)
 	return false; // continue with execution.
 }
 
+// Returns pointer to scheduler's sync member function based on provided sync context.
+//
+template<SyncCtx ctx>
+constexpr auto sync_func()
+{
+	if      constexpr (ctx == SyncCtx::main)  return &Scheduler::sync_main;
+	else if constexpr (ctx == SyncCtx::yield) return &Scheduler::sync_yield;
+}
+
 // Synchronization point for the workers.
 // We will call sync function based on provided sync type and go to sleep if sync function returns true.
 // sync function will wake up new worker if needed.
@@ -286,12 +295,8 @@ bool Scheduler::sync_main(Worker& worker)
 template<SyncCtx ctx>
 void Scheduler::sync(Worker& worker)
 {
-	// Pointer to sync member function. Horrible syntax.
-	//
-	constexpr bool (Scheduler::*sync)(Worker&) = ctx == SyncCtx::main ? &Scheduler::sync_main : &Scheduler::sync_yield;
-
 	std::unique_lock<std::mutex> lock{ m_workers_mtx };
-	if ((this->*sync)(worker))
+	if ((this->*sync_func<ctx>())(worker))
 		worker.m_cv.wait(lock);
 }
 

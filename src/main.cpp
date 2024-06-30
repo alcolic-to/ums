@@ -1,12 +1,14 @@
 #include <iostream>
-
-// Random
 #include <random>
+#include <chrono>
+#include <exception>
 
 #include "cos.h"
 
 std::random_device rd;     // only used once to initialise (seed) engine
 std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in this case)
+
+using namespace std::chrono_literals;
 
 void f2()
 {
@@ -46,8 +48,36 @@ void f1()
 	return;
 }
 
+Event e;
+
+int f3()
+{
+	int first = 0, second = 1;
+	
+	// Fibbonaci seq.
+	//
+	for (int i = 2; i < 1000000000; ++i)
+	{
+		int sum = first + second;
+		first = second;
+		second = sum;
+
+		// if (i % 10000 == 0)
+		// 	tls_worker->wait_event(e);
+	}
+
+	return second;
+}
+
 int main(int argc, char* argv[])
 {
-	for (int i = 0; i < 100000; ++i)
+	for (int i = 0; i < 1000; ++i)
+	{
 		task_manager.execute_task(Task{ f1 });
+	}
+
+	// std::this_thread::sleep_for(5s);
+	// e.signal();
+
+	// std::cout << f3() << std::endl;
 }

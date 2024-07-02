@@ -116,7 +116,7 @@ bool Scheduler::has_tasks() const
 	return !m_tasks.empty();
 }
 
-void Scheduler::prepare_worker()
+void Scheduler::prepare_next_worker()
 {
 	m_worker = m_runnable_queue.front();
 	m_runnable_queue.pop_front();
@@ -168,6 +168,29 @@ void Scheduler::schedule_waiting_workers()
 		else
 			++it;
 	}
+}
+
+void Scheduler::schedule_workers()
+{
+	schedule_waiting_workers();
+	schedule_idle_workers();
+
+	// Idle loop if there is no work.
+	//
+	while (!has_runnable_workers() && !exit())
+	{
+		// TODO: Release CPU (sleep) only when our time slice expires.
+		//
+		std::this_thread::sleep_for(CFG_idle_sleep);
+
+		schedule_waiting_workers();
+		schedule_idle_workers();
+	}
+
+	if (exit())
+		exit_workers();
+	else
+		prepare_next_worker();
 }
 
 bool Scheduler::initializing() const { return m_state == State::initializing; }
@@ -231,8 +254,8 @@ bool Scheduler::sync_main(Worker* worker)
 		else
 			return false; // skip scheduling.
 	}
-
-	return true; // proceed with scheduling.
+	else
+		return true; // proceed with scheduling.
 }
 
 // Returns pointer to scheduler's sync member function based on provided sync context.
@@ -245,22 +268,6 @@ constexpr auto sync_func()
 	else if constexpr (ctx == SyncCtx::wait_event) return &Scheduler::sync_wait_event;
 }
 
-void Scheduler::schedule_workers()
-{
-	schedule_waiting_workers();
-	schedule_idle_workers();
-
-	// Idle loop if there is no work.
-	//
-	while (!has_runnable_workers() && !exit())
-	{
-		std::this_thread::sleep_for(CFG_idle_sleep);
-
-		schedule_waiting_workers();
-		schedule_idle_workers();
-	}
-}
-
 // Synchronization point for the workers.
 // We will call sync function based on provided sync type and proceed with scheduling if it returns true.
 // Currently, only important work is done within Scheduler::sync_main on workers initialization.
@@ -271,14 +278,6 @@ void Scheduler::sync(Worker* worker)
 	if ((this->*sync_func<ctx>())(worker))
 	{
 		schedule_workers();
-
-		if (exit())
-		{
-			exit_workers();
-			return;
-		}
-
-		prepare_worker();
 
 		if (m_worker != worker)
 			context_switch(worker);
@@ -296,7 +295,7 @@ void Scheduler::exit_workers() const
 
 bool Scheduler::exit() const
 {
-	return exiting() && !has_tasks() && !has_runnable_workers() && !has_waiting_workers();
+	return !has_runnable_workers() && exiting() && !has_tasks() && !has_waiting_workers();
 }
 
 // Creates worker object and starts worker thread on a provided CPU.

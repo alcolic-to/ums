@@ -74,7 +74,7 @@ public:
 	void save_idle(Worker* worker);
 	void save_waiting(Worker* worker);
 
-	void prepare_worker();
+	void prepare_next_worker();
 
 	bool has_tasks() const;
 	Task next_task();
@@ -84,11 +84,11 @@ public:
 	void schedule_idle_workers();
 	void schedule_waiting_workers();
 
+	void schedule_workers();
+
 	bool exiting() const;
 	bool initializing() const;
 	Worker* worker() const;
-
-	void schedule_workers();
 
 	void set_state(State state);
 

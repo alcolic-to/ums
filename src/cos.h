@@ -20,14 +20,40 @@ class Worker;
 class Task
 {
 public:
+	enum class State : int { not_started, running, done };
 
-	Task() = default;
+	Task()
+		: m_state{ State::not_started }
+	{ }
+
 	Task(const std::function<void()> function)
-		: m_function{ function } {}
+		: m_func{ function }
+		, m_state{ State::not_started }
+	{ }
 
-	void operator()() { m_function(); }
+	void wait()
+	{
+		std::unique_lock<std::mutex> lock{ m_mtx };
+		if (m_state != Task::State::done)
+			m_cv.wait(lock);
+	}
 
-	std::function<void()> m_function;
+	void notify()
+	{
+		std::unique_lock<std::mutex> lock{ m_mtx };
+		m_state = State::done;
+		m_cv.notify_one();
+	}
+
+	void operator()()
+	{
+		m_func();
+	}
+
+	std::function<void()> m_func;
+	State m_state;
+	std::mutex m_mtx;
+	std::condition_variable m_cv;
 };
 
 class CPUs final
@@ -64,20 +90,21 @@ public:
 
 	void start();
 
-	void enqueue_task(const Task& task);
-
 	bool has_idle_workers() const;
 	bool has_runnable_workers() const;
 	bool has_waiting_workers() const;
 
 	void save_runnable(Worker* worker);
-	void save_idle(Worker* worker);
 	void save_waiting(Worker* worker);
+
+	template<bool back>
+	void save_idle(Worker* worker);
 
 	void prepare_next_worker();
 
+	void enqueue_task(std::shared_ptr<Task> task);
+	std::shared_ptr<Task> next_task();
 	bool has_tasks() const;
-	Task next_task();
 
 	void schedule_idle_worker();
 
@@ -85,6 +112,8 @@ public:
 	void schedule_waiting_workers();
 
 	void schedule_workers();
+
+	void idle_sleep();
 
 	bool exiting() const;
 	bool initializing() const;
@@ -112,7 +141,10 @@ public:
 	std::list<Worker*> m_waiting_queue;
 	Worker* m_worker;
 	std::mutex m_tasks_mtx;
-	std::deque<Task> m_tasks;
+
+	// TODO: Try vector here.
+	//
+	std::deque<std::shared_ptr<Task>> m_tasks;
 	State m_state;
 	bool m_workers_started;
 };
@@ -126,7 +158,7 @@ public:
 
 	void worker_entry_point(Worker& worker) const;
 	void bind_thread() const;
-	void execute_task(const Task& task);
+	void execute_task(std::shared_ptr<Task> task);
 	void inc_load();
 	void dec_load();
 	uint64_t load() const;
@@ -192,7 +224,7 @@ public:
 	State m_state;
 
 	Event* m_event;
-	Task m_task;
+	std::shared_ptr<Task> m_task;
 	CPU& m_cpu;
 	Scheduler& m_scheduler;
 };
@@ -202,13 +234,16 @@ class Task_manager final
 public:
 	Task_manager(const CPUs& cpus)
 		: m_cpus{ cpus }
-	{
-	}
+	{ }
 
-	void execute_task(Task task);
+	template<bool async>
+	void execute_task(const std::function<void()> func);
 
 	const CPUs& m_cpus;
 };
+
+template void Task_manager::execute_task<true>(const std::function<void()> func);
+template void Task_manager::execute_task<false>(const std::function<void()> func);
 
 extern CPUs cpus;
 extern Task_manager task_manager;

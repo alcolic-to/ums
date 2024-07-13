@@ -11,8 +11,8 @@
 using namespace std::chrono_literals;
 
 constexpr uint64_t CFG_allowed_cpus = 0b0000'1111;
-constexpr int CFG_workers_per_cpu = 16;
-constexpr auto CFG_idle_sleep = 1ms;
+constexpr int CFG_workers_per_cpu = 4;
+constexpr auto CFG_idle_sleep = 20ns;
 
 // Creates new CPU for each bit available in available CPUs mask.
 //
@@ -50,14 +50,14 @@ void CPU::worker_entry_point(Worker& worker) const
 {
 	bind_thread();
 
-	std::cout << "Started thread: " << worker.id() << " on CPU " << worker.cpu().m_id << std::endl;
+	// std::cout << "Started thread: " << worker.id() << " on CPU " << worker.cpu().m_id << "\n";
 
 	worker.main_loop();
 
-	std::cout << "Ended thread: " << worker.id() << " on CPU " << worker.cpu().m_id << std::endl;
+	// std::cout << "Ended thread: " << worker.id() << " on CPU " << worker.cpu().m_id << "\n";
 }
 
-void CPU::execute_task(const Task& task)
+void CPU::execute_task(std::shared_ptr<Task> task)
 {
 	m_scheduler.enqueue_task(task);
 }
@@ -83,12 +83,6 @@ void Scheduler::start()
 	m_worker->m_cv.notify_one();
 }
 
-void Scheduler::enqueue_task(const Task& task)
-{
-	std::scoped_lock<std::mutex> lock{ m_tasks_mtx };
-	m_tasks.push_back(task);
-}
-
 bool Scheduler::has_idle_workers() const { return !m_idle_queue.empty(); }
 bool Scheduler::has_runnable_workers() const { return !m_runnable_queue.empty(); }
 bool Scheduler::has_waiting_workers() const { return !m_waiting_queue.empty(); }
@@ -99,9 +93,14 @@ void Scheduler::save_runnable(Worker* worker)
 	worker->set_state(Worker::State::runnable);
 }
 
+template<bool back>
 void Scheduler::save_idle(Worker* worker)
 {
-	m_idle_queue.push_back(worker);
+	if constexpr (back)
+		m_idle_queue.push_back(worker);
+	else
+		m_idle_queue.push_front(worker);
+
 	worker->set_state(Worker::State::idle);
 }
 
@@ -109,11 +108,6 @@ void Scheduler::save_waiting(Worker* worker)
 {
 	m_waiting_queue.push_back(worker);
 	worker->set_state(Worker::State::waiting);
-}
-
-bool Scheduler::has_tasks() const
-{
-	return !m_tasks.empty();
 }
 
 void Scheduler::prepare_next_worker()
@@ -124,13 +118,24 @@ void Scheduler::prepare_next_worker()
 	m_worker->set_state(Worker::State::running);
 }
 
-Task Scheduler::next_task()
+void Scheduler::enqueue_task(std::shared_ptr<Task> task)
 {
 	std::scoped_lock<std::mutex> lock{ m_tasks_mtx };
-	Task t = m_tasks.front();
+	m_tasks.push_back(task);
+}
+
+std::shared_ptr<Task> Scheduler::next_task()
+{
+	std::scoped_lock<std::mutex> lock{ m_tasks_mtx };
+	std::shared_ptr<Task> t = m_tasks.front();
 	m_tasks.pop_front();
 
 	return t;
+}
+
+bool Scheduler::has_tasks() const
+{
+	return !m_tasks.empty();
 }
 
 void Scheduler::schedule_idle_worker()
@@ -179,9 +184,7 @@ void Scheduler::schedule_workers()
 	//
 	while (!has_runnable_workers() && !exit())
 	{
-		// TODO: Release CPU (sleep) only when our time slice expires.
-		//
-		std::this_thread::sleep_for(CFG_idle_sleep);
+		idle_sleep();
 
 		schedule_waiting_workers();
 		schedule_idle_workers();
@@ -193,12 +196,50 @@ void Scheduler::schedule_workers()
 		prepare_next_worker();
 }
 
+void Scheduler::idle_sleep()
+{
+	// TODO: Check what should be done here.
+	// TODO: Release CPU (sleep) only when our time slice expires.
+	// TODO: Check why there is a problem with sync tasks execution
+	// if there is a sleep after task is done.
+	//
+
+	// tatic int c = 0;
+	// onstexpr int sleep_cycle = 1 << 20;
+	// 
+	// f ((++c & (sleep_cycle-1)) == 0)
+	// 
+	// 	std::cout << "Zzzz...\n";
+	// 	std::this_thread::sleep_for(CFG_idle_sleep);
+	// 	c = 0;
+	// 
+
+	// auto start = std::chrono::high_resolution_clock::now();
+	// 
+	// std::this_thread::sleep_for(CFG_idle_sleep);
+	// 
+	// auto end = std::chrono::high_resolution_clock::now();
+	// 
+	// std::chrono::duration<double, std::milli> duration = end - start;
+	// std::cout << "Sleep duration: " << duration.count() << "ms.\n";
+
+	// auto start = std::chrono::high_resolution_clock::now();
+	// 
+	// std::unique_lock lock{ m_workers_mtx };
+	// m_worker->wait(lock);
+	// 
+	// auto end = std::chrono::high_resolution_clock::now();
+	// 
+	// std::chrono::duration<double, std::milli> duration = end - start;
+	// std::cout << "Sleep duration: " << duration.count() << "ms.\n";
+}
+
 bool Scheduler::initializing() const { return m_state == State::initializing; }
 bool Scheduler::exiting() const { return m_state == State::exiting; }
 void Scheduler::set_state(State state) { m_state = state; }
 Worker* Scheduler::worker() const { return m_worker; }
 
-// Switches execution context from previous worker to current.
+// Switches thread execution context from previous worker to current.
 //
 // Notes:
 // There is a single mutex on scheduler used for workers synchronization and every worker has it's own condition variable.
@@ -221,7 +262,6 @@ void Scheduler::context_switch(Worker* prevWorker)
 bool Scheduler::sync_wait_event(Worker* worker)
 {
 	save_waiting(worker);
-
 	return true; // proceed with scheduling.
 }
 
@@ -230,7 +270,6 @@ bool Scheduler::sync_wait_event(Worker* worker)
 bool Scheduler::sync_yield(Worker* worker)
 {
 	save_runnable(worker);
-
 	return true; // proceed with scheduling.
 }
 
@@ -238,10 +277,10 @@ bool Scheduler::sync_yield(Worker* worker)
 //
 bool Scheduler::sync_main(Worker* worker)
 {
-	save_idle(worker);
-
 	if (initializing())
 	{
+		save_idle<true>(worker);
+
 		std::unique_lock<std::mutex> lock{ m_workers_mtx };
 		worker->notify();   // Notify thread that created us to continue
 		worker->wait(lock); // and go to sleep.
@@ -255,7 +294,10 @@ bool Scheduler::sync_main(Worker* worker)
 			return false; // skip scheduling.
 	}
 	else
+	{
+		save_idle<false>(worker);
 		return true; // proceed with scheduling.
+	}
 }
 
 // Returns pointer to scheduler's sync member function based on provided sync context.
@@ -383,20 +425,30 @@ void Worker::main_loop()
 
 		try
 		{
-			m_task();
-			std::cout << "CPU " << m_cpu.m_id << ": worker id " << id() << " task done.\n";
+			m_task->m_func();
 		}
-		catch (std::exception& ex)
+		catch (const std::exception& ex)
 		{
 			std::cout << ex.what() << "\n";
 		}
+
+		// std::cout << "CPU " << m_cpu.m_id << ": worker id " << id() << " task done.\n";
+
+		m_task->notify();
+		m_task.reset();
 	}
 }
 
-void Task_manager::execute_task(Task task)
+template<bool async>
+void Task_manager::execute_task(const std::function<void()> func)
 {
+	std::shared_ptr<Task> task = std::make_shared<Task>(func);
+
 	CPU& best_cpu = m_cpus.min_load_cpu();
 	best_cpu.execute_task(task);
+
+	if constexpr (!async)
+		task->wait();
 }
 
 void Event::wait()

@@ -66,7 +66,6 @@ public:
 	// TODO: reorganize data members for quick access.
 	//
 	std::condition_variable m_cv;
-	std::thread m_thread;
 
 	uint64_t m_id;
 	State m_state;
@@ -74,6 +73,7 @@ public:
 	Event* m_event;
 	std::shared_ptr<Task> m_task;
 	Scheduler& m_scheduler;
+	std::thread m_thread;
 };
 
 extern thread_local Worker* tls_worker;

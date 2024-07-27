@@ -15,8 +15,6 @@ void Event::wait() { tls_worker->wait_event(*this); }
 Worker::Worker(uint64_t id, Scheduler& scheduler)
 	: m_id{ id }
 	, m_state{ State::initializing }
-	, m_cv{}
-	, m_task{}
 	, m_event{ nullptr }
 	, m_scheduler{ scheduler }
 	, m_thread{ &Worker::entry_point, this }

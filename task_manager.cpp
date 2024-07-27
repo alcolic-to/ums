@@ -42,6 +42,9 @@ void Task_manager::execute_task(const std::function<void()> func)
 		task->wait();
 }
 
+template void Task_manager::execute_task<true>(const std::function<void()> func);
+template void Task_manager::execute_task<false>(const std::function<void()> func);
+
 // Global task manager.
 //
 Task_manager task_manager{ cpus };

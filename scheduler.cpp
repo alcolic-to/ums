@@ -287,3 +287,7 @@ bool Scheduler::exit() const
 {
 	return !has_runnable_workers() && exiting() && !has_tasks() && !has_waiting_workers();
 }
+
+template void Scheduler::sync<SyncCtx::main>(Worker* worker);
+template void Scheduler::sync<SyncCtx::yield>(Worker* worker);
+template void Scheduler::sync<SyncCtx::wait_event>(Worker* worker);

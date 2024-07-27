@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <mutex>
+#include <condition_variable>
 
 class CPUs;
 
@@ -36,9 +37,6 @@ public:
 
 	const CPUs& m_cpus;
 };
-
-template void Task_manager::execute_task<true>(const std::function<void()> func);
-template void Task_manager::execute_task<false>(const std::function<void()> func);
 
 extern Task_manager task_manager;
 

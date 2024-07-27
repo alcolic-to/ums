@@ -93,8 +93,4 @@ public:
 	std::vector<std::unique_ptr<Worker>> m_workers;
 };
 
-template void Scheduler::sync<SyncCtx::main>(Worker* worker);
-template void Scheduler::sync<SyncCtx::yield>(Worker* worker);
-template void Scheduler::sync<SyncCtx::wait_event>(Worker* worker);
-
 #endif // COS_SCHEDULER_H

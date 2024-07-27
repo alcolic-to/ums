@@ -1,82 +1,18 @@
-#include <cstdint>
-#include <cassert>
-#include <memory>
-
-#include <iostream>
-#include <chrono>
-
-#include "os_specific.h"
-#include "cos.h"
-
-using namespace std::chrono_literals;
-
-constexpr uint64_t CFG_allowed_cpus = 0b0000'1111;
-constexpr int CFG_workers_per_cpu = 4;
-constexpr auto CFG_idle_sleep = 20ns;
-
-// Creates new CPU for each bit available in available CPUs mask.
-//
-CPUs::CPUs()
-	: m_system_cpus_count{ cpus_count() }
-	, m_avail_cpus_mask{ cpus_avail_mask() }
-{
-	m_avail_cpus_mask &= CFG_allowed_cpus;
-
-	for (uint64_t cpu_id = 0, cpus_mask = m_avail_cpus_mask; cpus_mask != 0; ++cpu_id, cpus_mask >>= 1)
-		if (cpus_mask & 1)
-			m_cpus.emplace_back(std::make_unique<CPU>(cpu_id, 1 << cpu_id));
-}
-
-CPU& CPUs::min_load_cpu() const
-{
-	constexpr auto cmp = [](const std::unique_ptr<CPU>& left, const std::unique_ptr<CPU>& right) { return left->load() < right->load(); };
-	return **std::min_element(m_cpus.begin(), m_cpus.end(), cmp);
-}
-
-CPU::CPU(uint64_t cpu_id, uint64_t cpu_mask)
-	: m_id{ cpu_id }
-	, m_mask{ cpu_mask }
-	, m_load{ 0 }
-	, m_scheduler{ *this }
-	, m_workers{}
-{
-	for (int i = 0; i < CFG_workers_per_cpu; ++i)
-		m_workers.push_back(std::make_unique<Worker>(i, *this));
-
-	m_scheduler.start();
-}
-
-void CPU::worker_entry_point(Worker& worker) const
-{
-	bind_thread();
-
-	// std::cout << "Started thread: " << worker.id() << " on CPU " << worker.cpu().m_id << "\n";
-
-	worker.main_loop();
-
-	// std::cout << "Ended thread: " << worker.id() << " on CPU " << worker.cpu().m_id << "\n";
-}
-
-void CPU::execute_task(std::shared_ptr<Task> task)
-{
-	m_scheduler.enqueue_task(task);
-}
-
-void CPU::inc_load() { ++m_load; }
-void CPU::dec_load() { --m_load; }
-uint64_t CPU::load() const { return m_load + m_scheduler.m_tasks.size(); }
+#include "scheduler.h"
+#include "cpu.h"
+#include "config.h"
+#include "task_manager.h"
 
 Scheduler::Scheduler(const CPU& cpu)
 	: m_cpu{ cpu }
 	, m_worker{ nullptr }
 	, m_state{ State::initializing }
 	, m_workers_started{ false }
-{ }
-
-// Wakes up one worker.
-//
-void Scheduler::start()
+	, m_load{ 0 }
 {
+	for (int i = 0; i < CFG_workers_per_cpu; ++i)
+		m_workers.push_back(std::make_unique<Worker>(i, *this));
+
 	m_state = State::running;
 
 	m_worker = m_idle_queue.front();
@@ -239,6 +175,18 @@ bool Scheduler::exiting() const { return m_state == State::exiting; }
 void Scheduler::set_state(State state) { m_state = state; }
 Worker* Scheduler::worker() const { return m_worker; }
 
+void Scheduler::inc_load() { ++m_load; }
+void Scheduler::dec_load() { --m_load; }
+uint64_t Scheduler::load() const { return m_load + m_tasks.size(); }
+
+void Scheduler::manage_load(Worker::State prevState, Worker::State newState)
+{
+	if (Worker::state_idle(prevState) && Worker::state_runnable(newState))
+		inc_load();
+	else if (Worker::state_runnable(prevState) && Worker::state_idle(newState))
+		dec_load();
+}
+
 // Switches thread execution context from previous worker to current.
 //
 // Notes:
@@ -339,123 +287,3 @@ bool Scheduler::exit() const
 {
 	return !has_runnable_workers() && exiting() && !has_tasks() && !has_waiting_workers();
 }
-
-// Creates worker object and starts worker thread on a provided CPU.
-// We will wait for a signal from created thread, so we can continue when it is ready.
-//
-Worker::Worker(uint64_t id, CPU& cpu)
-	: m_id{ id }
-	, m_state{ State::initializing }
-	, m_cv{}
-	, m_cpu{ cpu }
-	, m_task{}
-	, m_event{ nullptr }
-	, m_scheduler{ cpu.m_scheduler }
-	, m_thread{ &CPU::worker_entry_point, &cpu, std::ref(*this) }
-{
-	std::unique_lock<std::mutex> lock{ m_scheduler.m_workers_mtx };
-	m_cv.wait(lock);
-}
-
-Worker::~Worker()
-{
-	m_scheduler.set_state(Scheduler::State::exiting);
-
-	if (m_thread.joinable())
-		m_thread.join();
-}
-
-void Worker::set_state(Worker::State state)
-{
-	// TODO: Create manager load function in m_cpu to calculate all of this.
-	//
-	if (state_idle(m_state) && state_runnable(state))
-		m_cpu.inc_load();
-	else if (state_runnable(m_state) && state_idle(state))
-		m_cpu.dec_load();
-
-	m_state = state;
-}
-
-bool Worker::exit() const
-{
-	return m_state == State::exiting;
-}
-
-// Yields current worker and wakes up next worker for execution.
-//
-void Worker::yield()
-{
-	m_scheduler.sync<SyncCtx::yield>(this);
-}
-
-// Wait on a event if it is not signaled.
-//
-void Worker::wait_event(Event& event)
-{
-	if (!event.m_cond)
-	{
-		m_event = &event;
-		m_scheduler.sync<SyncCtx::wait_event>(this);
-	}
-}
-
-void Worker::notify()
-{
-	m_cv.notify_one();
-}
-
-void Worker::wait(std::unique_lock<std::mutex>& lock)
-{
-	m_cv.wait(lock);
-}
-
-// Main worker loop.
-//
-void Worker::main_loop()
-{
-	tls_worker = this;
-
-	while (true)
-	{
-		m_scheduler.sync<SyncCtx::main>(this);
-
-		if (exit())
-			return;
-
-		try
-		{
-			m_task->m_func();
-		}
-		catch (const std::exception& ex)
-		{
-			std::cout << ex.what() << "\n";
-		}
-
-		// std::cout << "CPU " << m_cpu.m_id << ": worker id " << id() << " task done.\n";
-
-		m_task->notify();
-		m_task.reset();
-	}
-}
-
-template<bool async>
-void Task_manager::execute_task(const std::function<void()> func)
-{
-	std::shared_ptr<Task> task = std::make_shared<Task>(func);
-
-	CPU& best_cpu = m_cpus.min_load_cpu();
-	best_cpu.execute_task(task);
-
-	if constexpr (!async)
-		task->wait();
-}
-
-void Event::wait()
-{
-	tls_worker->wait_event(*this);
-}
-
-CPUs cpus;
-Task_manager task_manager{ cpus };
-thread_local Worker* tls_worker;

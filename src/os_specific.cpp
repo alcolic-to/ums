@@ -2,8 +2,6 @@
 #include <stdexcept>
 #include <iostream>
 
-#include "cos.h"
-
 // OS specific preprocessor definitions.
 //
 #if defined _WIN32
@@ -45,11 +43,11 @@ uint64_t cpus_avail_mask()
 	return procCpuMask;
 }
 
-// Binds current thread to this CPU.
+// Binds current thread to to provided CPU.
 //
-void CPU::bind_thread() const
+void bind_thread(uint64_t cpu_mask)
 {
-	SetThreadAffinityMask(GetCurrentThread(), m_mask);
+	SetThreadAffinityMask(GetCurrentThread(), cpu_mask);
 }
 
 #elif define OS_LINUX
@@ -66,9 +64,9 @@ uint64_t cpus_avail_mask()
 	throw std::logic_error("Not implemented.");
 }
 
-// Binds current thread to this CPU.
+// Binds current thread to provided CPU.
 //
-void CPU::bind_thread() const
+void bind_thread(uint64_t cpu_mask)
 {
 	throw std::logic_error("Not implemented.");
 }

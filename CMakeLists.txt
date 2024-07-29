@@ -15,20 +15,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # -> compile_commands.json
 
-# Set Clang as the compiler
-#
-set(CMAKE_C_COMPILER "clang")
-set(CMAKE_CXX_COMPILER "clang++")
-
-# set(CMAKE_C_COMPILER "gcc")
-# set(CMAKE_CXX_COMPILER "g++")
-
 # Separate bin directory from build directory.
 #
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG>)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG>)
-
 
 add_executable(user_mode_scheduler main.cpp cpu.cpp os_specific.cpp scheduler.cpp task_manager.cpp worker.cpp)
 target_include_directories(user_mode_scheduler PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

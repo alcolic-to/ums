@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <iostream>
+#include <cassert>
 
 // OS specific preprocessor definitions.
 //
@@ -8,13 +9,15 @@
 #define OS_WINDOWS
 #elif defined __linux__
 #define OS_LINUX
+#elif defined __APPLE__
+#define OS_MAC
 #else
-#define OS_OTHER
+#define OS_UNKNOWN
 #endif
 
 // Windows implementations.
 //
-#if defined OS_WINDOWS
+#if defined(OS_WINDOWS)
 
 // Reduce size of windows.h includes and include windows.
 //
@@ -50,7 +53,7 @@ void bind_thread(uint64_t cpu_mask)
 	SetThreadAffinityMask(GetCurrentThread(), cpu_mask);
 }
 
-#elif define OS_LINUX
+#elif defined(OS_LINUX)
 
 #include <unistd.h>
 
@@ -71,5 +74,24 @@ void bind_thread(uint64_t cpu_mask)
 	throw std::logic_error("Not implemented.");
 }
 
+#elif defined(OS_MAC)
+uint32_t cpus_count()
+{
+    assert(false && "Not implemented.");
+    return 0;
+}
+
+uint64_t cpus_avail_mask()
+{
+    assert(false && "Not implemented.");
+    return 0;
+}
+
+void bind_thread(uint64_t cpu_mask)
+{
+    assert(false && "Not implemented.");
+}
+
 #else
+static_assert(false && "Unknown OS.");
 #endif

@@ -1,10 +1,10 @@
+cmake_minimum_required(VERSION 3.10)
+project(user_mode_scheduler)
 # Usage:
 # Create initial cmake build folder: cmake -S . -B .\build -G "Unix Makefiles"
 # Create build with desired config: cmake --build .\build --config [Debug/Release/RelWithDebInfo/MinSizeRel] --parallel 8
 #
 # Clean command: cmake --build .\build --target clean
-
-cmake_minimum_required(VERSION 3.10)
 
 # Below is not working for some reason.
 # set(CMAKE_GENERATOR "Unix Makefiles")
@@ -15,23 +15,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # -> compile_commands.json
 
-# Set Clang as the compiler
-#
-set(CMAKE_C_COMPILER "clang")
-set(CMAKE_CXX_COMPILER "clang++")
-
-# set(CMAKE_C_COMPILER "gcc")
-# set(CMAKE_CXX_COMPILER "g++")
-
 # Separate bin directory from build directory.
 #
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG>)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG>)
 
-project(user_mode_scheduler)
-
-add_executable(user_mode_scheduler main.cpp config.h cpu.cpp cpu.h os_specific.cpp os_specific.h scheduler.cpp scheduler.h task_manager.cpp task_manager.h worker.cpp worker.h)
+add_executable(user_mode_scheduler main.cpp cpu.cpp os_specific.cpp scheduler.cpp task_manager.cpp worker.cpp)
+target_include_directories(user_mode_scheduler PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # For previous version created with VS (not VS code), we needed UNICODE definitions because all APIs used wchar type.
 #

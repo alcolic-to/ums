@@ -3,7 +3,9 @@
 #include <chrono>
 #include <exception>
 
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 #include "worker.h"
 #include "task_manager.h"

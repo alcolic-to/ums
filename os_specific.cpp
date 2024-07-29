@@ -75,10 +75,29 @@ void bind_thread(uint64_t cpu_mask)
 }
 
 #elif defined(OS_MAC)
+#include <sys/sysctl.h>
+
 uint32_t cpus_count()
 {
-    assert(false && "Not implemented.");
-    return 0;
+    int num_cpu;
+    size_t len = sizeof(num_cpu);
+    int mib[2] = { CTL_HW, HW_AVAILCPU };
+
+    if (sysctl(mib, 2, &num_cpu, &len, nullptr, 0) == -1)
+    {
+        mib[1] = HW_NCPU;
+        if (sysctl(mib, 2, &num_cpu, &len, nullptr, 0) == -1)
+        {
+            return num_cpu = 1;
+        }
+    }
+
+    if (num_cpu < 1)
+    {
+        num_cpu = 1;
+    }
+
+    return num_cpu;
 }
 
 uint64_t cpus_avail_mask()

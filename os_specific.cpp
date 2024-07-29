@@ -1,6 +1,7 @@
 #include "os_specific.h"
 #include <cstdint>
 #include <iostream>
+#include <cassert>
 
 // OS specific preprocessor definitions.
 //
@@ -8,8 +9,10 @@
 #define OS_WINDOWS
 #elif defined __linux__
 #define OS_LINUX
+#elif defined __APPLE__
+#define OS_MAC
 #else
-#define OS_OTHER
+#define OS_UNKNOWN
 #endif
 
 #define ENDL '\n'
@@ -129,6 +132,50 @@ void print_thread_affinity()
 
 	std::cout << ENDL;
 }
+
+#elif defined(OS_MAC)
+#include <sys/sysctl.h>
+
+uint32_t cpus_count()
+{
+    int num_cpu;
+    size_t len = sizeof(num_cpu);
+    int mib[2] = { CTL_HW, HW_AVAILCPU };
+
+    if (sysctl(mib, 2, &num_cpu, &len, nullptr, 0) == -1)
+    {
+        mib[1] = HW_NCPU;
+        if (sysctl(mib, 2, &num_cpu, &len, nullptr, 0) == -1)
+        {
+            return num_cpu = 1;
+        }
+    }
+
+    if (num_cpu < 1)
+    {
+        num_cpu = 1;
+    }
+
+    return num_cpu;
+}
+
+// Getting availability mask for process on OSX is not supported
+// Instead, we return all available CPUs
+uint64_t cpus_avail_mask()
+{
+    uint64_t procCpuMask = 0; // This process is only allowed to run on these CPUs.
+    for (uint32_t i = 0; i < cpus_count(); ++i)
+        procCpuMask |= (1 << i);
+
+    return procCpuMask;
+}
+
+// Binding thread to CPU is not supported on OSX
+void bind_thread(uint64_t cpu_mask)
+{
+    return;
+}
+
 #else
 static_assert(!"Unknown OS.");
 #endif

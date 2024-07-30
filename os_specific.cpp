@@ -65,69 +65,69 @@ uint32_t cpus_count()
 
 uint64_t cpus_avail_mask()
 {
-    pid_t pid = getpid();
-    cpu_set_t mask;
-    CPU_ZERO(&mask);
-    uint64_t cpu_mask = 0;
+	pid_t pid = getpid();
+	cpu_set_t mask;
+	CPU_ZERO(&mask);
+	uint64_t cpu_mask = 0;
 
-    if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1)
-    {
-        std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << ENDL;
-        return -1;
-    }
+	if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1)
+	{
+		std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << ENDL;
+		return -1;
+	}
 
-    int num_cores = CPU_COUNT(&mask);
-    std::cout << "Process is allowed to run on " << num_cores << " cores." << ENDL;
+	int num_cores = CPU_COUNT(&mask);
+	std::cout << "Process is allowed to run on " << num_cores << " cores." << ENDL;
 
-    for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
-    {
-        if (CPU_ISSET(i, &mask))
-        {
-            std::cout << "CPU " << i << " is available." << ENDL;
-            cpu_mask |= (1 << i);
-        }
-    }
+	for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
+	{
+		if (CPU_ISSET(i, &mask))
+		{
+			std::cout << "CPU " << i << " is available." << ENDL;
+			cpu_mask |= (1 << i);
+		}
+	}
 
-    return cpu_mask;
+	return cpu_mask;
 }
 
 // Binds current thread to provided CPU.
 //
 void bind_thread(uint64_t cpu_mask)
 {
-    cpu_set_t mask; 
-    CPU_ZERO(&mask);
+	cpu_set_t mask; 
+	CPU_ZERO(&mask);
 
-    for (std::size_t i = 0; i < sizeof(cpu_mask); ++i)
-    {
-        if (cpu_mask & (1 << i))
-            CPU_SET(i, &mask);
-    }
+	for (std::size_t i = 0; i < sizeof(cpu_mask); ++i)
+	{
+		if (cpu_mask & (1 << i))
+			CPU_SET(i, &mask);
+	}
 
-    pthread_t current_thread = pthread_self();
-    if (pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-        std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << ENDL;
-    
-    print_thread_affinity();
+	pthread_t current_thread = pthread_self();
+	if (pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
+		std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << ENDL;
+
+	print_thread_affinity();
 }
 
 void print_thread_affinity()
 {
-    cpu_set_t mask;
-    CPU_ZERO(&mask);
+	cpu_set_t mask;
+	CPU_ZERO(&mask);
 
-    pthread_t current_thread = pthread_self();
-    if (pthread_getaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-        std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << ENDL;
+	pthread_t current_thread = pthread_self();
+	if (pthread_getaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
+		std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << ENDL;
 
-    std::cout << "Thread affinity: ";
-    for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
-    {
-        if (CPU_ISSET(i, &mask))
-            std::cout << i << " ";
-    }
+	std::cout << "Thread affinity: ";
+	for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
+	{
+		if (CPU_ISSET(i, &mask))
+			std::cout << i << " ";
+	}
 
-    std::cout << ENDL;
+	std::cout << ENDL;
 }
 #else
 static_assert(!"Unknown OS.");

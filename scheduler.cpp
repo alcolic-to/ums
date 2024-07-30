@@ -71,7 +71,7 @@ std::shared_ptr<Task> Scheduler::next_task()
 
 bool Scheduler::has_tasks()
 {
-    std::scoped_lock<std::mutex> lock{ m_tasks_mtx };
+	std::scoped_lock<std::mutex> lock{ m_tasks_mtx };
 	return !m_tasks.empty();
 }
 

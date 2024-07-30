@@ -40,7 +40,7 @@ public:
 
 	void enqueue_task(std::shared_ptr<Task> task);
 	std::shared_ptr<Task> next_task();
-	bool has_tasks() const;
+	bool has_tasks();
 
 	void schedule_idle_worker();
 
@@ -72,7 +72,7 @@ public:
 	void sync(Worker* worker);
 
 	void exit_workers() const;
-	bool exit() const;
+	bool should_exit() ;
 
 public:
 	const CPU& m_cpu;

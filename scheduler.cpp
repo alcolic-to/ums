@@ -69,8 +69,9 @@ std::shared_ptr<Task> Scheduler::next_task()
 	return t;
 }
 
-bool Scheduler::has_tasks() const
+bool Scheduler::has_tasks()
 {
+	std::scoped_lock<std::mutex> lock{ m_tasks_mtx };
 	return !m_tasks.empty();
 }
 
@@ -118,7 +119,7 @@ void Scheduler::schedule_workers()
 
 	// Idle loop if there is no work.
 	//
-	while (!has_runnable_workers() && !exit())
+	while (!has_runnable_workers() && !should_exit())
 	{
 		idle_sleep();
 
@@ -126,7 +127,7 @@ void Scheduler::schedule_workers()
 		schedule_idle_workers();
 	}
 
-	if (exit())
+	if (should_exit())
 		exit_workers();
 	else
 		prepare_next_worker();
@@ -283,7 +284,7 @@ void Scheduler::exit_workers() const
 	}
 }
 
-bool Scheduler::exit() const
+bool Scheduler::should_exit()
 {
 	return !has_runnable_workers() && exiting() && !has_tasks() && !has_waiting_workers();
 }

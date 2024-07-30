@@ -1,6 +1,5 @@
 #include "os_specific.h"
 #include <cstdint>
-#include <stdexcept>
 #include <iostream>
 
 // OS specific preprocessor definitions.
@@ -12,6 +11,8 @@
 #else
 #define OS_OTHER
 #endif
+
+#define ENDL '\n'
 
 // Windows implementations.
 //
@@ -39,7 +40,7 @@ uint64_t cpus_avail_mask()
 
 	GetProcessAffinityMask(GetCurrentProcess(), &procCpuMask, &allCpusMask);
 
-	std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask << '\n';
+	std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask << ENDL;
 
 	return procCpuMask;
 }
@@ -53,7 +54,6 @@ void bind_thread(uint64_t cpu_mask)
 
 #elif defined(OS_LINUX)
 
-#include <iostream>
 #include <unistd.h>
 #include <sched.h>
 #include <cstring>
@@ -72,18 +72,18 @@ uint64_t cpus_avail_mask()
 
     if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1)
     {
-        std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << std::endl;
+        std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << ENDL;
         return -1;
     }
 
     int num_cores = CPU_COUNT(&mask);
-    std::cout << "Process is allowed to run on " << num_cores << " cores." << std::endl;
+    std::cout << "Process is allowed to run on " << num_cores << " cores." << ENDL;
 
     for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
     {
         if (CPU_ISSET(i, &mask))
         {
-            std::cout << "CPU " << i << " is available." << std::endl;
+            std::cout << "CPU " << i << " is available." << ENDL;
             cpu_mask |= (1 << i);
         }
     }
@@ -101,16 +101,12 @@ void bind_thread(uint64_t cpu_mask)
     for (std::size_t i = 0; i < sizeof(cpu_mask); ++i)
     {
         if (cpu_mask & (1 << i))
-        {
             CPU_SET(i, &mask);
-        }
     }
 
     pthread_t current_thread = pthread_self();
     if (pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-    {
-        std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << std::endl;
-    }
+        std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << ENDL;
     
     print_thread_affinity();
 }
@@ -122,20 +118,17 @@ void print_thread_affinity()
 
     pthread_t current_thread = pthread_self();
     if (pthread_getaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-    {
-        std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << std::endl;
-    }
+        std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << ENDL;
 
     std::cout << "Thread affinity: ";
     for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
     {
         if (CPU_ISSET(i, &mask))
-        {
             std::cout << i << " ";
-        }
     }
-    std::cout << std::endl;
+
+    std::cout << ENDL;
 }
 #else
-static_assert(false && "Unknown OS.");
+static_assert(!"Unknown OS.");
 #endif

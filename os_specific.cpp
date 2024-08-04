@@ -66,7 +66,7 @@ void bind_thread(uint64_t cpu_mask)
 
 uint32_t cpus_count()
 {
-	return std::min(MAX_CPUS, sysconf(_SC_NPROCESSORS_ONLN));
+	return std::min(MAX_CPUS, static_cast<std::uint32_t>(sysconf(_SC_NPROCESSORS_ONLN)));
 }
 
 uint64_t cpus_avail_mask()

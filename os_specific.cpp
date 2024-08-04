@@ -1,7 +1,8 @@
-#include "os_specific.h"
 #include <cstdint>
 #include <iostream>
 #include <cassert>
+
+#include "os_specific.h"
 
 // OS specific preprocessor definitions.
 //
@@ -16,6 +17,8 @@
 #endif
 
 #define ENDL '\n'
+
+constexpr uint32_t MAX_CPUS = 64;
 
 // Windows implementations.
 //
@@ -63,7 +66,7 @@ void bind_thread(uint64_t cpu_mask)
 
 uint32_t cpus_count()
 {
-	return sysconf(_SC_NPROCESSORS_ONLN);;
+	return std::min(MAX_CPUS, sysconf(_SC_NPROCESSORS_ONLN));
 }
 
 uint64_t cpus_avail_mask()
@@ -82,7 +85,7 @@ uint64_t cpus_avail_mask()
 	int num_cores = CPU_COUNT(&mask);
 	std::cout << "Process is allowed to run on " << num_cores << " cores." << ENDL;
 
-	for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
+	for (std::size_t i = 0; i < cpus_count(); ++i)
 	{
 		if (CPU_ISSET(i, &mask))
 		{
@@ -101,7 +104,7 @@ void bind_thread(uint64_t cpu_mask)
 	cpu_set_t mask; 
 	CPU_ZERO(&mask);
 
-	for (std::size_t i = 0; i < sizeof(cpu_mask); ++i)
+	for (std::size_t i = 0; i < cpus_count(); ++i)
 	{
 		if (cpu_mask & (1 << i))
 			CPU_SET(i, &mask);
@@ -156,7 +159,7 @@ uint32_t cpus_count()
         num_cpu = 1;
     }
 
-    return num_cpu;
+    return std::min(static_cast<uint32_t>(num_cpu), MAX_CPUS);
 }
 
 // Getting availability mask for process on OSX is not supported

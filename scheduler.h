@@ -62,7 +62,7 @@ public:
 	void dec_load();
 	uint64_t load() const;
 
-	void context_switch(Worker* prevWorker);
+	void context_switch(Worker* prev_worker);
 
 	bool sync_main(Worker* worker);
 	bool sync_yield(Worker* worker);

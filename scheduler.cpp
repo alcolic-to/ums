@@ -199,11 +199,11 @@ void Scheduler::manage_load(Worker::State prevState, Worker::State newState)
 // (and notified thread can not wake up until we release lock) so mutex will be unlocked only when we call wait on this thread,
 // which will release lock and wake another thread.
 //
-void Scheduler::context_switch(Worker* prevWorker)
+void Scheduler::context_switch(Worker* prev_worker)
 {
 	std::unique_lock<std::mutex> lock{ m_workers_mtx };
 	m_worker->notify();
-	prevWorker->wait(lock);
+	prev_worker->wait(lock);
 }
 
 // Synchronization point for the workers for wait event.
@@ -286,7 +286,7 @@ void Scheduler::exit_workers() const
 
 bool Scheduler::should_exit()
 {
-	return !has_runnable_workers() && exiting() && !has_tasks() && !has_waiting_workers();
+	return exiting() && !has_runnable_workers() && !has_waiting_workers() && !has_tasks();
 }
 
 template void Scheduler::sync<SyncCtx::main>(Worker* worker);

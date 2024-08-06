@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <atomic>
 
 #include "task_manager.h"
 
@@ -20,7 +21,7 @@ public:
 	void wait();
 
 public:
-	bool m_cond;
+	std::atomic<bool> m_cond;
 };
 
 // TODO: Check whether worker should be placed on std::hardware_constructive_interference_size alignment,

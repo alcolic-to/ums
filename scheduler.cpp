@@ -5,6 +5,7 @@
 #include "config.h"
 #include "task_manager.h"
 #include "util.h"
+#include "sync_api.h"
 
 Scheduler::Scheduler(const CPU& cpu)
 	: m_cpu{ cpu }

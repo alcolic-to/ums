@@ -4,11 +4,7 @@
 #include "cpu.h"
 #include "os_specific.h"
 #include "scheduler.h"
-#include "util.h"
-
-Event::Event() : m_cond{ false } {};
-void Event::signal() { m_cond = true; }
-void Event::wait() { tls_worker->wait_event(*this); }
+#include "sync_api.h"
 
 // Creates worker object and starts worker thread on a provided CPU.
 // We will wait for a signal from created thread, so we can continue when it is ready.
@@ -53,11 +49,11 @@ void Worker::yield()
 
 // Wait on a event if it is not signaled.
 //
-void Worker::wait_event(Event& event)
+void Worker::wait_event(Event* event)
 {
-	if (!event.m_cond)
+	if (!event->check())
 	{
-		m_event = &event;
+		m_event = event;
 		m_scheduler.sync<SyncCtx::wait_event>(this);
 	}
 }

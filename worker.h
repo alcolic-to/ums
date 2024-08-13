@@ -10,6 +10,7 @@
 #include <atomic>
 
 #include "task_manager.h"
+#include "os_specific.h"
 
 class Scheduler;
 
@@ -30,7 +31,7 @@ public:
 class Worker final
 {
 public:
-	enum class State : int { initializing, idle, waiting, runnable, running, exiting };
+	enum class State : int { initializing, idle, waiting, pending_io, runnable, running, exiting };
 
 	static bool state_idle(State state);
 	static bool state_runnable(State state);
@@ -52,6 +53,8 @@ public:
 
 	void yield();
 	void wait_event(Event& event);
+	void read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset);
+	void write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset);
 
 	void set_state(State state);
 
@@ -74,6 +77,7 @@ public:
 
 	Event* m_event;
 	std::shared_ptr<Task> m_task;
+	std::unique_ptr<IO_Request> m_io_request;
 	Scheduler& m_scheduler;
 	std::thread m_thread;
 };

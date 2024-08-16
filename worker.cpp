@@ -4,6 +4,7 @@
 #include "cpu.h"
 #include "os_specific.h"
 #include "scheduler.h"
+#include "util.h"
 
 Event::Event() : m_cond{ false } {};
 void Event::signal() { m_cond = true; }
@@ -25,8 +26,6 @@ Worker::Worker(uint64_t id, Scheduler& scheduler)
 
 Worker::~Worker()
 {
-	m_scheduler.set_state(Scheduler::State::exiting);
-
 	if (m_thread.joinable())
 		m_thread.join();
 }
@@ -37,7 +36,7 @@ void Worker::set_state(Worker::State state)
 	m_state = state;
 }
 
-bool Worker::state_idle(State state) { return state == State::idle || state == State::waiting; }
+bool Worker::state_idle(State state) { return state == State::idle || state == State::waiting || state == State::pending_io; }
 bool Worker::state_runnable(State state) { return state == State::runnable || state == State::running; }
 
 bool Worker::exit() const
@@ -61,6 +60,22 @@ void Worker::wait_event(Event& event)
 		m_event = &event;
 		m_scheduler.sync<SyncCtx::wait_event>(this);
 	}
+}
+
+void Worker::read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
+{
+	m_io_request = std::make_unique<IO_Request>(file_handle, buffer, nbytes, offset, IO_Request::Type::read);
+
+	if (m_io_request->m_state == IO_Request::State::pending)
+		m_scheduler.sync<SyncCtx::io>(this);
+}
+
+void Worker::write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
+{
+	m_io_request = std::make_unique<IO_Request>(file_handle, buffer, nbytes, offset, IO_Request::Type::write);
+
+	if (m_io_request->m_state == IO_Request::State::pending)
+		m_scheduler.sync<SyncCtx::io>(this);
 }
 
 void Worker::notify()
@@ -106,7 +121,7 @@ void Worker::main_loop()
 			std::cout << ex.what() << "\n";
 		}
 
-		// std::cout << "CPU " << m_cpu.m_id << ": worker id " << id() << " task done.\n";
+		// std::cout << "CPU " << m_scheduler.m_cpu.m_id << ": worker id " << id() << " task done.\n";
 
 		m_task->notify();
 		m_task.reset();

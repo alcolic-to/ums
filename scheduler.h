@@ -8,6 +8,7 @@
 #include <deque>
 #include <list>
 #include <mutex>
+#include <atomic>
 
 #include "worker.h" // This can be moved and class Worker can be forward declared if we dispose Worker::State.
 #include "task_manager.h"
@@ -17,7 +18,7 @@ class CPU;
 
 // Synchronization context for scheduler.
 //
-enum class SyncCtx : int { main, yield, wait_event };
+enum class SyncCtx : int { main, yield, wait_event, io };
 
 class Scheduler final
 {
@@ -25,13 +26,16 @@ public:
 	enum class State : int { initializing, running, exiting };
 
 	Scheduler(const CPU& cpu);
+	~Scheduler();
 
 	bool has_idle_workers() const;
 	bool has_runnable_workers() const;
 	bool has_waiting_workers() const;
+	bool has_pending_io_workers() const;
 
 	void save_runnable(Worker* worker);
 	void save_waiting(Worker* worker);
+	void save_pending_io(Worker* worker);
 
 	template<bool back>
 	void save_idle(Worker* worker);
@@ -44,10 +48,12 @@ public:
 
 	void schedule_idle_worker();
 
+	void schedule_io_workers();
 	void schedule_idle_workers();
 	void schedule_waiting_workers();
-
 	void schedule_workers();
+
+	void schedule();
 
 	void idle_sleep();
 
@@ -67,24 +73,27 @@ public:
 	bool sync_main(Worker* worker);
 	bool sync_yield(Worker* worker);
 	bool sync_wait_event(Worker* worker);
+	bool sync_io(Worker* worker);
 
 	template<SyncCtx ctx>
 	void sync(Worker* worker);
 
 	void exit_workers() const;
-	bool should_exit() ;
+	bool should_exit();
 
 public:
 	const CPU& m_cpu;
 
 	Worker* m_worker;
-	std::mutex m_workers_mtx;
 	std::deque<Worker*> m_runnable_queue;
 	std::deque<Worker*> m_idle_queue;
 	std::list<Worker*> m_waiting_queue;
+	std::list<Worker*> m_pending_io_queue;
+
+	std::mutex m_workers_mtx;
 	std::mutex m_tasks_mtx;
 	std::deque<std::shared_ptr<Task>> m_tasks;
-	State m_state;
+	std::atomic<State> m_state;
 	bool m_workers_started;
 	uint64_t m_load;
 

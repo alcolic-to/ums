@@ -1,8 +1,10 @@
 #include <cstdint>
 #include <iostream>
 #include <cassert>
+#include <exception>
 
 #include "os_specific.h"
+#include "util.h"
 
 // OS specific preprocessor definitions.
 //
@@ -28,6 +30,13 @@ constexpr uint32_t MAX_CPUS = 64;
 //
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+
+// Helper function for getting result from win32 API.
+//
+DWORD bool_to_error(bool b)
+{
+	return b ? ERROR_SUCCESS : GetLastError();
+}
 
 // Returns number of CPUs in the system.
 //
@@ -56,6 +65,83 @@ uint64_t cpus_avail_mask()
 void bind_thread(uint64_t cpu_mask)
 {
 	SetThreadAffinityMask(GetCurrentThread(), cpu_mask);
+}
+
+OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl)
+{
+	return reinterpret_cast<OVERLAPPED*>(&io_ctrl.m_ol);
+}
+
+void read_file(IO_Request& io)
+{
+	DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+
+	// std::cout << "ReadFile: " << read_res << "\n";
+
+	switch (read_res)
+	{
+	case (ERROR_SUCCESS):
+		io.m_state = IO_Request::State::completed;
+		break;
+	case (ERROR_IO_PENDING):
+		io.m_state = IO_Request::State::pending;
+		break;
+	default:
+		io.m_state = IO_Request::State::error;
+		break;
+	}
+}
+
+void write_file(IO_Request& io)
+{
+	DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+
+	// std::cout << "WriteFile: " << write_res << "\n";
+
+	switch (write_res)
+	{
+	case (ERROR_SUCCESS):
+		io.m_state = IO_Request::State::completed;
+		break;
+	case (ERROR_IO_PENDING):
+		io.m_state = IO_Request::State::pending;
+		break;
+	default:
+		io.m_state = IO_Request::State::error;
+		break;
+	}
+}
+
+bool io_completed(IO_Control& io_control)
+{
+	return HasOverlappedIoCompleted(to_ol_ptr(io_control));
+}
+
+void update_io_state(IO_Request& io)
+{
+	if (io.pending() && !io_completed(io.m_control))
+	{
+		// std::cout << "IO still pending...\n";
+		return;
+	}
+
+	DWORD bytes = 0;
+	DWORD ol_res = bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_control), &bytes, false));
+
+	// std::cout << "GetOverlappedResult: " << ol_res << ", Bytes written : " << bytes << "\n";
+
+	switch (ol_res)
+	{
+	case (ERROR_SUCCESS):
+		io.m_state = IO_Request::State::completed;
+		break;
+	case (ERROR_IO_PENDING):
+		io.m_state = IO_Request::State::pending;
+		break;
+	default:
+		io.m_state = IO_Request::State::error;
+		break;
+	}
 }
 
 #elif defined(OS_LINUX)
@@ -136,6 +222,11 @@ void print_thread_affinity()
 	std::cout << ENDL;
 }
 
+void read_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
+void write_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
+bool io_completed(IO_Control& io_control) { throw std::logic_error{ "Not implemented" }; }
+void update_io_state(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
+
 #elif defined(OS_MAC)
 #include <sys/sysctl.h>
 
@@ -178,6 +269,11 @@ void bind_thread(uint64_t cpu_mask)
 {
     return;
 }
+
+void read_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
+void write_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
+bool io_completed(IO_Control& io_control) { throw std::logic_error{ "Not implemented" }; }
+void update_io_state(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
 
 #else
 static_assert(!"Unknown OS.");

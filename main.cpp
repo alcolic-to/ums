@@ -9,9 +9,30 @@
 
 #include "worker.h"
 #include "task_manager.h"
+#include "util.h"
 
 std::random_device rd;     // only used once to initialise (seed) engine
 std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in this case)
+
+class PRNG
+{
+public:
+	PRNG(uint64_t seed) : m_seed(seed) { }
+
+	template<typename T>
+	T rand() { return T(rand64()); }
+
+private:
+	uint64_t m_seed;
+
+	uint64_t rand64()
+	{
+		m_seed ^= m_seed >> 12, m_seed ^= m_seed << 25, m_seed ^= m_seed >> 27;
+		return m_seed * 2685821657736338717LL;
+	}
+};
+
+static PRNG prng{ 1070372 };
 
 using namespace std::chrono_literals;
 
@@ -76,6 +97,12 @@ uint64_t f3()
 	return second;
 }
 
+void thread_function()
+{
+	for (int i = 0; i < 1000; ++i)
+		task_manager.execute_task<false>(f3);
+}
+
 // Duration of ~4ms when plugged in.
 //
 uint64_t f4()
@@ -97,13 +124,7 @@ uint64_t f4()
 	return second;
 }
 
-void thread_function()
-{
-	for (int i = 0; i < 1000; ++i)
-		task_manager.execute_task<false>(f3);
-}
-
-int main(int argc, char* argv[])
+void ms3_function()
 {
 	uint64_t r = 0;
 	auto start = std::chrono::high_resolution_clock::now();
@@ -122,18 +143,70 @@ int main(int argc, char* argv[])
 
 	// std::this_thread::sleep_for(10s);
 
-	std::cout << r << "\n";
-
-	// std::vector<std::thread> v;
-	// 
-	// for (int i = 0; i < 10; ++i)
-	// 	v.push_back(std::thread{ thread_function });
-	// 
-	// for (auto& it : v)
-	// 	it.join();
-
-	// std::this_thread::sleep_for(5s);
-	// e.signal();
-
-	// std::cout << f3() << "\n";
+	// std::cout << r << "\n";
 }
+
+void test_signal()
+{
+	std::vector<std::thread> v;
+	
+	for (int i = 0; i < 10; ++i)
+		v.push_back(std::thread{ thread_function });
+	
+	for (auto& it : v)
+		it.join();
+
+	std::this_thread::sleep_for(5s);
+	e.signal();
+
+	std::cout << f3() << "\n";
+}
+
+#if defined _WIN32
+
+// HANDLE file_for_write = CreateFile("io_testing_file_0", GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH, NULL);
+HANDLE file_for_read = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING, NULL);
+
+void read_from_file()
+{
+	constexpr int read_size = 8 * 1024;
+	int max_read_size = read_size * 128;
+
+	auto buf = std::make_unique<char[]>(read_size);
+
+	read_file(file_for_read, buf.get(), read_size, (prng.rand<uint64_t>() % read_size) * read_size);
+	std::cout << "Read buffer: " << buf.get() << "\n";
+}
+
+//void write_to_file()
+//{
+//	int write_size = 8 * 1024;
+//	int max_file_size = write_size * 128;
+//
+//	std::string io_str(write_size, 'a');
+//	
+//	// for (int i = 0; i < 10; ++i)
+//	// 	std::cout << prng.rand<uint64_t>() << "\n";
+//
+//	write_file(file_for_write, io_str.data(), io_str.size(), (prng.rand<uint64_t>() % max_file_size) * io_str.size());
+//}
+
+int main(int argc, char* argv[])
+{
+	/*for (int i = 0; i < 128; ++i)
+		task_manager.execute_task<true>(write_to_file);*/
+
+		// task_manager.execute_task<true>(io_func);
+
+	for (int i = 0; i < 128; ++i)
+		task_manager.execute_task<true>(read_from_file);
+}
+
+#else
+
+int main(int argc, char* argv[])
+{
+	
+}
+
+#endif

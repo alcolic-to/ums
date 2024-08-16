@@ -1,7 +1,10 @@
+#include <iostream>
+
 #include "scheduler.h"
 #include "cpu.h"
 #include "config.h"
 #include "task_manager.h"
+#include "util.h"
 
 Scheduler::Scheduler(const CPU& cpu)
 	: m_cpu{ cpu }
@@ -19,9 +22,15 @@ Scheduler::Scheduler(const CPU& cpu)
 	m_worker->m_cv.notify_one();
 }
 
+Scheduler::~Scheduler()
+{
+	set_state(Scheduler::State::exiting);
+}
+
 bool Scheduler::has_idle_workers() const { return !m_idle_queue.empty(); }
 bool Scheduler::has_runnable_workers() const { return !m_runnable_queue.empty(); }
 bool Scheduler::has_waiting_workers() const { return !m_waiting_queue.empty(); }
+bool Scheduler::has_pending_io_workers() const { return !m_pending_io_queue.empty(); }
 
 void Scheduler::save_runnable(Worker* worker)
 {
@@ -44,6 +53,12 @@ void Scheduler::save_waiting(Worker* worker)
 {
 	m_waiting_queue.push_back(worker);
 	worker->set_state(Worker::State::waiting);
+}
+
+void Scheduler::save_pending_io(Worker* worker)
+{
+	m_pending_io_queue.push_back(worker);
+	worker->set_state(Worker::State::pending_io);
 }
 
 void Scheduler::prepare_next_worker()
@@ -81,8 +96,27 @@ void Scheduler::schedule_idle_worker()
 	m_idle_queue.pop_front();
 
 	worker->m_task = next_task();
-	worker->set_state(Worker::State::runnable);
-	m_runnable_queue.push_back(worker);
+	save_runnable(worker);
+}
+
+// Moves workers from pending_io to runnable queue if worker's I/O is completed.
+//
+void Scheduler::schedule_io_workers()
+{
+	auto io_completed = [](Worker* worker)
+	{
+		worker->m_io_request->update();
+		return worker->m_io_request->completed();
+	};
+
+	auto begin = m_pending_io_queue.begin();
+	auto end = m_pending_io_queue.end();
+
+	for (auto it = std::find_if(begin, end, io_completed); it != end; it = std::find_if(it, end, io_completed))
+	{
+		save_runnable(*it);
+		it = m_pending_io_queue.erase(it);
+	}
 }
 
 void Scheduler::schedule_idle_workers()
@@ -95,36 +129,35 @@ void Scheduler::schedule_idle_workers()
 //
 void Scheduler::schedule_waiting_workers()
 {
-	auto it = m_waiting_queue.begin();
-	while (it != m_waiting_queue.end())
-	{
-		Worker* worker = *it;
+	auto signaled = [](Worker* worker) { return worker->m_event->m_cond.load(); };
 
-		if (worker->m_event->m_cond)
-		{
-			m_waiting_queue.erase(it++);
-			worker->m_event = nullptr;
-			worker->set_state(Worker::State::runnable);
-			m_runnable_queue.push_back(worker);
-		}
-		else
-			++it;
+	auto begin = m_waiting_queue.begin();
+	auto end = m_waiting_queue.end();
+
+	for (auto it = std::find_if(begin, end, signaled); it != end; it = std::find_if(it, end, signaled))
+	{
+		save_runnable(*it);
+		it = m_waiting_queue.erase(it);
 	}
 }
 
 void Scheduler::schedule_workers()
 {
+	schedule_io_workers();
 	schedule_waiting_workers();
 	schedule_idle_workers();
+}
+
+void Scheduler::schedule()
+{
+	schedule_workers();
 
 	// Idle loop if there is no work.
 	//
 	while (!has_runnable_workers() && !should_exit())
 	{
 		idle_sleep();
-
-		schedule_waiting_workers();
-		schedule_idle_workers();
+		schedule_workers();
 	}
 
 	if (should_exit())
@@ -135,6 +168,8 @@ void Scheduler::schedule_workers()
 
 void Scheduler::idle_sleep()
 {
+	// std::cout << "Idle sleep.\n";
+
 	// TODO: Check what should be done here.
 	// TODO: Release CPU (sleep) only when our time slice expires.
 	// TODO: Check why there is a problem with sync tasks execution
@@ -222,6 +257,14 @@ bool Scheduler::sync_yield(Worker* worker)
 	return true; // proceed with scheduling.
 }
 
+// Synchronization point for the workers for I/O operations.
+//
+bool Scheduler::sync_io(Worker* worker)
+{
+	save_pending_io(worker);
+	return true; // proceed with scheduling.
+}
+
 // Synchronization point for the workers in main worker loop.
 //
 bool Scheduler::sync_main(Worker* worker)
@@ -257,6 +300,7 @@ constexpr auto sync_func()
 	if      constexpr (ctx == SyncCtx::main)       return &Scheduler::sync_main;
 	else if constexpr (ctx == SyncCtx::yield)      return &Scheduler::sync_yield;
 	else if constexpr (ctx == SyncCtx::wait_event) return &Scheduler::sync_wait_event;
+	else if constexpr (ctx == SyncCtx::io)         return &Scheduler::sync_io;
 }
 
 // Synchronization point for the workers.
@@ -268,7 +312,7 @@ void Scheduler::sync(Worker* worker)
 {
 	if ((this->*sync_func<ctx>())(worker))
 	{
-		schedule_workers();
+		schedule();
 
 		if (m_worker != worker)
 			context_switch(worker);
@@ -286,9 +330,10 @@ void Scheduler::exit_workers() const
 
 bool Scheduler::should_exit()
 {
-	return exiting() && !has_runnable_workers() && !has_waiting_workers() && !has_tasks();
+	return exiting() && !has_runnable_workers() && !has_waiting_workers() && !has_pending_io_workers() && !has_tasks();
 }
 
 template void Scheduler::sync<SyncCtx::main>(Worker* worker);
 template void Scheduler::sync<SyncCtx::yield>(Worker* worker);
 template void Scheduler::sync<SyncCtx::wait_event>(Worker* worker);
+template void Scheduler::sync<SyncCtx::io>(Worker* worker);

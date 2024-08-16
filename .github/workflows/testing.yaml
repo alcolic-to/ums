@@ -38,5 +38,5 @@ jobs:
     - name: Print cmake veersion
       run: cmake --version
     
-    - name: Print ninja version
-      run: ninja --version
+    - name: Configure
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}

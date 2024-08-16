@@ -4,7 +4,7 @@
 #include "cpu.h"
 #include "config.h"
 #include "task_manager.h"
-#include "io.h"
+#include "io_api.h"
 #include "sync_api.h"
 #include "worker.h"
 

@@ -5,7 +5,7 @@
 #include "os_specific.h"
 #include "scheduler.h"
 #include "sync_api.h"
-#include "io.h"
+#include "io_api.h"
 
 // Creates worker object and starts worker thread on a provided CPU.
 // We will wait for a signal from created thread, so we can continue when it is ready.

@@ -44,4 +44,4 @@ jobs:
       run: cmake --build build
 
     - name: Test
-      run: cd build && ctest -V
+      run: cd build && ctest -V -C ${{ env.CMAKE_BUILD_TYPE }}

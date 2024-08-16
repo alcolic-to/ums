@@ -11,6 +11,7 @@
 #include "task_manager.h"
 #include "util.h"
 #include "sync_api.h"
+#include "io_api.h"
 
 std::random_device rd;     // only used once to initialise (seed) engine
 std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in this case)

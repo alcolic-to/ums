@@ -37,4 +37,6 @@ jobs:
     steps:
     - name: Print cmake veersion
       run: cmake --version
-
+    
+    - name: Print ninja version
+      run: ninja --version

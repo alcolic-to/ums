@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <atomic>
 
 class Event
 {
@@ -21,7 +22,7 @@ class ConditionalEvent final : public Event
         virtual void signal() override;
         virtual bool check() const override;
     private:
-        bool m_cond;
+        std::atomic<bool> m_cond;
 };
 
 class TimedEvent final : public Event

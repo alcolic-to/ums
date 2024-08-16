@@ -6,6 +6,7 @@
 #include "task_manager.h"
 #include "util.h"
 #include "sync_api.h"
+#include "io.h"
 
 Scheduler::Scheduler(const CPU& cpu)
 	: m_cpu{ cpu }
@@ -130,7 +131,7 @@ void Scheduler::schedule_idle_workers()
 //
 void Scheduler::schedule_waiting_workers()
 {
-	auto signaled = [](Worker* worker) { return worker->m_event->m_cond.load(); };
+	auto signaled = [](Worker* worker) { return worker->m_event->check(); };
 
 	auto begin = m_waiting_queue.begin();
 	auto end = m_waiting_queue.end();

@@ -1,5 +1,5 @@
 #include "sync_api.h"
-#include "utils.h"
+#include "util.h"
 #include "worker.h"
 
 void Event::wait() { tls_worker->wait_event(this); }
@@ -10,7 +10,7 @@ void ConditionalEvent::wait() { Base::wait(); }
 
 void ConditionalEvent::signal() { m_cond = true; }
 
-bool ConditionalEvent::check() const { return m_cond; }
+bool ConditionalEvent::check() const { return m_cond.load(); }
 
 TimedEvent::TimedEvent(std::uint64_t time_to_sleep_in_ms)
     : m_time_to_sleep_in_ms(time_to_sleep_in_ms) {}

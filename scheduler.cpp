@@ -258,6 +258,8 @@ private:
 
 static constexpr Scheduler_Loads Loads;
 
+static_assert(Loads[Worker::State::runnable] == 10);
+
 // Sets new scheduler load based on previous and new worker state.
 //
 void Scheduler::manage_load(Worker::State prev_state, Worker::State new_state)

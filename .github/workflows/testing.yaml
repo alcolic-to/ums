@@ -1,0 +1,40 @@
+name: CMake Build
+
+run-name: ${{ github.actor }} invoked build.
+
+on: [push, pull_request]
+
+env:
+  CMAKE_VERSION: 3.20.0
+  CMAKE_BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    outputs:
+      tag: ${{ steps.git.outputs.tag }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+              name: "Windows Latest MSVC",
+              os: windows-latest,
+              cc: "cl", cxx: "cl",
+            }
+          - {
+              name: "Linux Latest GCC",
+              os: ubuntu-latest,
+              cc: "gcc", cxx: "g++",
+            }
+          - {
+              name: "MacOS Latest Clang",
+              os: macos-latest,
+              cc: "clang", cxx: "clang++",
+            }
+    
+    steps:
+    - name: Print cmake veersion
+      run: cmake --version
+

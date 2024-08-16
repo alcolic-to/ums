@@ -2,11 +2,9 @@
 #include "util.h"
 #include "worker.h"
 
-void Event::wait() { tls_worker->wait_event(this); }
-
 ConditionalEvent::ConditionalEvent() : m_cond(false) {}
 
-void ConditionalEvent::wait() { Base::wait(); }
+void ConditionalEvent::wait() { tls_worker->wait_event(this); }
 
 void ConditionalEvent::signal() { m_cond = true; }
 
@@ -18,7 +16,7 @@ TimedEvent::TimedEvent(std::uint64_t time_to_sleep_in_ms)
 void TimedEvent::wait()
 {
     m_start_time = get_time_in_ms();
-    Base::wait();
+    tls_worker->wait_sleep(this);
 }
 
 void TimedEvent::signal() {}

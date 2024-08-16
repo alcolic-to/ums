@@ -11,6 +11,7 @@
 #include "task_manager.h"
 #include "util.h"
 #include "sync_api.h"
+#include "io_api.h"
 
 std::random_device rd;     // only used once to initialise (seed) engine
 std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in this case)
@@ -174,7 +175,7 @@ void single_read()
 
 	auto buf = std::make_unique<char[]>(read_size);
 
-	read_file(file, buf.get(), read_size, 0);
+	cos_read_file(file, buf.get(), read_size, 0);
 	std::cout << "Read buffer: " << buf.get() << "\n";
 }
 
@@ -185,7 +186,7 @@ void single_write()
 
 	std::string io_str(write_size, 'a');
 
-	write_file(file, io_str.data(), io_str.size(), 0);
+	cos_write_file(file, io_str.data(), io_str.size(), 0);
 }
 
 void read_from_file()
@@ -195,7 +196,7 @@ void read_from_file()
 
 	auto buf = std::make_unique<char[]>(read_size);
 
-	read_file(file, buf.get(), read_size, (prng.rand<uint64_t>() % read_size) * read_size);
+	cos_read_file(file, buf.get(), read_size, (prng.rand<uint64_t>() % read_size) * read_size);
 	// std::cout << "Read buffer: " << buf.get() << "\n";
 }
 
@@ -209,7 +210,7 @@ void write_to_file()
 	// for (int i = 0; i < 10; ++i)
 	// 	std::cout << prng.rand<uint64_t>() << "\n";
 
-	write_file(file, io_str.data(), io_str.size(), (prng.rand<uint64_t>() % max_file_size) * io_str.size());
+	cos_write_file(file, io_str.data(), io_str.size(), (prng.rand<uint64_t>() % max_file_size) * io_str.size());
 }
 
 int main(int argc, char* argv[])

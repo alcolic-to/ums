@@ -1,5 +1,6 @@
 #include "io_api.h"
 #include "worker.h"
+#include "os_specific.h"
 
 IO_Request::IO_Request(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset, Type type)
 	: m_file_handle{ file_handle }
@@ -21,12 +22,12 @@ void IO_Request::update()
 	update_io_state(*this);
 }
 
-void read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
+void cos_read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
 {
 	tls_worker->read_file(file_handle, buffer, nbytes, offset);
 }
 
-void write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
+void cos_write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
 {
 	tls_worker->write_file(file_handle, buffer, nbytes, offset);
 }

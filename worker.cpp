@@ -4,11 +4,8 @@
 #include "cpu.h"
 #include "os_specific.h"
 #include "scheduler.h"
-#include "util.h"
-
-Event::Event() : m_cond{ false } {};
-void Event::signal() { m_cond = true; }
-void Event::wait() { tls_worker->wait_event(*this); }
+#include "sync_api.h"
+#include "io_api.h"
 
 // Creates worker object and starts worker thread on a provided CPU.
 // We will wait for a signal from created thread, so we can continue when it is ready.
@@ -16,7 +13,8 @@ void Event::wait() { tls_worker->wait_event(*this); }
 Worker::Worker(uint64_t id, Scheduler& scheduler)
 	: m_id{ id }
 	, m_state{ State::initializing }
-	, m_event{ nullptr }
+	, m_cond_event{ nullptr }
+	, m_timed_event{ nullptr }
 	, m_scheduler{ scheduler }
 	, m_thread{ &Worker::entry_point, this }
 {
@@ -50,13 +48,19 @@ void Worker::yield()
 
 // Wait on a event if it is not signaled.
 //
-void Worker::wait_event(Event& event)
+void Worker::wait_event(ConditionalEvent* event)
 {
-	if (!event.m_cond)
+	if (!event->check())
 	{
-		m_event = &event;
+		m_cond_event = event;
 		m_scheduler.sync<SyncCtx::wait_event>(this);
 	}
+}
+
+void Worker::wait_sleep(TimedEvent* event)
+{
+    m_timed_event = event;
+    m_scheduler.sync<SyncCtx::wait_sleep>(this);
 }
 
 void Worker::read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)

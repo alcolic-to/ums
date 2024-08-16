@@ -10,6 +10,7 @@
 #include "worker.h"
 #include "task_manager.h"
 #include "util.h"
+#include "sync_api.h"
 
 std::random_device rd;     // only used once to initialise (seed) engine
 std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in this case)
@@ -74,7 +75,7 @@ void f1()
 	return;
 }
 
-Event e;
+ConditionalEvent e;
 
 // Duration of ~1s when plugged in.
 //
@@ -228,9 +229,18 @@ int main(int argc, char* argv[])
 
 #else
 
+void sleep_test()
+{
+    cos_sleep(1000);
+}
+
 int main(int argc, char* argv[])
 {
-	
+    std::uint64_t start = get_time_in_ms();
+    for (std::size_t i = 0; i < 10; ++i)
+        task_manager.execute_task<false>(sleep_test);
+    std::uint64_t end = get_time_in_ms();
+    std::cout << "Total exec time: " << end - start << "ms.\n";
 }
 
 #endif

@@ -7,23 +7,13 @@
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <atomic>
 
 #include "task_manager.h"
 #include "os_specific.h"
 
 class Scheduler;
-
-class Event final
-{
-public:
-	Event();
-	void signal();
-	void wait();
-
-public:
-	std::atomic<bool> m_cond;
-};
+class TimedEvent;
+class ConditionalEvent;
 
 // TODO: Check whether worker should be placed on std::hardware_constructive_interference_size alignment,
 // to avoid false sharing.
@@ -31,7 +21,7 @@ public:
 class Worker final
 {
 public:
-	enum class State : int { initializing, idle, waiting, pending_io, runnable, running, exiting };
+	enum class State : int { initializing, idle, waiting, pending_io, runnable, sleeping , running, exiting };
 
 	// Create worker object and start worker thread on a provided CPU.
 	//
@@ -49,9 +39,10 @@ public:
 	void main_loop();
 
 	void yield();
-	void wait_event(Event& event);
 	void read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset);
 	void write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset);
+	void wait_event(ConditionalEvent* event);
+	void wait_sleep(TimedEvent* event);
 
 	void set_state(State state);
 
@@ -72,7 +63,8 @@ public:
 	uint64_t m_id;
 	State m_state;
 
-	Event* m_event;
+	ConditionalEvent* m_cond_event;
+	TimedEvent* m_timed_event;
 	std::shared_ptr<Task> m_task;
 	std::unique_ptr<IO_Request> m_io_request;
 	Scheduler& m_scheduler;

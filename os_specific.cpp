@@ -128,7 +128,7 @@ void update_io_state(IO_Request& io)
 	DWORD bytes = 0;
 	DWORD ol_res = bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_control), &bytes, false));
 
-	// std::cout << "GetOverlappedResult: " << ol_res << ", Bytes written : " << bytes << "\n";
+	// std::cout << "GetOverlappedResult: " << ol_res << ", bytes : " << bytes << "\n";
 
 	switch (ol_res)
 	{

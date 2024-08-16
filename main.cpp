@@ -164,8 +164,28 @@ void test_signal()
 
 #if defined _WIN32
 
-// HANDLE file_for_write = CreateFile("io_testing_file_0", GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH, NULL);
-HANDLE file_for_read = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING, NULL);
+HANDLE file = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS | FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH, NULL);
+
+void single_read()
+{
+	constexpr int read_size = 8 * 1024;
+	int max_read_size = read_size * 128;
+
+	auto buf = std::make_unique<char[]>(read_size);
+
+	read_file(file, buf.get(), read_size, 0);
+	std::cout << "Read buffer: " << buf.get() << "\n";
+}
+
+void single_write()
+{
+	int write_size = 8 * 1024;
+	int max_file_size = write_size * 128;
+
+	std::string io_str(write_size, 'a');
+
+	write_file(file, io_str.data(), io_str.size(), 0);
+}
 
 void read_from_file()
 {
@@ -174,32 +194,36 @@ void read_from_file()
 
 	auto buf = std::make_unique<char[]>(read_size);
 
-	read_file(file_for_read, buf.get(), read_size, (prng.rand<uint64_t>() % read_size) * read_size);
-	std::cout << "Read buffer: " << buf.get() << "\n";
+	read_file(file, buf.get(), read_size, (prng.rand<uint64_t>() % read_size) * read_size);
+	// std::cout << "Read buffer: " << buf.get() << "\n";
 }
 
-//void write_to_file()
-//{
-//	int write_size = 8 * 1024;
-//	int max_file_size = write_size * 128;
-//
-//	std::string io_str(write_size, 'a');
-//	
-//	// for (int i = 0; i < 10; ++i)
-//	// 	std::cout << prng.rand<uint64_t>() << "\n";
-//
-//	write_file(file_for_write, io_str.data(), io_str.size(), (prng.rand<uint64_t>() % max_file_size) * io_str.size());
-//}
+void write_to_file()
+{
+	int write_size = 8 * 1024;
+	int max_file_size = write_size * 128;
+
+	std::string io_str(write_size, 'a');
+	
+	// for (int i = 0; i < 10; ++i)
+	// 	std::cout << prng.rand<uint64_t>() << "\n";
+
+	write_file(file, io_str.data(), io_str.size(), (prng.rand<uint64_t>() % max_file_size) * io_str.size());
+}
 
 int main(int argc, char* argv[])
 {
-	/*for (int i = 0; i < 128; ++i)
-		task_manager.execute_task<true>(write_to_file);*/
+	// for (int i = 0; i < 1024; ++i)
+	// 	task_manager.execute_task<true>(write_to_file);
+	// 
+	// for (int i = 0; i < 1000 * 1024; ++i)
+	// 	task_manager.execute_task<true>(read_from_file);
 
-		// task_manager.execute_task<true>(io_func);
+	// task_manager.execute_task<false>(write_to_file);
+	// task_manager.execute_task<false>(read_from_file);
 
-	for (int i = 0; i < 128; ++i)
-		task_manager.execute_task<true>(read_from_file);
+	for (int i = 0; i < 10000000; ++i)
+		task_manager.execute_task<true>(f4);
 }
 
 #else

@@ -36,9 +36,6 @@ void Worker::set_state(Worker::State state)
 	m_state = state;
 }
 
-bool Worker::state_idle(State state) { return state == State::idle || state == State::waiting || state == State::pending_io; }
-bool Worker::state_runnable(State state) { return state == State::runnable || state == State::running; }
-
 bool Worker::exit() const
 {
 	return m_state == State::exiting;

@@ -33,9 +33,6 @@ class Worker final
 public:
 	enum class State : int { initializing, idle, waiting, pending_io, runnable, running, exiting };
 
-	static bool state_idle(State state);
-	static bool state_runnable(State state);
-
 	// Create worker object and start worker thread on a provided CPU.
 	//
 	Worker(uint64_t id, Scheduler& scheduler);

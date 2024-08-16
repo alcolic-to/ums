@@ -63,7 +63,7 @@ public:
 
 	void set_state(State state);
 
-	void manage_load(Worker::State prevState, Worker::State newState);
+	void manage_load(Worker::State prev_state, Worker::State new_state);
 	void inc_load();
 	void dec_load();
 	uint64_t load() const;

@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "scheduler.h"
+#include "worker.h"
 #include "cpu.h"
 #include "config.h"
 #include "task_manager.h"
@@ -16,7 +17,7 @@ Scheduler::Scheduler(const CPU& cpu)
 	for (int i = 0; i < CFG_workers_per_cpu; ++i)
 		m_workers.push_back(std::make_unique<Worker>(i, *this));
 
-	m_state = State::running;
+	set_state(State::running);
 
 	m_worker = m_idle_queue.front();
 	m_worker->m_cv.notify_one();
@@ -24,7 +25,7 @@ Scheduler::Scheduler(const CPU& cpu)
 
 Scheduler::~Scheduler()
 {
-	set_state(Scheduler::State::exiting);
+	set_state(State::exiting);
 }
 
 bool Scheduler::has_idle_workers() const { return !m_idle_queue.empty(); }
@@ -209,18 +210,41 @@ void Scheduler::idle_sleep()
 bool Scheduler::initializing() const { return m_state == State::initializing; }
 bool Scheduler::exiting() const { return m_state == State::exiting; }
 void Scheduler::set_state(State state) { m_state = state; }
+
 Worker* Scheduler::worker() const { return m_worker; }
 
-void Scheduler::inc_load() { ++m_load; }
-void Scheduler::dec_load() { --m_load; }
-uint64_t Scheduler::load() const { return m_load + m_tasks.size(); }
-
-void Scheduler::manage_load(Worker::State prevState, Worker::State newState)
+class Scheduler_Loads
 {
-	if (Worker::state_idle(prevState) && Worker::state_runnable(newState))
-		inc_load();
-	else if (Worker::state_runnable(prevState) && Worker::state_idle(newState))
-		dec_load();
+public:
+	constexpr inline Scheduler_Loads()
+	{
+		m_loads[int(Worker::State::initializing)] = 0;
+		m_loads[int(Worker::State::idle)]         = 0;
+		m_loads[int(Worker::State::waiting)]      = 1;
+		m_loads[int(Worker::State::pending_io)]   = 2;
+		m_loads[int(Worker::State::runnable)]     = 10;
+		m_loads[int(Worker::State::running)]      = 10;
+		m_loads[int(Worker::State::exiting)]      = 0;
+	}
+
+	constexpr inline int operator[](const Worker::State state) const { return m_loads[int(state)]; }
+
+private:
+	int m_loads[int(Worker::State::exiting) + 1];
+};
+
+static constexpr Scheduler_Loads Loads;
+
+// Sets new scheduler load based on previous and new worker state.
+//
+void Scheduler::manage_load(Worker::State prev_state, Worker::State new_state)
+{
+	m_load += Loads[new_state] - Loads[prev_state];
+}
+
+uint64_t Scheduler::load() const
+{
+	return m_load + m_tasks.size() * Loads[Worker::State::runnable];
 }
 
 // Switches thread execution context from previous worker to current.

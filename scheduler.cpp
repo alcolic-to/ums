@@ -253,7 +253,7 @@ public:
 	constexpr inline int operator[](const Worker::State state) const { return m_loads[int(state)]; }
 
 private:
-	int m_loads[int(Worker::State::exiting) + 1];
+	int m_loads[int(Worker::State::exiting) + 1] = { 0 };
 };
 
 static constexpr Scheduler_Loads Loads;

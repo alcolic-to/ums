@@ -230,6 +230,80 @@ int main(int argc, char* argv[])
 
 #else
 
+#ifdef __linux__
+
+#include <fcntl.h>
+#include <string.h>
+#include <liburing.h>
+
+int fd = open("io_testing_file_0", O_WRONLY | O_CREAT, 0644);
+char *buffer;
+const std::size_t block_size = 4096;
+
+void write_to_file()
+{
+    // Allocate aligned memory
+    if (posix_memalign((void **)&buffer, block_size, block_size))
+    {
+        std::cerr << "posix_memalign failed\n";
+        return;
+    }
+
+    strcpy(buffer, "Hello, world!\n");
+    
+    // Create the io_uring instance
+    struct io_uring ring;
+    if (io_uring_queue_init(32, &ring, 0) < 0)
+    {
+        std::cerr << "io_uring_queue_init failed\n";
+        return;
+    }
+
+    // Prepare the iovec structure
+    struct iovec iov;
+    iov.iov_base = (void*) buffer;
+    iov.iov_len = block_size;
+
+    // Get a submission queue entry
+    struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
+
+    // Prepare the I/O request
+    io_uring_prep_writev(sqe, fd, &iov, 1, 0);
+
+    // Submit the I/O request
+    io_uring_submit(&ring);
+
+    // cqe is a pointer to the completion queue entry
+    struct io_uring_cqe *cqe;
+    while (1)
+    {
+        // Peek to see if I/O completed
+        int ret = io_uring_peek_cqe(&ring, &cqe);
+        if (ret == 0 && cqe != nullptr)
+        {
+            if (cqe->res < 0)
+            {
+                std::cerr << "Error writing to file\n";
+            }
+            else
+            {
+                std::cout << "Wrote " << cqe->res << " bytes to file\n";
+            }
+
+            // Mark completion as seen
+            io_uring_cqe_seen(&ring, cqe);
+            break;
+        }
+
+        std::cout << "I/O still pending ..." << std::endl;
+        usleep(10000);  // Sleep for a short time before polling again
+    }
+
+    io_uring_queue_exit(&ring);
+}
+
+#endif // __linux__
+
 void sleep_test()
 {
     cos_sleep(1000);
@@ -237,11 +311,16 @@ void sleep_test()
 
 int main(int argc, char* argv[])
 {
-    std::uint64_t start = get_time_in_ms();
-    for (std::size_t i = 0; i < 10; ++i)
-        task_manager.execute_task<false>(sleep_test);
-    std::uint64_t end = get_time_in_ms();
-    std::cout << "Total exec time: " << end - start << "ms.\n";
+    std::vector<std::thread> v;
+    const std::size_t num_threads = 100;
+
+    for (std::size_t i = 0; i < num_threads; ++i)
+        v.push_back(std::thread{ write_to_file });
+
+    for (auto& it : v)
+        it.join();
+
+    std::cout << "All threads joined\n";
 }
 
 #endif

@@ -11,6 +11,7 @@ Supported OS:
 * `cmake` - minimum version 3.10
 * `clang` and `clang++`
 * `Ninja` - for faster build times
+* For linux `liburing-dev` package is required
 
 ## Usage
 

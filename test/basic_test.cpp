@@ -4,6 +4,8 @@
 
 #include "task_manager.h"
 
+#define ENDL '\n'
+
 void f()
 {
     std::this_thread::sleep_for (std::chrono::milliseconds(10));
@@ -22,10 +24,8 @@ TEST(BasicTestSuite, BasicTest)
     auto end = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<double, std::milli> duration = end - start;
-    std::cout << "Total exec time: " << duration.count() << "ms.\n";
+    std::cout << "Total exec time: " << duration.count() << "ms." << ENDL;
 
-    // std::this_thread::sleep_for(10s);
-
-    std::cout << r << "\n";
+    std::cout << r << ENDL;
 
 }

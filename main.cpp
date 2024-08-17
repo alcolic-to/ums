@@ -236,28 +236,25 @@ int main(int argc, char* argv[])
 #include <string.h>
 #include <liburing.h>
 
-int fd = open("io_testing_file_0", O_WRONLY | O_CREAT, 0644);
-char *buffer;
-const std::size_t block_size = 4096;
+#include <errno.h>
 
-void write_to_file()
+const std::size_t block_size = 4096;
+struct io_uring ring;
+int ret = io_uring_queue_init(32, &ring, 0);
+
+void write_to_file(int thread_id)
 {
+    int fd = open("io_testing_file_0", O_WRONLY | O_CREAT | O_DIRECT, 0644);
+    char *buffer;
+
     // Allocate aligned memory
     if (posix_memalign((void **)&buffer, block_size, block_size))
     {
-        std::cerr << "posix_memalign failed\n";
+        std::cerr << "posix_memalign failed" << std::endl;
         return;
     }
 
     strcpy(buffer, "Hello, world!\n");
-    
-    // Create the io_uring instance
-    struct io_uring ring;
-    if (io_uring_queue_init(32, &ring, 0) < 0)
-    {
-        std::cerr << "io_uring_queue_init failed\n";
-        return;
-    }
 
     // Prepare the iovec structure
     struct iovec iov;
@@ -269,6 +266,7 @@ void write_to_file()
 
     // Prepare the I/O request
     io_uring_prep_writev(sqe, fd, &iov, 1, 0);
+    sqe->user_data = thread_id;
 
     // Submit the I/O request
     io_uring_submit(&ring);
@@ -279,15 +277,15 @@ void write_to_file()
     {
         // Peek to see if I/O completed
         int ret = io_uring_peek_cqe(&ring, &cqe);
-        if (ret == 0 && cqe != nullptr)
+        if (ret == 0 && cqe != nullptr && cqe->user_data == thread_id)
         {
             if (cqe->res < 0)
             {
-                std::cerr << "Error writing to file\n";
+                std::cerr << "Error writing to file" << std::endl;
             }
             else
             {
-                std::cout << "Wrote " << cqe->res << " bytes to file\n";
+                std::cout << "Wrote " << thread_id << " " << cqe->res << " bytes to file" << std::endl;
             }
 
             // Mark completion as seen
@@ -295,11 +293,12 @@ void write_to_file()
             break;
         }
 
-        std::cout << "I/O still pending ..." << std::endl;
-        usleep(10000);  // Sleep for a short time before polling again
+        // printf("Waiting for completion: %s", strerror(ret));
+        sleep(1);
     }
 
-    io_uring_queue_exit(&ring);
+    free(buffer);
+    close(fd);
 }
 
 #endif // __linux__
@@ -315,12 +314,13 @@ int main(int argc, char* argv[])
     const std::size_t num_threads = 100;
 
     for (std::size_t i = 0; i < num_threads; ++i)
-        v.push_back(std::thread{ write_to_file });
+        v.push_back(std::thread{ write_to_file, i });
 
     for (auto& it : v)
         it.join();
 
     std::cout << "All threads joined\n";
+    io_uring_queue_exit(&ring);
 }
 
 #endif

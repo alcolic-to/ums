@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
 
 const std::size_t block_size = 4096;
 std::mutex io_mutex;
-const std::size_t num_threads = 100;
+const std::size_t num_threads = 1;
 
 void create_file(const char *file, size_t size, char pattern)
 {
@@ -302,7 +302,12 @@ void write_to_file(int thread_id)
     }
 
     struct io_uring ring;
-    io_uring_queue_init(1, &ring, 0);
+    int ret = io_uring_queue_init(1, &ring, 0);
+	if (ret < 0)
+	{
+		std::cout << "Failed to initialize io_uring " << strerror(-ret) << std::endl;
+		return;
+	}
 
     // Get a submission queue entry
     struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
@@ -323,7 +328,7 @@ void write_to_file(int thread_id)
     io_uring_sqe_set_data64(sqe, thread_id);
 
     // Submit the I/O request
-    int ret = io_uring_submit(&ring);
+    ret = io_uring_submit(&ring);
     if (ret < 0)
     {
         std::cerr << "io_uring_submit failed" << std::endl;

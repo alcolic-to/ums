@@ -12,26 +12,26 @@
 class CPU final
 {
 public:
-	CPU(uint64_t cpu_id, uint64_t cpu_mask);
+    CPU(uint64_t cpu_id, uint64_t cpu_mask);
 
 public:
-	uint64_t m_id;
-	uint64_t m_mask;
+    uint64_t m_id;
+    uint64_t m_mask;
 
-	Scheduler m_scheduler;
+    Scheduler m_scheduler;
 };
 
 class CPUs final
 {
 public:
-	CPUs();
+    CPUs();
 
-	Scheduler& min_load_scheduler() const;
+    Scheduler& min_load_scheduler() const;
 
 private:
-	uint32_t m_system_cpus_count;
-	uint64_t m_avail_cpus_mask;
-	std::vector<std::unique_ptr<CPU>> m_cpus;
+    uint32_t m_system_cpus_count;
+    uint64_t m_avail_cpus_mask;
+    std::vector<std::unique_ptr<CPU>> m_cpus;
 };
 
 extern CPUs cpus;

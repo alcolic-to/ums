@@ -19,19 +19,19 @@ std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in thi
 class PRNG
 {
 public:
-	PRNG(uint64_t seed) : m_seed(seed) { }
+    PRNG(uint64_t seed) : m_seed(seed) { }
 
-	template<typename T>
-	T rand() { return T(rand64()); }
+    template<typename T>
+    T rand() { return T(rand64()); }
 
 private:
-	uint64_t m_seed;
+    uint64_t m_seed;
 
-	uint64_t rand64()
-	{
-		m_seed ^= m_seed >> 12, m_seed ^= m_seed << 25, m_seed ^= m_seed >> 27;
-		return m_seed * 2685821657736338717LL;
-	}
+    uint64_t rand64()
+    {
+        m_seed ^= m_seed >> 12, m_seed ^= m_seed << 25, m_seed ^= m_seed >> 27;
+        return m_seed * 2685821657736338717LL;
+    }
 };
 
 static PRNG prng{ 1070372 };
@@ -40,40 +40,40 @@ using namespace std::chrono_literals;
 
 void f2()
 {
-	tls_worker->yield();
+    tls_worker->yield();
 }
 
 void f1()
 {
-	auto start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
 
-	std::vector<int> v;
-	for (int i = 0; i < 1000; ++i)
-		v.push_back(rand());
+    std::vector<int> v;
+    for (int i = 0; i < 1000; ++i)
+        v.push_back(rand());
 
-	std::uniform_int_distribution<int> uni(0, 10);
-	int funcDur = uni(rng);
-	// int funcDur = 1;
+    std::uniform_int_distribution<int> uni(0, 10);
+    int funcDur = uni(rng);
+    // int funcDur = 1;
 
-	int i = 0;
-	while (true)
-	{
-		auto end = std::chrono::high_resolution_clock::now();
+    int i = 0;
+    while (true)
+    {
+        auto end = std::chrono::high_resolution_clock::now();
 
-		std::chrono::duration<double, std::milli> duration = end - start;
-		if (duration.count() > funcDur)
-		{
-			std::cout << "Task execution exceeded time limit of " << duration.count() << "ms.\n";
-			break;
-		}
+        std::chrono::duration<double, std::milli> duration = end - start;
+        if (duration.count() > funcDur)
+        {
+            std::cout << "Task execution exceeded time limit of " << duration.count() << "ms.\n";
+            break;
+        }
 
-		if (v[rand() % v.size()] == rand() % v.size() && i++ % 100 == 0)
-		{
-			tls_worker->yield();
-		}
-	}
+        if (v[rand() % v.size()] == rand() % v.size() && i++ % 100 == 0)
+        {
+            tls_worker->yield();
+        }
+    }
 
-	return;
+    return;
 }
 
 ConditionalEvent e;
@@ -82,86 +82,86 @@ ConditionalEvent e;
 //
 uint64_t f3()
 {
-	uint64_t first = 0, second = 1;
-	
-	// Fibbonaci seq.
-	//
-	for (uint64_t i = 2; i < 3000000000; ++i)
-	{
-		uint64_t sum = first + second;
-		first = second;
-		second = sum;
+    uint64_t first = 0, second = 1;
+    
+    // Fibbonaci seq.
+    //
+    for (uint64_t i = 2; i < 3000000000; ++i)
+    {
+        uint64_t sum = first + second;
+        first = second;
+        second = sum;
 
-		// if (i % 10000 == 0)
-		// 	tls_worker->wait_event(e);
-	}
+        // if (i % 10000 == 0)
+        //     tls_worker->wait_event(e);
+    }
 
-	return second;
+    return second;
 }
 
 void thread_function()
 {
-	for (int i = 0; i < 1000; ++i)
-		task_manager.execute_task<false>(f3);
+    for (int i = 0; i < 1000; ++i)
+        task_manager.execute_task<false>(f3);
 }
 
 // Duration of ~4ms when plugged in.
 //
 uint64_t f4()
 {
-	uint64_t first = 0, second = 1;
+    uint64_t first = 0, second = 1;
 
-	// Fibbonaci seq.
-	//
-	for (uint64_t i = 2; i < 10000000; ++i)
-	{
-		uint64_t sum = first + second;
-		first = second;
-		second = sum;
+    // Fibbonaci seq.
+    //
+    for (uint64_t i = 2; i < 10000000; ++i)
+    {
+        uint64_t sum = first + second;
+        first = second;
+        second = sum;
 
-		// if (i % 10000 == 0)
-		// 	tls_worker->wait_event(e);
-	}
+        // if (i % 10000 == 0)
+        //     tls_worker->wait_event(e);
+    }
 
-	return second;
+    return second;
 }
 
 void ms3_function()
 {
-	uint64_t r = 0;
-	auto start = std::chrono::high_resolution_clock::now();
+    uint64_t r = 0;
+    auto start = std::chrono::high_resolution_clock::now();
 
-	for (int i = 0; i < 1000; ++i)
-	{
-		task_manager.execute_task<false>(f4);
-		// std::cout << GetCurrentProcessorNumber() << "\n";
-		// r += f4();
-	}
+    for (int i = 0; i < 1000; ++i)
+    {
+        task_manager.execute_task<false>(f4);
+        // std::cout << GetCurrentProcessorNumber() << "\n";
+        // r += f4();
+    }
 
-	auto end = std::chrono::high_resolution_clock::now();
+    auto end = std::chrono::high_resolution_clock::now();
 
-	std::chrono::duration<double, std::milli> duration = end - start;
-	std::cout << "Total exec time: " << duration.count() << "ms.\n";
+    std::chrono::duration<double, std::milli> duration = end - start;
+    std::cout << "Total exec time: " << duration.count() << "ms.\n";
 
-	// std::this_thread::sleep_for(10s);
+    // std::this_thread::sleep_for(10s);
 
-	// std::cout << r << "\n";
+    // std::cout << r << "\n";
 }
 
 void test_signal()
 {
-	std::vector<std::thread> v;
-	
-	for (int i = 0; i < 10; ++i)
-		v.push_back(std::thread{ thread_function });
-	
-	for (auto& it : v)
-		it.join();
+    std::vector<std::thread> v;
+    
+    for (int i = 0; i < 10; ++i)
+        v.push_back(std::thread{ thread_function });
+    
+    for (auto& it : v)
+        it.join();
 
-	std::this_thread::sleep_for(5s);
-	e.signal();
+    std::this_thread::sleep_for(5s);
+    e.signal();
 
-	std::cout << f3() << "\n";
+    std::cout << f3() << "\n";
 }
 
 #if defined _WIN32
@@ -170,62 +170,62 @@ HANDLE file = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, N
 
 void single_read()
 {
-	constexpr int read_size = 8 * 1024;
-	int max_read_size = read_size * 128;
+    constexpr int read_size = 8 * 1024;
+    int max_read_size = read_size * 128;
 
-	auto buf = std::make_unique<char[]>(read_size);
+    auto buf = std::make_unique<char[]>(read_size);
 
-	cos_read_file(file, buf.get(), read_size, 0);
-	std::cout << "Read buffer: " << buf.get() << "\n";
+    cos_read_file(file, buf.get(), read_size, 0);
+    std::cout << "Read buffer: " << buf.get() << "\n";
 }
 
 void single_write()
 {
-	int write_size = 8 * 1024;
-	int max_file_size = write_size * 128;
+    int write_size = 8 * 1024;
+    int max_file_size = write_size * 128;
 
-	std::string io_str(write_size, 'a');
+    std::string io_str(write_size, 'a');
 
-	cos_write_file(file, io_str.data(), io_str.size(), 0);
+    cos_write_file(file, io_str.data(), io_str.size(), 0);
 }
 
 void read_from_file()
 {
-	constexpr int read_size = 8 * 1024;
-	int max_read_size = read_size * 128;
+    constexpr int read_size = 8 * 1024;
+    int max_read_size = read_size * 128;
 
-	auto buf = std::make_unique<char[]>(read_size);
+    auto buf = std::make_unique<char[]>(read_size);
 
-	cos_read_file(file, buf.get(), read_size, (prng.rand<uint64_t>() % read_size) * read_size);
-	// std::cout << "Read buffer: " << buf.get() << "\n";
+    cos_read_file(file, buf.get(), read_size, (prng.rand<uint64_t>() % read_size) * read_size);
+    // std::cout << "Read buffer: " << buf.get() << "\n";
 }
 
 void write_to_file()
 {
-	int write_size = 8 * 1024;
-	int max_file_size = write_size * 128;
+    int write_size = 8 * 1024;
+    int max_file_size = write_size * 128;
 
-	std::string io_str(write_size, 'a');
-	
-	// for (int i = 0; i < 10; ++i)
-	// 	std::cout << prng.rand<uint64_t>() << "\n";
+    std::string io_str(write_size, 'a');
+    
+    // for (int i = 0; i < 10; ++i)
+    //     std::cout << prng.rand<uint64_t>() << "\n";
 
-	cos_write_file(file, io_str.data(), io_str.size(), (prng.rand<uint64_t>() % max_file_size) * io_str.size());
+    cos_write_file(file, io_str.data(), io_str.size(), (prng.rand<uint64_t>() % max_file_size) * io_str.size());
 }
 
 int main(int argc, char* argv[])
 {
-	// for (int i = 0; i < 1024; ++i)
-	// 	task_manager.execute_task<true>(write_to_file);
-	// 
-	// for (int i = 0; i < 1000 * 1024; ++i)
-	// 	task_manager.execute_task<true>(read_from_file);
+    // for (int i = 0; i < 1024; ++i)
+    //     task_manager.execute_task<true>(write_to_file);
+    // 
+    // for (int i = 0; i < 1000 * 1024; ++i)
+    //     task_manager.execute_task<true>(read_from_file);
 
-	// task_manager.execute_task<false>(write_to_file);
-	// task_manager.execute_task<false>(read_from_file);
+    // task_manager.execute_task<false>(write_to_file);
+    // task_manager.execute_task<false>(read_from_file);
 
-	for (int i = 0; i < 10000000; ++i)
-		task_manager.execute_task<true>(f4);
+    for (int i = 0; i < 10000000; ++i)
+        task_manager.execute_task<true>(f4);
 }
 
 #else

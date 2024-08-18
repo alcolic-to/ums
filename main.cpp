@@ -241,10 +241,61 @@ int main(int argc, char* argv[])
 const std::size_t block_size = 4096;
 struct io_uring ring;
 int ret = io_uring_queue_init(32, &ring, 0);
+std::mutex io_mutex;
+
+void create_file(const char *file, size_t size, char pattern)
+{
+	char *buf;
+	int fd;
+
+	buf = (char*) malloc(size);
+	memset(buf, pattern, size);
+
+	fd = open(file, O_WRONLY | O_CREAT, 0644);
+
+	write(fd, buf, size);
+	fsync(fd);
+	close(fd);
+	free(buf);
+}
+
+void wait_complete()
+{
+    // cqe is a pointer to the completion queue entry
+    struct io_uring_cqe *cqe;
+    std::vector<std::uint64_t> thread_ids;
+    while (1)
+    {
+        // Peek to see if I/O completed
+        std::uint32_t head;
+        std::uint32_t i = 0;
+        io_uring_for_each_cqe(&ring, head, cqe)
+        {
+            std::uint64_t tid = io_uring_cqe_get_data64(cqe);
+            thread_ids.push_back(tid);
+            i++;
+        }
+
+        io_uring_cq_advance(&ring, i);
+
+        if (thread_ids.size() == 100)
+        {
+            break;
+        }
+        else
+        {
+            std::cout << "Number of completions is " << thread_ids.size() << std::endl;
+        }
+
+        sleep(1);
+    }
+}
+
+std::vector<std::uint64_t> submited_ios;
 
 void write_to_file(int thread_id)
 {
-    int fd = open("io_testing_file_0", O_WRONLY | O_CREAT | O_DIRECT, 0644);
+    int fd = open("io_testing_file_0", O_RDWR | O_DIRECT);
     char *buffer;
 
     // Allocate aligned memory
@@ -254,48 +305,41 @@ void write_to_file(int thread_id)
         return;
     }
 
-    strcpy(buffer, "Hello, world!\n");
-
-    // Prepare the iovec structure
-    struct iovec iov;
-    iov.iov_base = (void*) buffer;
-    iov.iov_len = block_size;
+    std::unique_lock<std::mutex> lock(io_mutex);
 
     // Get a submission queue entry
     struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
+    if (sqe == nullptr)
+    {
+        std::cerr << "io_uring_get_sqe failed" << std::endl;
+        close(fd);
+        free(buffer);
+        return;
+    }
+
+    struct iovec iov;
+    iov.iov_base = buffer;
+    iov.iov_len = block_size;
 
     // Prepare the I/O request
-    io_uring_prep_writev(sqe, fd, &iov, 1, 0);
-    sqe->user_data = thread_id;
+    io_uring_prep_writev(sqe, fd, &iov, 1, block_size * thread_id);
+    io_uring_sqe_set_data64(sqe, thread_id);
 
     // Submit the I/O request
-    io_uring_submit(&ring);
-
-    // cqe is a pointer to the completion queue entry
-    struct io_uring_cqe *cqe;
-    while (1)
+    ret = io_uring_submit(&ring);
+    if (ret < 0)
     {
-        // Peek to see if I/O completed
-        int ret = io_uring_peek_cqe(&ring, &cqe);
-        if (ret == 0 && cqe != nullptr && cqe->user_data == thread_id)
-        {
-            if (cqe->res < 0)
-            {
-                std::cerr << "Error writing to file" << std::endl;
-            }
-            else
-            {
-                std::cout << "Wrote " << thread_id << " " << cqe->res << " bytes to file" << std::endl;
-            }
-
-            // Mark completion as seen
-            io_uring_cqe_seen(&ring, cqe);
-            break;
-        }
-
-        // printf("Waiting for completion: %s", strerror(ret));
-        sleep(1);
+        std::cerr << "io_uring_submit failed" << std::endl;
+        close(fd);
+        free(buffer);
+        io_uring_queue_exit(&ring);
+        return;
     }
+
+    submited_ios.push_back(thread_id);
+
+    // Release the lock
+    lock.unlock();
 
     free(buffer);
     close(fd);
@@ -310,6 +354,7 @@ void sleep_test()
 
 int main(int argc, char* argv[])
 {
+    create_file("io_testing_file_0", block_size * 100, 'a');
     std::vector<std::thread> v;
     const std::size_t num_threads = 100;
 
@@ -319,8 +364,10 @@ int main(int argc, char* argv[])
     for (auto& it : v)
         it.join();
 
+    std::cout << "Submited ios " << submited_ios.size() << std::endl;
+    wait_complete();
+
     std::cout << "All threads joined\n";
-    io_uring_queue_exit(&ring);
 }
 
 #endif

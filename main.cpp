@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdio>
 #include <iostream>
 #include <random>
@@ -240,8 +241,6 @@ int main(int argc, char* argv[])
 #include <errno.h>
 
 const std::size_t block_size = 4096;
-struct io_uring ring;
-int ret = io_uring_queue_init(32, &ring, 0);
 std::mutex io_mutex;
 const std::size_t num_threads = 100;
 
@@ -261,67 +260,34 @@ void create_file(const char *file, size_t size, char pattern)
 	free(buf);
 }
 
-void wait_complete()
+void wait_complete(struct io_uring* ring, std::size_t thread_id)
 {
     // cqe is a pointer to the completion queue entry
     struct io_uring_cqe *cqe;
-    std::vector<std::uint64_t> thread_ids;
 
-    for (std::uint64_t i = 0; i < num_threads;)
+    int ret = io_uring_wait_cqe(ring, &cqe);
+    if (ret == 0 && cqe != nullptr)
     {
-        int res = io_uring_peek_cqe(&ring, &cqe);
-        if (res == 0 && cqe != nullptr)
+        std::uint64_t tid = io_uring_cqe_get_data64(cqe);
+        if (thread_id != tid)
         {
-            if (cqe->res != block_size)
-            {
-                std::cerr << "Didn't write " << block_size << " bytes!" << std::endl;
-                return;
-            }
-            else
-            {
-                std::uint64_t tid = io_uring_cqe_get_data64(cqe);
-                thread_ids.push_back(tid);
-                io_uring_cqe_seen(&ring, cqe);
-                ++i;
-                continue;
-            }
-        }
-
-        sleep(1);
-    }
-
-    std::sort(thread_ids.begin(), thread_ids.end());
-    // for (auto i : thread_ids)
-    //     std::cout << i << std::endl;
-
-    std::cout << "Thread ids count " << thread_ids.size() << std::endl;
-    std::size_t prev = 102;
-    for (auto i : thread_ids)
-    {
-        if (i == prev)
-        {
-            std::cout << "Duplicate is " << i << std::endl;
+            std::cout << "Thread ids don't match. tid " << tid << " thread_id " << thread_id << std::endl;
             return;
         }
-        else
+
+        if (cqe->res != block_size)
         {
-            prev = i;
-        }
-    }
-    
-    for (std::size_t i = 0; i < num_threads; ++i)
-    {
-        if (thread_ids[i] != i)
-        {
-            std::cerr << "Completed IO " << i << " doesnt match thread_ids[i] " << thread_ids[i] << std::endl;
+            std::cout << "Thread " << tid << " wrong number of bytes " << cqe->res << std::endl;
             return;
         }
-    }
 
-    std::cout << "All done!" << std::endl;
+        std::cout << "Everything ok for thread " << tid << " cqe->res " << cqe->res << std::endl;
+    }
+    else
+    {
+        std::cout << "Something went wrong on thread " << thread_id << std::endl;
+    }
 }
-
-std::vector<std::uint64_t> submited_ios;
 
 void write_to_file(int thread_id)
 {
@@ -335,7 +301,8 @@ void write_to_file(int thread_id)
         return;
     }
 
-    // std::unique_lock<std::mutex> lock(io_mutex);
+    struct io_uring ring;
+    io_uring_queue_init(1, &ring, 0);
 
     // Get a submission queue entry
     struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
@@ -356,7 +323,7 @@ void write_to_file(int thread_id)
     io_uring_sqe_set_data64(sqe, thread_id);
 
     // Submit the I/O request
-    ret = io_uring_submit(&ring);
+    int ret = io_uring_submit(&ring);
     if (ret < 0)
     {
         std::cerr << "io_uring_submit failed" << std::endl;
@@ -371,10 +338,7 @@ void write_to_file(int thread_id)
         return;
     }
 
-    submited_ios.push_back(thread_id);
-
-    // Release the lock
-    // lock.unlock();
+    wait_complete(&ring, thread_id);
 
     free(buffer);
     close(fd);
@@ -389,20 +353,20 @@ void sleep_test()
 
 int main(int argc, char* argv[])
 {
-    create_file("io_testing_file_0", block_size * 100, 'a');
+    create_file("io_testing_file_0", block_size * num_threads, 'a');
     std::vector<std::thread> v;
 
+    // for (std::size_t i = 0; i < num_threads; ++i)
+    //     write_to_file(i);
+
     for (std::size_t i = 0; i < num_threads; ++i)
-        write_to_file(i);
+        v.push_back(std::thread{ write_to_file, i });
 
-//    for (std::size_t i = 0; i < num_threads; ++i)
-//        v.push_back(std::thread{ write_to_file, i });
+    for (auto& it : v)
+        it.join();
 
-//    for (auto& it : v)
-//        it.join();
-
-    std::cout << "Submited ios " << submited_ios.size() << std::endl;
-    wait_complete();
+    // std::cout << "Submited ios " << submited_ios.size() << std::endl;
+    // wait_complete();
 
     std::cout << "All threads joined\n";
 }

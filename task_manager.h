@@ -12,30 +12,30 @@ class CPUs;
 class Task
 {
 public:
-	enum class State : int { not_started, running, done };
+    enum class State : int { not_started, running, done };
 
-	Task();
-	Task(const std::function<void()> function);
+    Task();
+    Task(const std::function<void()> function);
 
-	void wait();
-	void notify();
-	void operator()();
+    void wait();
+    void notify();
+    void operator()();
 
-	std::function<void()> m_func;
-	State m_state;
-	std::mutex m_mtx;
-	std::condition_variable m_cv;
+    std::function<void()> m_func;
+    State m_state;
+    std::mutex m_mtx;
+    std::condition_variable m_cv;
 };
 
 class Task_manager final
 {
 public:
-	Task_manager(const CPUs& cpus);
+    Task_manager(const CPUs& cpus);
 
-	template<bool async>
-	void execute_task(const std::function<void()> func);
+    template<bool async>
+    void execute_task(const std::function<void()> func);
 
-	const CPUs& m_cpus;
+    const CPUs& m_cpus;
 };
 
 extern Task_manager task_manager;

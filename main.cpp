@@ -364,7 +364,7 @@ std::uint64_t off3 = off2 + strlen(msg2);
 
 void write_thread1()
 {
-    cos_write_file(reinterpret_cast<void*>(fd),
+    cos_write_file(reinterpret_cast<void*>(&fd),
             reinterpret_cast<void*>(msg1),
             strlen(msg1),
             off1);
@@ -372,7 +372,7 @@ void write_thread1()
 
 void write_thread2()
 {
-    cos_write_file(reinterpret_cast<void*>(fd),
+    cos_write_file(reinterpret_cast<void*>(&fd),
             reinterpret_cast<void*>(msg2),
             strlen(msg2),
             off2);
@@ -380,14 +380,44 @@ void write_thread2()
 
 void write_thread3()
 {
-    cos_write_file(reinterpret_cast<void*>(fd),
+    cos_write_file(reinterpret_cast<void*>(&fd),
             reinterpret_cast<void*>(msg3),
             strlen(msg3),
             off3);
 }
 
+#include <signal.h>
+#include <execinfo.h> // backtrace/backtrace_symbols_fd
+
+void signal_handler(int sig)
+{
+    void *array[10];
+    size_t size;
+
+    size = backtrace(array, 10);
+
+    fprintf(stderr, "Error: signal %d:\n", sig);
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
+
+    exit(1);
+}
+
 int main(int argc, char* argv[])
 {
+	char *buf;
+
+	buf = (char*) malloc(5000);
+	memset(buf, 'a', 5000);
+
+	int temp = open("uring_testing", O_WRONLY | O_CREAT, 0644);
+
+	write(temp, buf, 5000);
+	fsync(temp);
+	close(temp);
+	free(buf);
+    
+	// sleep(100);
+    // signal(SIGSEGV, signal_handler);
     // create_file("io_testing_file_0", block_size * num_threads, 'a');
     // std::vector<std::thread> v;
     //

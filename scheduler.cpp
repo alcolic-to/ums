@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "scheduler.h"
 #include "worker.h"
 #include "cpu.h"
@@ -114,8 +112,10 @@ void Scheduler::schedule_io_workers()
 {
 	auto io_completed = [](Worker* worker)
 	{
-		worker->m_io_request->update();
-		return worker->m_io_request->completed();
+		// worker->m_io_request->update();
+		// return worker->m_io_request->completed();
+        worker->update_io();
+        return worker->get_io_status();
 	};
 
 	auto begin = m_pending_io_queue.begin();

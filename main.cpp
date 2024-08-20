@@ -351,24 +351,64 @@ void sleep_test()
     cos_sleep(1000);
 }
 
+int fd = open("uring_testing", O_RDWR, O_DIRECT);
+
+char msg1[] = "This is thread1.\n";
+std::uint64_t off1 = 0;
+
+char msg2[] = "This is thread2.\n";
+std::uint64_t off2 = strlen(msg1);
+
+char msg3[] = "This is thread3.\n";
+std::uint64_t off3 = off2 + strlen(msg2);
+
+void write_thread1()
+{
+    cos_write_file(reinterpret_cast<void*>(fd),
+            reinterpret_cast<void*>(msg1),
+            strlen(msg1),
+            off1);
+}
+
+void write_thread2()
+{
+    cos_write_file(reinterpret_cast<void*>(fd),
+            reinterpret_cast<void*>(msg2),
+            strlen(msg2),
+            off2);
+}
+
+void write_thread3()
+{
+    cos_write_file(reinterpret_cast<void*>(fd),
+            reinterpret_cast<void*>(msg3),
+            strlen(msg3),
+            off3);
+}
+
 int main(int argc, char* argv[])
 {
-    create_file("io_testing_file_0", block_size * num_threads, 'a');
-    std::vector<std::thread> v;
-
+    // create_file("io_testing_file_0", block_size * num_threads, 'a');
+    // std::vector<std::thread> v;
+    //
+    // // for (std::size_t i = 0; i < num_threads; ++i)
+    // //     write_to_file(i);
+    //
     // for (std::size_t i = 0; i < num_threads; ++i)
-    //     write_to_file(i);
-
-    for (std::size_t i = 0; i < num_threads; ++i)
-        v.push_back(std::thread{ write_to_file, i });
-
-    for (auto& it : v)
-        it.join();
-
-    // std::cout << "Submited ios " << submited_ios.size() << std::endl;
-    // wait_complete();
-
-    std::cout << "All threads joined\n";
+    //     v.push_back(std::thread{ write_to_file, i });
+    //
+    // for (auto& it : v)
+    //     it.join();
+    //
+    // // std::cout << "Submited ios " << submited_ios.size() << std::endl;
+    // // wait_complete();
+    //
+    // std::cout << "All threads joined\n";
+    
+    task_manager.execute_task<false>(write_thread1);
+    task_manager.execute_task<false>(write_thread2);
+    task_manager.execute_task<false>(write_thread3);
+    close(fd);
 }
 
 #endif

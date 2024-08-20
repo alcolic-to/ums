@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <liburing.h>
 
 #include "task_manager.h"
 #include "os_specific.h"
@@ -43,6 +44,8 @@ public:
 	void write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset);
 	void wait_event(ConditionalEvent* event);
 	void wait_sleep(TimedEvent* event);
+    void update_io();
+    bool get_io_status() const;
 
 	void set_state(State state);
 
@@ -63,6 +66,10 @@ public:
 	uint64_t m_id;
 	State m_state;
 
+    std::uint64_t m_io_req_id;
+    bool m_io_completed;
+    std::uint64_t m_io_bytes;
+    io_uring m_uring;
 	ConditionalEvent* m_cond_event;
 	TimedEvent* m_timed_event;
 	std::shared_ptr<Task> m_task;

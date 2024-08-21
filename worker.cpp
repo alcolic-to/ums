@@ -13,13 +13,14 @@
 Worker::Worker(uint64_t id, Scheduler& scheduler)
     : m_id{ id }
     , m_state{ State::initializing }
+    , m_running{ true }
     , m_cond_event{ nullptr }
     , m_timed_event{ nullptr }
     , m_scheduler{ scheduler }
     , m_thread{ &Worker::entry_point, this }
 {
     std::unique_lock<std::mutex> lock{ m_scheduler.m_workers_mtx };
-    m_cv.wait(lock);
+    m_cv.wait(lock, [&] { return !m_running; } );
 }
 
 Worker::~Worker()
@@ -79,14 +80,16 @@ void Worker::write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64
         m_scheduler.sync<SyncCtx::io>(this);
 }
 
-void Worker::notify()
+void Worker::notify([[maybe_unused]] std::unique_lock<std::mutex>& lock)
 {
+    m_running = true;
     m_cv.notify_one();
 }
 
 void Worker::wait(std::unique_lock<std::mutex>& lock)
 {
-    m_cv.wait(lock);
+    m_running = false;
+    m_cv.wait(lock, [&] { return m_running; } );
 }
 
 void Worker::entry_point()
@@ -122,7 +125,7 @@ void Worker::main_loop()
             std::cout << ex.what() << "\n";
         }
 
-        // std::cout << "CPU " << m_scheduler.m_cpu.m_id << ": worker id " << id() << " task done.\n";
+        std::cout << "CPU " << m_scheduler.m_cpu.m_id << ": worker id " << id() << " task done.\n";
 
         m_task->notify();
         m_task.reset();

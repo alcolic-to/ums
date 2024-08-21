@@ -1,4 +1,5 @@
 #include <iostream>
+#include <mutex>
 
 #include "scheduler.h"
 #include "worker.h"
@@ -19,10 +20,11 @@ Scheduler::Scheduler(const CPU& cpu)
     for (int i = 0; i < CFG_workers_per_cpu; ++i)
         m_workers.push_back(std::make_unique<Worker>(i, *this));
 
-    set_state(State::running);
+    std::unique_lock<std::mutex> lock{ m_workers_mtx };
 
+    set_state(State::running);
     m_worker = m_idle_queue.front();
-    m_worker->m_cv.notify_one();
+    m_worker->notify(lock);
 }
 
 Scheduler::~Scheduler()
@@ -286,7 +288,7 @@ uint64_t Scheduler::load() const
 void Scheduler::context_switch(Worker* prev_worker)
 {
     std::unique_lock<std::mutex> lock{ m_workers_mtx };
-    m_worker->notify();
+    m_worker->notify(lock);
     prev_worker->wait(lock);
 }
 
@@ -331,8 +333,9 @@ bool Scheduler::sync_main(Worker* worker)
         save_idle<true>(worker);
 
         std::unique_lock<std::mutex> lock{ m_workers_mtx };
-        worker->notify();   // Notify thread that created us to continue
-        worker->wait(lock); // and go to sleep.
+
+        worker->notify(lock); // Notify thread that created us to continue
+        worker->wait(lock);   // and go to sleep.
 
         // If we are the first started worker on scheduler we are going to schedule work;
         // otherwise our work is already scheduled, so we return false.
@@ -377,12 +380,13 @@ void Scheduler::sync(Worker* worker)
     }
 }
 
-void Scheduler::exit_workers() const
+void Scheduler::exit_workers()
 {
+    std::unique_lock<std::mutex> lock{ m_workers_mtx };
     for (Worker* worker : m_idle_queue)
     {
         worker->set_state(Worker::State::exiting);
-        worker->m_cv.notify_one();
+        worker->notify(lock);
     }
 }
 

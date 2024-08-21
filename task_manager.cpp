@@ -12,8 +12,7 @@ Task::Task(const std::function<void()> function)
 void Task::wait()
 {
     std::unique_lock<std::mutex> lock{ m_mtx };
-    if (m_state != Task::State::done)
-        m_cv.wait(lock);
+    m_cv.wait(lock, [&] { return m_state == Task::State::done; });
 }
 
 void Task::notify()

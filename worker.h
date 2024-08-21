@@ -46,7 +46,7 @@ public:
 
     void set_state(State state);
 
-    void notify();
+    void notify(std::unique_lock<std::mutex>& lock);
     void wait(std::unique_lock<std::mutex>& lock);
 
     constexpr uint64_t id() const { return m_id; }
@@ -59,10 +59,9 @@ public:
     // TODO: reorganize data members for quick access.
     //
     std::condition_variable m_cv;
-
     uint64_t m_id;
     State m_state;
-
+    bool m_running; // Flag used for spurious wakeup check.
     ConditionalEvent* m_cond_event;
     TimedEvent* m_timed_event;
     std::shared_ptr<Task> m_task;

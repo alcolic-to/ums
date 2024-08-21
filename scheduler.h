@@ -81,7 +81,7 @@ public:
     template<SyncCtx ctx>
     void sync(Worker* worker);
 
-    void exit_workers() const;
+    void exit_workers();
     bool should_exit();
 
 public:

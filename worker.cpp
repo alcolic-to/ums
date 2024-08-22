@@ -1,6 +1,5 @@
 #include <iostream>
 #include <cassert>
-#include <liburing.h>
 #include <locale>
 #include <string.h>
 
@@ -23,19 +22,12 @@ Worker::Worker(uint64_t id, Scheduler& scheduler)
     , m_scheduler{ scheduler }
     , m_thread{ &Worker::entry_point, this }
 {
-    int ret = io_uring_queue_init(1, &m_uring, 0 /* flags */);
-    if (ret < 0)
-    {
-        assert(!"Io uring failed!");
-    }
-
     std::unique_lock<std::mutex> lock{ m_scheduler.m_workers_mtx };
     m_cv.wait(lock, [&] { return !m_running; } );
 }
 
 Worker::~Worker()
 {
-    io_uring_queue_exit(&m_uring);
     if (m_thread.joinable())
         m_thread.join();
 }
@@ -73,11 +65,6 @@ void Worker::wait_sleep(TimedEvent* event)
 {
     m_timed_event = event;
     m_scheduler.sync<SyncCtx::wait_sleep>(this);
-}
-
-io_uring* Worker::get_io_uring()
-{
-    return &m_uring;
 }
 
 void Worker::read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)

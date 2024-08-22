@@ -7,7 +7,6 @@
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <liburing.h>
 
 #include "task_manager.h"
 #include "os_specific.h"
@@ -44,7 +43,6 @@ public:
 	void write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset);
 	void wait_event(ConditionalEvent* event);
 	void wait_sleep(TimedEvent* event);
-    io_uring* get_io_uring();
 
     void set_state(State state);
 
@@ -70,7 +68,6 @@ public:
     std::unique_ptr<IO_Request> m_io_request;
     Scheduler& m_scheduler;
     std::thread m_thread;
-    io_uring m_uring;
 };
 
 extern thread_local Worker* tls_worker;

@@ -67,14 +67,14 @@ void bind_thread(uint64_t cpu_mask)
     SetThreadAffinityMask(GetCurrentThread(), cpu_mask);
 }
 
-OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl)
+OVERLAPPED* to_ol_ptr(IO_Request& io)
 {
-    return reinterpret_cast<OVERLAPPED*>(&io_ctrl.m_ol);
+    return reinterpret_cast<OVERLAPPED*>(io.m_io_handle);
 }
 
 void read_file(IO_Request& io)
 {
-    DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+    DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io)));
 
     // std::cout << "ReadFile: " << read_res << "\n";
 
@@ -94,7 +94,7 @@ void read_file(IO_Request& io)
 
 void write_file(IO_Request& io)
 {
-    DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+    DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io)));
 
     // std::cout << "WriteFile: " << write_res << "\n";
 
@@ -112,21 +112,21 @@ void write_file(IO_Request& io)
     }
 }
 
-bool io_completed(IO_Control& io_control)
+bool io_completed(IO_Request& io)
 {
-    return HasOverlappedIoCompleted(to_ol_ptr(io_control));
+    return HasOverlappedIoCompleted(to_ol_ptr(io));
 }
 
 void update_io_state(IO_Request& io)
 {
-    if (io.pending() && !io_completed(io.m_control))
+    if (io.pending() && !io_completed(io))
     {
         // std::cout << "IO still pending...\n";
         return;
     }
 
     DWORD bytes = 0;
-    DWORD ol_res = bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_control), &bytes, false));
+    DWORD ol_res = bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io), &bytes, false));
 
     // std::cout << "GetOverlappedResult: " << ol_res << ", bytes : " << bytes << "\n";
 
@@ -146,10 +146,15 @@ void update_io_state(IO_Request& io)
 
 void* init_io_handle(uint64_t offset)
 {
+    OVERLAPPED* ol = new OVERLAPPED();
+    ol->Offset = offset & 0xFFFFFFFF;
+    ol->OffsetHigh = (offset >> 32) & 0xFFFFFFFF;;
+    return reinterpret_cast<void*>(ol); 
 }
 
 void free_io_handle(void* io_handle)
 {
+    delete reinterpret_cast<OVERLAPPED*>(io_handle);
 }
 
 #elif defined(OS_LINUX)
@@ -295,11 +300,6 @@ void update_io_state(IO_Request& io)
     tls_uring.update_io_state(io);
 }
 
-bool io_completed(IO_Control& io_control)
-{
-    return false;
-}
-
 void read_file(IO_Request& io)
 { 
     tls_uring.submit(io);
@@ -371,7 +371,6 @@ void bind_thread(uint64_t cpu_mask)
 
 void read_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
 void write_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
-bool io_completed(IO_Control& io_control) { throw std::logic_error{ "Not implemented" }; }
 void update_io_state(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
 void* init_io_handle(uint64_t offset) { throw std::logic_error{ "Not implemented" }; }
 void free_io_handle(void* io_handle) { throw std::logic_error{ "Not implemented" }; }

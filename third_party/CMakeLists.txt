@@ -1,4 +1,4 @@
-if (UNIX)
+if (LINUX)
 include(ExternalProject)
 
 set(URING_PROJECT_PREFIX "${CMAKE_BINARY_DIR}/third_party/uring_project")

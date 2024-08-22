@@ -18,7 +18,7 @@
 #define OS_UNKNOWN
 #endif
 
-#define ENDL '\n'
+constexpr char endl = '\n';
 
 constexpr uint32_t MAX_CPUS = 64;
 
@@ -55,7 +55,7 @@ uint64_t cpus_avail_mask()
 
     GetProcessAffinityMask(GetCurrentProcess(), &procCpuMask, &allCpusMask);
 
-    std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask << ENDL;
+    std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask << endl;
 
     return procCpuMask;
 }
@@ -72,13 +72,18 @@ OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl)
     return reinterpret_cast<OVERLAPPED*>(&io_ctrl.m_ol);
 }
 
-void read_file(IO_Request& io)
+void issue_io_with_handle(IO_Request& io)
 {
-    DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+    DWORD io_res = 0;
 
-    // std::cout << "ReadFile: " << read_res << "\n";
+    if (io.m_type == IO_Request::Type::read)
+        io_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+    else
+        io_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
 
-    switch (read_res)
+    // std::cout << "Read/Write file: " << write_res << "\n";
+
+    switch (io_res)
     {
     case (ERROR_SUCCESS):
         io.m_state = IO_Request::State::completed;
@@ -92,31 +97,35 @@ void read_file(IO_Request& io)
     }
 }
 
-void write_file(IO_Request& io)
+void issue_io_with_stream(IO_Request& io)
 {
-    DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+    io.m_state = IO_Request::State::pending;
 
-    // std::cout << "WriteFile: " << write_res << "\n";
+    io.m_file_stream->seekp(io.m_offset);
 
-    switch (write_res)
-    {
-    case (ERROR_SUCCESS):
+    if (io.m_type == IO_Request::Type::read)
+        io.m_file_stream->read(static_cast<char*>(io.m_buffer), io.m_nbytes);
+    else
+        io.m_file_stream->write(static_cast<char*>(io.m_buffer), io.m_nbytes);
+
+    if (io.m_file_stream->good() && io.m_type == IO_Request::Type::write)
+        io.m_file_stream->flush();
+
+    if (io.m_file_stream->good())
         io.m_state = IO_Request::State::completed;
-        break;
-    case (ERROR_IO_PENDING):
-        io.m_state = IO_Request::State::pending;
-        break;
-    default:
+    else
         io.m_state = IO_Request::State::error;
-        break;
-    }
 }
 
+// Fast win32 API check for completion state.
+//
 bool io_completed(IO_Control& io_control)
 {
     return HasOverlappedIoCompleted(to_ol_ptr(io_control));
 }
 
+// Updates I/O state. If we've issued async I/O, we need to check manually whether I/O is done.
+//
 void update_io_state(IO_Request& io)
 {
     if (io.pending() && !io_completed(io.m_control))
@@ -164,18 +173,18 @@ uint64_t cpus_avail_mask()
 
     if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1)
     {
-        std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << ENDL;
+        std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << endl;
         return -1;
     }
 
     int num_cores = CPU_COUNT(&mask);
-    std::cout << "Process is allowed to run on " << num_cores << " cores." << ENDL;
+    std::cout << "Process is allowed to run on " << num_cores << " cores." << endl;
 
     for (std::size_t i = 0; i < cpus_count(); ++i)
     {
         if (CPU_ISSET(i, &mask))
         {
-            std::cout << "CPU " << i << " is available." << ENDL;
+            std::cout << "CPU " << i << " is available." << endl;
             cpu_mask |= (1 << i);
         }
     }
@@ -198,7 +207,7 @@ void bind_thread(uint64_t cpu_mask)
 
     pthread_t current_thread = pthread_self();
     if (pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-        std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << ENDL;
+        std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << endl;
 
     print_thread_affinity();
 }
@@ -210,7 +219,7 @@ void print_thread_affinity()
 
     pthread_t current_thread = pthread_self();
     if (pthread_getaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-        std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << ENDL;
+        std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << endl;
 
     std::cout << "Thread affinity: ";
     for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
@@ -219,7 +228,7 @@ void print_thread_affinity()
             std::cout << i << " ";
     }
 
-    std::cout << ENDL;
+    std::cout << endl;
 }
 
 void read_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }

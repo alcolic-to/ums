@@ -17,8 +17,8 @@ void print_thread_affinity();
 
 // I/O functions.
 //
-void read_file(IO_Request& io);
-void write_file(IO_Request& io);
+void issue_io_with_handle(IO_Request& io);
+void issue_io_with_stream(IO_Request& io);
 bool io_completed(IO_Control& io_control);
 void update_io_state(IO_Request& io);
 

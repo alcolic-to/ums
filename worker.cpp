@@ -64,19 +64,19 @@ void Worker::wait_sleep(TimedEvent* event)
     m_scheduler.sync<SyncCtx::wait_sleep>(this);
 }
 
-void Worker::read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
+void Worker::issue_io(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset, IO_Request::Type type)
 {
-    m_io_request = std::make_unique<IO_Request>(file_handle, buffer, nbytes, offset, IO_Request::Type::read);
+    m_io_request = std::make_unique<IO_Request>(file_handle, buffer, nbytes, offset, type);
 
     if (m_io_request->m_state == IO_Request::State::pending)
         m_scheduler.sync<SyncCtx::io>(this);
 }
 
-void Worker::write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
+void Worker::issue_io(std::fstream* file_stream, void* buffer, uint64_t nbytes, uint64_t offset, IO_Request::Type type)
 {
-    m_io_request = std::make_unique<IO_Request>(file_handle, buffer, nbytes, offset, IO_Request::Type::write);
+    m_io_request = std::make_unique<IO_Request>(file_stream, buffer, nbytes, offset, type);
 
-    if (m_io_request->m_state == IO_Request::State::pending)
+    if (m_io_request->m_state == IO_Request::State::init || m_io_request->m_state == IO_Request::State::pending)
         m_scheduler.sync<SyncCtx::io>(this);
 }
 

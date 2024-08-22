@@ -1,3 +1,4 @@
+#include <fstream>
 #include <iostream>
 #include <random>
 #include <chrono>
@@ -167,15 +168,16 @@ void test_signal()
 #if defined _WIN32
 
 HANDLE file = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS | FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH, NULL);
+std::fstream fs{ "io_testing_file_1", std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc };
 
 void single_read()
 {
     constexpr int read_size = 8 * 1024;
-    int max_read_size = read_size * 128;
 
     auto buf = std::make_unique<char[]>(read_size);
 
-    cos_read_file(file, buf.get(), read_size, 0);
+    // cos_read_file(file, buf.get(), read_size, 0);
+    cos_read_file(fs, buf.get(), read_size, 0);
     std::cout << "Read buffer: " << buf.get() << "\n";
 }
 
@@ -186,37 +188,53 @@ void single_write()
 
     std::string io_str(write_size, 'a');
 
-    cos_write_file(file, io_str.data(), io_str.size(), 0);
+    cos_write_file(fs, io_str.data(), io_str.size(), 0);
 }
 
 void read_from_file()
 {
+    std::fstream fs{ "io_testing_file_1", std::ios::in | std::ios::out | std::ios::binary };
+
     constexpr int read_size = 8 * 1024;
     int max_read_size = read_size * 128;
 
     auto buf = std::make_unique<char[]>(read_size);
 
-    cos_read_file(file, buf.get(), read_size, (prng.rand<uint64_t>() % read_size) * read_size);
-    // std::cout << "Read buffer: " << buf.get() << "\n";
+    // cos_read_file(file, buf.get(), read_size, (prng.rand<uint64_t>() % read_size) * read_size);
+    size_t offset = (prng.rand<uint64_t>() % read_size) * read_size;
+    fs.seekp(offset);
+    fs.read(buf.get(), read_size);
+    if (fs.bad())
+        throw std::runtime_error("Failed to write page to disk");
+
+    std::cout << "Read buffer: " << buf.get() << "\n";
 }
 
 void write_to_file()
 {
-    int write_size = 8 * 1024;
-    int max_file_size = write_size * 128;
+    std::fstream fs("io_testing_file_1", std::ios::in | std::ios::out | std::ios::binary);
+    fs << "aaaa";
+
+    constexpr int write_size = 8 * 1024;
+    constexpr int max_file_size = write_size * 128;
+    int offset = (prng.rand<uint64_t>() % max_file_size);
 
     std::string io_str(write_size, 'a');
     
     // for (int i = 0; i < 10; ++i)
     //     std::cout << prng.rand<uint64_t>() << "\n";
 
-    cos_write_file(file, io_str.data(), io_str.size(), (prng.rand<uint64_t>() % max_file_size) * io_str.size());
+    // cos_write_file(file, io_str.data(), io_str.size(), offset);
+    cos_write_file(fs, io_str.data(), io_str.size(), 0);
 }
 
 int main(int argc, char* argv[])
 {
+    task_manager.execute_task<false>(single_write);
+    task_manager.execute_task<false>(single_read);
+
     // for (int i = 0; i < 1024; ++i)
-    //     task_manager.execute_task<true>(write_to_file);
+    //     task_manager.execute_task<false>(write_to_file);
     // 
     // for (int i = 0; i < 1000 * 1024; ++i)
     //     task_manager.execute_task<true>(read_from_file);
@@ -224,8 +242,8 @@ int main(int argc, char* argv[])
     // task_manager.execute_task<false>(write_to_file);
     // task_manager.execute_task<false>(read_from_file);
 
-    for (int i = 0; i < 10000000; ++i)
-        task_manager.execute_task<true>(f4);
+    // for (int i = 0; i < 10000000; ++i)
+    //     task_manager.execute_task<true>(f4);
 }
 
 #else

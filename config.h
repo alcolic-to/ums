@@ -8,7 +8,7 @@
 
 using namespace std::chrono_literals;
 
-constexpr uint64_t CFG_allowed_cpus = 0b0000'0011;
+constexpr uint64_t CFG_allowed_cpus = 0b0000'0001;
 constexpr int      CFG_workers_per_cpu = 4;
 constexpr auto     CFG_idle_sleep = 20ns;
 

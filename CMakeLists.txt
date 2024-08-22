@@ -1,10 +1,11 @@
-cmake_minimum_required(VERSION 3.10)
-project(user_mode_scheduler)
 # Usage:
 # Create initial cmake build folder: cmake -S . -B .\build -G "Unix Makefiles"
 # Create build with desired config: cmake --build .\build --config [Debug/Release/RelWithDebInfo/MinSizeRel] --parallel 8
 #
 # Clean command: cmake --build .\build --target clean
+
+cmake_minimum_required(VERSION 3.10)
+project(user_mode_scheduler)
 
 # Below is not working for some reason.
 # set(CMAKE_GENERATOR "Unix Makefiles")

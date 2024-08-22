@@ -38,11 +38,11 @@ public:
 
     void main_loop();
 
-	void yield();
-	void read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset);
-	void write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset);
-	void wait_event(ConditionalEvent* event);
-	void wait_sleep(TimedEvent* event);
+    void yield();
+    void read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset);
+    void write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset);
+    void wait_event(ConditionalEvent* event);
+    void wait_sleep(TimedEvent* event);
 
     void set_state(State state);
 

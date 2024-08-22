@@ -67,14 +67,14 @@ void bind_thread(uint64_t cpu_mask)
     SetThreadAffinityMask(GetCurrentThread(), cpu_mask);
 }
 
-OVERLAPPED* to_ol_ptr(IO_Request& io)
+OVERLAPPED* to_ol_ptr(void* io_handle)
 {
-    return reinterpret_cast<OVERLAPPED*>(io.m_io_handle);
+    return reinterpret_cast<OVERLAPPED*>(io_handle);
 }
 
 void read_file(IO_Request& io)
 {
-    DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io)));
+    DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_io_handle)));
 
     // std::cout << "ReadFile: " << read_res << "\n";
 
@@ -94,7 +94,7 @@ void read_file(IO_Request& io)
 
 void write_file(IO_Request& io)
 {
-    DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io)));
+    DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_io_handle)));
 
     // std::cout << "WriteFile: " << write_res << "\n";
 
@@ -126,7 +126,7 @@ void update_io_state(IO_Request& io)
     }
 
     DWORD bytes = 0;
-    DWORD ol_res = bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io), &bytes, false));
+    DWORD ol_res = bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_io_handle), &bytes, false));
 
     // std::cout << "GetOverlappedResult: " << ol_res << ", bytes : " << bytes << "\n";
 
@@ -144,7 +144,7 @@ void update_io_state(IO_Request& io)
     }
 }
 
-void* init_io_handle(uint64_t offset)
+void* alloc_io_handle(uint64_t offset)
 {
     OVERLAPPED* ol = new OVERLAPPED();
     ol->Offset = offset & 0xFFFFFFFF;
@@ -236,12 +236,12 @@ void print_thread_affinity()
     std::cout << ENDL;
 }
 
-uint64_t CosUring::get_io_request_id(IO_Request& io)
+uint64_t IO_Uring::get_io_request_id(IO_Request& io)
 {
     return *reinterpret_cast<uint64_t*>(io.m_io_handle);
 }
 
-void CosUring::submit(IO_Request& io)
+void IO_Uring::submit(IO_Request& io)
 {
     io_uring& ring = tls_uring.m_ring;
     io_uring_sqe* sqe = io_uring_get_sqe(&ring);
@@ -268,7 +268,7 @@ void CosUring::submit(IO_Request& io)
 }
 
 
-void CosUring::update_io_state(IO_Request& io)
+void IO_Uring::update_io_state(IO_Request& io)
 {
     if (io.m_state != IO_Request::State::pending)
         return;
@@ -310,7 +310,7 @@ void write_file(IO_Request& io)
     tls_uring.submit(io);
 }
 
-void* init_io_handle(uint64_t offset)
+void* alloc_io_handle(uint64_t offset)
 {
     (void) offset;
     static std::atomic<uint64_t> io_cnt { 0 };
@@ -324,9 +324,10 @@ void free_io_handle(void* io_handle)
     delete io_id;
 }
 
-thread_local CosUring tls_uring;
+thread_local IO_Uring tls_uring;
 
 #elif defined(OS_MAC)
+
 #include <sys/sysctl.h>
 
 uint32_t cpus_count()
@@ -372,7 +373,7 @@ void bind_thread(uint64_t cpu_mask)
 void read_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
 void write_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
 void update_io_state(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
-void* init_io_handle(uint64_t offset) { throw std::logic_error{ "Not implemented" }; }
+void* alloc_io_handle(uint64_t offset) { throw std::logic_error{ "Not implemented" }; }
 void free_io_handle(void* io_handle) { throw std::logic_error{ "Not implemented" }; }
 
 #else

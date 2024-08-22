@@ -1,7 +1,4 @@
 #include <iostream>
-#include <cassert>
-#include <locale>
-#include <string.h>
 
 #include "worker.h"
 #include "cpu.h"

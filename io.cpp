@@ -7,7 +7,7 @@ IO_Request::IO_Request(void* file_handle, void* buffer, uint64_t nbytes, uint64_
     , m_buffer{ buffer }
     , m_nbytes{ nbytes }
     , m_offset{ offset }
-    , m_io_handle { init_io_handle(offset) }
+    , m_io_handle { alloc_io_handle(offset) }
     , m_type{ type }
     , m_state{ State::init }
 {

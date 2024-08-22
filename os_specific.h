@@ -11,15 +11,15 @@ class IO_Request;
 
 #include <liburing.h>
 
-class CosUring
+class IO_Uring 
 {
 public:
-    CosUring()
+    IO_Uring()
     {
         io_uring_queue_init(1, &m_ring, 0 /* flags */);
     }
 
-    ~CosUring()
+    ~IO_Uring()
     {
         io_uring_queue_exit(&m_ring);
     }
@@ -33,7 +33,7 @@ public:
     io_uring m_ring;
 };
 
-extern thread_local CosUring tls_uring;
+extern thread_local IO_Uring tls_uring;
 
 #endif
 
@@ -49,7 +49,7 @@ void print_thread_affinity();
 void read_file(IO_Request& io);
 void write_file(IO_Request& io);
 void update_io_state(IO_Request& io);
-void* init_io_handle(uint64_t offset);
+void* alloc_io_handle(uint64_t offset);
 void free_io_handle(void* io_handle);
 
 #endif // OS_SPECIFIC_H

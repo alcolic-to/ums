@@ -1,6 +1,7 @@
 if (UNIX)
+include(ExternalProject)
 ExternalProject_Add(
-    uring
+    uring_project
     GIT_REPOSITORY https://github.com/axboe/liburing 
     GIT_TAG liburing-2.7
     PREFIX ${CMAKE_BINARY_DIR}/third_party/uring

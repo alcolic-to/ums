@@ -26,6 +26,7 @@ add_library(user_mode_scheduler_lib STATIC cpu.cpp os_specific.cpp scheduler.cpp
 
 if(UNIX)
     target_link_libraries(user_mode_scheduler_lib PUBLIC uring)
+    add_dependencies(user_mode_scheduler_lib uring_project)
 endif()
 
 set(COS_LIBRARIES user_mode_scheduler_lib)

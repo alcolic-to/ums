@@ -230,7 +230,7 @@ int main(int argc, char* argv[])
         task_manager.execute_task<true>(f4);
 }
 
-#else
+#elif __linux__
 
 #include <string.h>
 
@@ -292,42 +292,17 @@ void read_thread1()
 
 int main(int argc, char* argv[])
 {
-	// char *buf;
-	//
-	// buf = (char*) malloc(5000);
-	// memset(buf, 'a', 5000);
-	//
-	// int temp = open("uring_testing", O_WRONLY | O_CREAT, 0644);
-	//
-	// write(temp, buf, 5000);
-	// fsync(temp);
-	// close(temp);
-	// free(buf);
-    
-	// sleep(100);
-    // signal(SIGSEGV, signal_handler);
-    // create_file("io_testing_file_0", block_size * num_threads, 'a');
-    // std::vector<std::thread> v;
-    //
-    // // for (std::size_t i = 0; i < num_threads; ++i)
-    // //     write_to_file(i);
-    //
-    // for (std::size_t i = 0; i < num_threads; ++i)
-    //     v.push_back(std::thread{ write_to_file, i });
-    //
-    // for (auto& it : v)
-    //     it.join();
-    //
-    // // std::cout << "Submited ios " << submited_ios.size() << std::endl;
-    // // wait_complete();
-    //
-    // std::cout << "All threads joined\n";
-    
     task_manager.execute_task<false>(write_thread1);
     task_manager.execute_task<false>(write_thread2);
     task_manager.execute_task<false>(write_thread3);
     task_manager.execute_task<false>(read_thread1);
     std::cout << sizeof(io_uring) << std::endl;
+}
+
+#elif __APPLE__
+
+int main(int argc, char* argv[])
+{
 }
 
 #endif

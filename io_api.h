@@ -28,9 +28,7 @@ public:
     void* m_buffer;
     uint64_t m_nbytes;
     uint64_t m_offset;
-
     void* m_io_handle;
-
     Type m_type;
     State m_state;
 };

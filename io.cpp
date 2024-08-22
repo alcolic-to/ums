@@ -3,31 +3,35 @@
 #include "os_specific.h"
 
 IO_Request::IO_Request(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset, Type type)
-	: m_file_handle{ file_handle }
-	, m_buffer{ buffer }
-	, m_nbytes{ nbytes }
-	, m_offset{ offset }
-	, m_control{ offset }
-	, m_type{ type }
-	, m_state{ State::init }
+    : m_file_handle{ file_handle }
+    , m_buffer{ buffer }
+    , m_nbytes{ nbytes }
+    , m_offset{ offset }
+#ifdef __WIN32__
+    , m_control{ offset }
+#elif __linux__
+    , m_control { tls_worker->get_io_uring() }
+#endif
+    , m_type{ type }
+    , m_state{ State::init }
 {
-	if (m_type == Type::read)
-		read_file(*this);
-	else
-		write_file(*this);
+    if (m_type == Type::read)
+        read_file(*this);
+    else
+        write_file(*this);
 }
 
 void IO_Request::update()
 {
-	update_io_state(*this);
+    update_io_state(*this);
 }
 
 void cos_read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
 {
-	tls_worker->read_file(file_handle, buffer, nbytes, offset);
+    tls_worker->read_file(file_handle, buffer, nbytes, offset);
 }
 
 void cos_write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
 {
-	tls_worker->write_file(file_handle, buffer, nbytes, offset);
+    tls_worker->write_file(file_handle, buffer, nbytes, offset);
 }

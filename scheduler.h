@@ -23,87 +23,87 @@ enum class SyncCtx : int { main, yield, wait_event, io, wait_sleep };
 class Scheduler final
 {
 public:
-	enum class State : int { initializing, running, exiting };
+    enum class State : int { initializing, running, exiting };
 
-	Scheduler(const CPU& cpu);
-	~Scheduler();
+    Scheduler(const CPU& cpu);
+    ~Scheduler();
 
-	bool has_idle_workers() const;
-	bool has_runnable_workers() const;
-	bool has_waiting_workers() const;
-	bool has_pending_io_workers() const;
+    bool has_idle_workers() const;
+    bool has_runnable_workers() const;
+    bool has_waiting_workers() const;
+    bool has_pending_io_workers() const;
 
-	void save_runnable(Worker* worker);
-	void save_waiting(Worker* worker);
-	void save_sleeping(Worker* worker);
-	void save_pending_io(Worker* worker);
+    void save_runnable(Worker* worker);
+    void save_waiting(Worker* worker);
+    void save_sleeping(Worker* worker);
+    void save_pending_io(Worker* worker);
 
-	template<bool back>
-	void save_idle(Worker* worker);
+    template<bool back>
+    void save_idle(Worker* worker);
 
-	void prepare_next_worker();
+    void prepare_next_worker();
 
-	void enqueue_task(std::shared_ptr<Task> task);
-	std::shared_ptr<Task> next_task();
-	bool has_tasks();
+    void enqueue_task(std::shared_ptr<Task> task);
+    std::shared_ptr<Task> next_task();
+    bool has_tasks();
 
-	void schedule_idle_worker();
+    void schedule_idle_worker();
 
-	void schedule_io_workers();
-	void schedule_idle_workers();
-	void schedule_waiting_workers();
-	void schedule_sleeping_workers();
-	void schedule_workers();
+    void schedule_io_workers();
+    void schedule_idle_workers();
+    void schedule_waiting_workers();
+    void schedule_sleeping_workers();
+    void schedule_workers();
 
-	void schedule();
+    void schedule();
 
-	void idle_sleep();
+    void idle_sleep();
 
-	bool exiting() const;
-	bool initializing() const;
-	Worker* worker() const;
+    bool exiting() const;
+    bool initializing() const;
+    Worker* worker() const;
 
-	void set_state(State state);
+    void set_state(State state);
 
-	void manage_load(Worker::State prev_state, Worker::State new_state);
-	void inc_load();
-	void dec_load();
-	uint64_t load() const;
+    void manage_load(Worker::State prev_state, Worker::State new_state);
+    void inc_load();
+    void dec_load();
+    uint64_t load() const;
 
-	void context_switch(Worker* prev_worker);
+    void context_switch(Worker* prev_worker);
 
-	bool sync_main(Worker* worker);
-	bool sync_yield(Worker* worker);
-	bool sync_wait_event(Worker* worker);
-	bool sync_wait_sleep(Worker* worker);
-	bool sync_io(Worker* worker);
+    bool sync_main(Worker* worker);
+    bool sync_yield(Worker* worker);
+    bool sync_wait_event(Worker* worker);
+    bool sync_wait_sleep(Worker* worker);
+    bool sync_io(Worker* worker);
 
-	template<SyncCtx ctx>
-	void sync(Worker* worker);
+    template<SyncCtx ctx>
+    void sync(Worker* worker);
 
-	void exit_workers() const;
-	bool should_exit();
+    void exit_workers();
+    bool should_exit();
 
 public:
-	const CPU& m_cpu;
+    const CPU& m_cpu;
 
-	Worker* m_worker;
-	std::deque<Worker*> m_runnable_queue;
-	std::deque<Worker*> m_idle_queue;
-	std::list<Worker*> m_waiting_queue;
-	std::list<Worker*> m_pending_io_queue;
-	std::list<Worker*> m_sleeping_queue;
+    Worker* m_worker;
+    std::deque<Worker*> m_runnable_queue;
+    std::deque<Worker*> m_idle_queue;
+    std::list<Worker*> m_waiting_queue;
+    std::list<Worker*> m_pending_io_queue;
+    std::list<Worker*> m_sleeping_queue;
 
-	std::mutex m_workers_mtx;
-	std::mutex m_tasks_mtx;
-	std::deque<std::shared_ptr<Task>> m_tasks;
-	std::atomic<State> m_state;
-	bool m_workers_started;
-	uint64_t m_load;
+    std::mutex m_workers_mtx;
+    std::mutex m_tasks_mtx;
+    std::deque<std::shared_ptr<Task>> m_tasks;
+    std::atomic<State> m_state;
+    bool m_workers_started;
+    uint64_t m_load;
 
-	// TODO: Create workers in place next to each other.
-	//
-	std::vector<std::unique_ptr<Worker>> m_workers;
+    // TODO: Create workers in place next to each other.
+    //
+    std::vector<std::unique_ptr<Worker>> m_workers;
 };
 
 #endif // COS_SCHEDULER_H

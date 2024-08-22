@@ -35,14 +35,14 @@ constexpr uint32_t MAX_CPUS = 64;
 //
 DWORD bool_to_error(bool b)
 {
-	return b ? ERROR_SUCCESS : GetLastError();
+    return b ? ERROR_SUCCESS : GetLastError();
 }
 
 // Returns number of CPUs in the system.
 //
 uint32_t cpus_count()
 {
-	return GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+    return GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
 }
 
 // Returns availability mask for this process.
@@ -50,182 +50,246 @@ uint32_t cpus_count()
 //
 uint64_t cpus_avail_mask()
 {
-	uint64_t procCpuMask = 0; // This process is only allowed to run on these CPUs.
-	uint64_t allCpusMask = 0; // These are all available CPUs in the system.
+    uint64_t procCpuMask = 0; // This process is only allowed to run on these CPUs.
+    uint64_t allCpusMask = 0; // These are all available CPUs in the system.
 
-	GetProcessAffinityMask(GetCurrentProcess(), &procCpuMask, &allCpusMask);
+    GetProcessAffinityMask(GetCurrentProcess(), &procCpuMask, &allCpusMask);
 
-	std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask << ENDL;
+    std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask << ENDL;
 
-	return procCpuMask;
+    return procCpuMask;
 }
 
 // Binds current thread to to provided CPU.
 //
 void bind_thread(uint64_t cpu_mask)
 {
-	SetThreadAffinityMask(GetCurrentThread(), cpu_mask);
+    SetThreadAffinityMask(GetCurrentThread(), cpu_mask);
 }
 
 OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl)
 {
-	return reinterpret_cast<OVERLAPPED*>(&io_ctrl.m_ol);
+    return reinterpret_cast<OVERLAPPED*>(&io_ctrl.m_ol);
 }
 
 void read_file(IO_Request& io)
 {
-	DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+    DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
 
-	// std::cout << "ReadFile: " << read_res << "\n";
+    // std::cout << "ReadFile: " << read_res << "\n";
 
-	switch (read_res)
-	{
-	case (ERROR_SUCCESS):
-		io.m_state = IO_Request::State::completed;
-		break;
-	case (ERROR_IO_PENDING):
-		io.m_state = IO_Request::State::pending;
-		break;
-	default:
-		io.m_state = IO_Request::State::error;
-		break;
-	}
+    switch (read_res)
+    {
+    case (ERROR_SUCCESS):
+        io.m_state = IO_Request::State::completed;
+        break;
+    case (ERROR_IO_PENDING):
+        io.m_state = IO_Request::State::pending;
+        break;
+    default:
+        io.m_state = IO_Request::State::error;
+        break;
+    }
 }
 
 void write_file(IO_Request& io)
 {
-	DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+    DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
 
-	// std::cout << "WriteFile: " << write_res << "\n";
+    // std::cout << "WriteFile: " << write_res << "\n";
 
-	switch (write_res)
-	{
-	case (ERROR_SUCCESS):
-		io.m_state = IO_Request::State::completed;
-		break;
-	case (ERROR_IO_PENDING):
-		io.m_state = IO_Request::State::pending;
-		break;
-	default:
-		io.m_state = IO_Request::State::error;
-		break;
-	}
+    switch (write_res)
+    {
+    case (ERROR_SUCCESS):
+        io.m_state = IO_Request::State::completed;
+        break;
+    case (ERROR_IO_PENDING):
+        io.m_state = IO_Request::State::pending;
+        break;
+    default:
+        io.m_state = IO_Request::State::error;
+        break;
+    }
 }
 
 bool io_completed(IO_Control& io_control)
 {
-	return HasOverlappedIoCompleted(to_ol_ptr(io_control));
+    return HasOverlappedIoCompleted(to_ol_ptr(io_control));
 }
 
 void update_io_state(IO_Request& io)
 {
-	if (io.pending() && !io_completed(io.m_control))
-	{
-		// std::cout << "IO still pending...\n";
-		return;
-	}
+    if (io.pending() && !io_completed(io.m_control))
+    {
+        // std::cout << "IO still pending...\n";
+        return;
+    }
 
-	DWORD bytes = 0;
-	DWORD ol_res = bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_control), &bytes, false));
+    DWORD bytes = 0;
+    DWORD ol_res = bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_control), &bytes, false));
 
-	// std::cout << "GetOverlappedResult: " << ol_res << ", bytes : " << bytes << "\n";
+    // std::cout << "GetOverlappedResult: " << ol_res << ", bytes : " << bytes << "\n";
 
-	switch (ol_res)
-	{
-	case (ERROR_SUCCESS):
-		io.m_state = IO_Request::State::completed;
-		break;
-	case (ERROR_IO_PENDING):
-		io.m_state = IO_Request::State::pending;
-		break;
-	default:
-		io.m_state = IO_Request::State::error;
-		break;
-	}
+    switch (ol_res)
+    {
+    case (ERROR_SUCCESS):
+        io.m_state = IO_Request::State::completed;
+        break;
+    case (ERROR_IO_PENDING):
+        io.m_state = IO_Request::State::pending;
+        break;
+    default:
+        io.m_state = IO_Request::State::error;
+        break;
+    }
 }
 
 #elif defined(OS_LINUX)
 
 #include <unistd.h>
+#include <liburing.h>
 #include <sched.h>
 #include <cstring>
 
 uint32_t cpus_count()
 {
-	return std::min(MAX_CPUS, static_cast<std::uint32_t>(sysconf(_SC_NPROCESSORS_ONLN)));
+    return std::min(MAX_CPUS, static_cast<std::uint32_t>(sysconf(_SC_NPROCESSORS_ONLN)));
 }
 
 uint64_t cpus_avail_mask()
 {
-	pid_t pid = getpid();
-	cpu_set_t mask;
-	CPU_ZERO(&mask);
-	uint64_t cpu_mask = 0;
+    pid_t pid = getpid();
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    uint64_t cpu_mask = 0;
 
-	if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1)
-	{
-		std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << ENDL;
-		return -1;
-	}
+    if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1)
+    {
+        std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << ENDL;
+        return -1;
+    }
 
-	int num_cores = CPU_COUNT(&mask);
-	std::cout << "Process is allowed to run on " << num_cores << " cores." << ENDL;
+    int num_cores = CPU_COUNT(&mask);
+    std::cout << "Process is allowed to run on " << num_cores << " cores." << ENDL;
 
-	for (std::size_t i = 0; i < cpus_count(); ++i)
-	{
-		if (CPU_ISSET(i, &mask))
-		{
-			std::cout << "CPU " << i << " is available." << ENDL;
-			cpu_mask |= (1 << i);
-		}
-	}
+    for (std::size_t i = 0; i < cpus_count(); ++i)
+    {
+        if (CPU_ISSET(i, &mask))
+        {
+            std::cout << "CPU " << i << " is available." << ENDL;
+            cpu_mask |= (1 << i);
+        }
+    }
 
-	return cpu_mask;
+    return cpu_mask;
 }
 
 // Binds current thread to provided CPU.
 //
 void bind_thread(uint64_t cpu_mask)
 {
-	cpu_set_t mask; 
-	CPU_ZERO(&mask);
+    cpu_set_t mask; 
+    CPU_ZERO(&mask);
 
-	for (std::size_t i = 0; i < cpus_count(); ++i)
-	{
-		if (cpu_mask & (1 << i))
-			CPU_SET(i, &mask);
-	}
+    for (std::size_t i = 0; i < cpus_count(); ++i)
+    {
+        if (cpu_mask & (1 << i))
+            CPU_SET(i, &mask);
+    }
 
-	pthread_t current_thread = pthread_self();
-	if (pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-		std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << ENDL;
+    pthread_t current_thread = pthread_self();
+    if (pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
+        std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << ENDL;
 
-	print_thread_affinity();
+    print_thread_affinity();
 }
 
 void print_thread_affinity()
 {
-	cpu_set_t mask;
-	CPU_ZERO(&mask);
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
 
-	pthread_t current_thread = pthread_self();
-	if (pthread_getaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-		std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << ENDL;
+    pthread_t current_thread = pthread_self();
+    if (pthread_getaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
+        std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << ENDL;
 
-	std::cout << "Thread affinity: ";
-	for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
-	{
-		if (CPU_ISSET(i, &mask))
-			std::cout << i << " ";
-	}
+    std::cout << "Thread affinity: ";
+    for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
+    {
+        if (CPU_ISSET(i, &mask))
+            std::cout << i << " ";
+    }
 
-	std::cout << ENDL;
+    std::cout << ENDL;
 }
 
-void read_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
-void write_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
-bool io_completed(IO_Control& io_control) { throw std::logic_error{ "Not implemented" }; }
-void update_io_state(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
+// Helper function to submit io request
+//
+void submit_uring_request(IO_Request& io)
+{
+    io_uring& ring = *io.m_control.m_uring;
+    io_uring_sqe* sqe = io_uring_get_sqe(&ring);
+    if (!sqe)
+        assert(!"io_uring_get_sqe returned nullptr!");
+
+    iovec io_vec;
+    io_vec.iov_base = io.m_buffer;
+    io_vec.iov_len = io.m_nbytes;
+    int fd = *reinterpret_cast<int*>(io.m_file_handle);
+    int offset = io.m_offset;
+
+    // TODO add some key to identify request
+    // For now we are fine without key since we can have only
+    // one I/O per worker in any moment
+    if (io.m_type == IO_Request::Type::write)
+        io_uring_prep_writev(sqe, fd, &io_vec, 1, offset);
+    else
+        io_uring_prep_readv(sqe, fd, &io_vec, 1, offset);
+    
+    int ret = io_uring_submit(&ring);
+    if (ret != 1)
+        assert(!"io_uring_submit should return 1!");
+
+    io.set_pending();
+}
+
+void read_file(IO_Request& io)
+{ 
+    submit_uring_request(io);
+}
+
+void write_file(IO_Request& io)
+{
+    submit_uring_request(io);
+}
+
+bool io_completed(IO_Control& io_control)
+{
+    return false;
+}
+
+void update_io_state(IO_Request& io)
+{
+    if (io.m_state != IO_Request::State::pending)
+        return;
+
+    io_uring& ring = *io.m_control.m_uring;
+    io_uring_cqe* cqe;
+    int ret = io_uring_peek_cqe(&ring, &cqe);
+    if (ret == 0)
+    {
+        // Not sure what we do if ret is 0 but cqe is nullptr
+        // Fail request?
+        assert(cqe != nullptr && "cqe must not be nullptr");
+        
+        if (cqe->res != io.m_nbytes)
+            io.set_error();
+        else
+            io.set_completed();
+        io_uring_cqe_seen(&ring, cqe);
+    }
+    // TODO milant: HANDLE POSSIBLE RETURN VALUES
+}
 
 #elif defined(OS_MAC)
 #include <sys/sysctl.h>

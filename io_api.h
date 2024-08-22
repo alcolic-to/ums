@@ -35,7 +35,7 @@ public:
 
 #elif __linux__
 
-#include <liburing.h>
+class io_uring;
 
 struct IO_Control final
 {

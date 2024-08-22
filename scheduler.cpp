@@ -114,11 +114,11 @@ void Scheduler::schedule_idle_worker()
 //
 void Scheduler::schedule_io_workers()
 {
-	auto io_completed = [](Worker* worker)
-	{
-		worker->m_io_request->update();
-		return worker->m_io_request->completed();
-	};
+    auto io_completed = [](Worker* worker)
+    {
+        worker->m_io_request->update();
+        return worker->m_io_request->completed();
+    };
 
     auto begin = m_pending_io_queue.begin();
     auto end = m_pending_io_queue.end();

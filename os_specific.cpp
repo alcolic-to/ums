@@ -144,6 +144,14 @@ void update_io_state(IO_Request& io)
     }
 }
 
+void* init_io_handle(uint64_t offset)
+{
+}
+
+void free_io_handle(void* io_handle)
+{
+}
+
 #elif defined(OS_LINUX)
 
 #include <unistd.h>
@@ -223,11 +231,14 @@ void print_thread_affinity()
     std::cout << ENDL;
 }
 
-// Helper function to submit io request
-//
-void submit_uring_request(IO_Request& io)
+uint64_t CosUring::get_io_request_id(IO_Request& io)
 {
-    io_uring& ring = *io.m_control.m_uring;
+    return *reinterpret_cast<uint64_t*>(io.m_io_handle);
+}
+
+void CosUring::submit(IO_Request& io)
+{
+    io_uring& ring = tls_uring.m_ring;
     io_uring_sqe* sqe = io_uring_get_sqe(&ring);
     if (!sqe)
         assert(!"io_uring_get_sqe returned nullptr!");
@@ -238,13 +249,11 @@ void submit_uring_request(IO_Request& io)
     int fd = *reinterpret_cast<int*>(io.m_file_handle);
     int offset = io.m_offset;
 
-    // TODO add some key to identify request
-    // For now we are fine without key since we can have only
-    // one I/O per worker in any moment
     if (io.m_type == IO_Request::Type::write)
         io_uring_prep_writev(sqe, fd, &io_vec, 1, offset);
     else
         io_uring_prep_readv(sqe, fd, &io_vec, 1, offset);
+    io_uring_sqe_set_data64(sqe, get_io_request_id(io));
     
     int ret = io_uring_submit(&ring);
     if (ret != 1)
@@ -253,27 +262,13 @@ void submit_uring_request(IO_Request& io)
     io.set_pending();
 }
 
-void read_file(IO_Request& io)
-{ 
-    submit_uring_request(io);
-}
 
-void write_file(IO_Request& io)
-{
-    submit_uring_request(io);
-}
-
-bool io_completed(IO_Control& io_control)
-{
-    return false;
-}
-
-void update_io_state(IO_Request& io)
+void CosUring::update_io_state(IO_Request& io)
 {
     if (io.m_state != IO_Request::State::pending)
         return;
 
-    io_uring& ring = *io.m_control.m_uring;
+    io_uring& ring = tls_uring.m_ring;
     io_uring_cqe* cqe;
     int ret = io_uring_peek_cqe(&ring, &cqe);
     if (ret == 0)
@@ -286,10 +281,50 @@ void update_io_state(IO_Request& io)
             io.set_error();
         else
             io.set_completed();
+        uint64_t req_id = io_uring_cqe_get_data64(cqe);
+        
+        assert(req_id == get_io_request_id(io) && "Missmatch between req_id and cqe data64!");
+        
         io_uring_cqe_seen(&ring, cqe);
     }
     // TODO milant: HANDLE POSSIBLE RETURN VALUES
 }
+
+void update_io_state(IO_Request& io)
+{
+    tls_uring.update_io_state(io);
+}
+
+bool io_completed(IO_Control& io_control)
+{
+    return false;
+}
+
+void read_file(IO_Request& io)
+{ 
+    tls_uring.submit(io);
+}
+
+void write_file(IO_Request& io)
+{
+    tls_uring.submit(io);
+}
+
+void* init_io_handle(uint64_t offset)
+{
+    (void) offset;
+    static std::atomic<uint64_t> io_cnt { 0 };
+    uint64_t* io_id = new uint64_t(io_cnt.fetch_add(1));
+    return reinterpret_cast<void*>(io_id);
+}
+
+void free_io_handle(void* io_handle)
+{
+    uint64_t* io_id = reinterpret_cast<uint64_t*>(io_handle);
+    delete io_id;
+}
+
+thread_local CosUring tls_uring;
 
 #elif defined(OS_MAC)
 #include <sys/sysctl.h>
@@ -338,6 +373,8 @@ void read_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
 void write_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
 bool io_completed(IO_Control& io_control) { throw std::logic_error{ "Not implemented" }; }
 void update_io_state(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
+void* init_io_handle(uint64_t offset) { throw std::logic_error{ "Not implemented" }; }
+void free_io_handle(void* io_handle) { throw std::logic_error{ "Not implemented" }; }
 
 #else
 static_assert(!"Unknown OS.");

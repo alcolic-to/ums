@@ -232,119 +232,7 @@ int main(int argc, char* argv[])
 
 #else
 
-#ifdef __linux__
-
-#include <fcntl.h>
 #include <string.h>
-#include <liburing.h>
-
-#include <errno.h>
-
-const std::size_t block_size = 4096;
-std::mutex io_mutex;
-const std::size_t num_threads = 100;
-
-void create_file(const char *file, size_t size, char pattern)
-{
-	char *buf;
-	int fd;
-
-	buf = (char*) malloc(size);
-	memset(buf, pattern, size);
-
-	fd = open(file, O_WRONLY | O_CREAT, 0644);
-
-	write(fd, buf, size);
-	fsync(fd);
-	close(fd);
-	free(buf);
-}
-
-void wait_complete(struct io_uring* ring, std::size_t thread_id)
-{
-    // cqe is a pointer to the completion queue entry
-    struct io_uring_cqe *cqe;
-
-    int ret = io_uring_wait_cqe(ring, &cqe);
-    if (ret == 0 && cqe != nullptr)
-    {
-        std::uint64_t tid = io_uring_cqe_get_data64(cqe);
-        if (thread_id != tid)
-        {
-            std::cout << "Thread ids don't match. tid " << tid << " thread_id " << thread_id << std::endl;
-            return;
-        }
-
-        if (cqe->res != block_size)
-        {
-            std::cout << "Thread " << tid << " wrong number of bytes " << cqe->res << std::endl;
-            return;
-        }
-
-        std::cout << "Everything ok for thread " << tid << " cqe->res " << cqe->res << std::endl;
-    }
-    else
-    {
-        std::cout << "Something went wrong on thread " << thread_id << std::endl;
-    }
-}
-
-void write_to_file(int thread_id)
-{
-    int fd = open("io_testing_file_0", O_RDWR | O_DIRECT);
-    char *buffer;
-
-    // Allocate aligned memory
-    if (posix_memalign((void **)&buffer, block_size, block_size))
-    {
-        std::cerr << "posix_memalign failed" << std::endl;
-        return;
-    }
-
-    struct io_uring ring;
-    io_uring_queue_init(1, &ring, 0);
-
-    // Get a submission queue entry
-    struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
-    if (sqe == nullptr)
-    {
-        std::cerr << "io_uring_get_sqe failed" << std::endl;
-        close(fd);
-        free(buffer);
-        return;
-    }
-
-    struct iovec iov;
-    iov.iov_base = buffer;
-    iov.iov_len = block_size;
-
-    // Prepare the I/O request
-    io_uring_prep_writev(sqe, fd, &iov, 1, block_size * thread_id);
-    io_uring_sqe_set_data64(sqe, thread_id);
-
-    // Submit the I/O request
-    int ret = io_uring_submit(&ring);
-    if (ret < 0)
-    {
-        std::cerr << "io_uring_submit failed" << std::endl;
-        close(fd);
-        free(buffer);
-        io_uring_queue_exit(&ring);
-        return;
-    }
-    else if (ret!= 1)
-    {
-        std::cerr << "io_uring failed to submit 1 task " << std::endl;
-        return;
-    }
-
-    wait_complete(&ring, thread_id);
-
-    free(buffer);
-    close(fd);
-}
-
-#endif // __linux__
 
 void sleep_test()
 {
@@ -402,22 +290,6 @@ void read_thread1()
     delete[] buffer;
 }
 
-#include <signal.h>
-#include <execinfo.h> // backtrace/backtrace_symbols_fd
-
-void signal_handler(int sig)
-{
-    void *array[10];
-    size_t size;
-
-    size = backtrace(array, 10);
-
-    fprintf(stderr, "Error: signal %d:\n", sig);
-    backtrace_symbols_fd(array, size, STDERR_FILENO);
-
-    exit(1);
-}
-
 int main(int argc, char* argv[])
 {
 	// char *buf;
@@ -455,7 +327,7 @@ int main(int argc, char* argv[])
     task_manager.execute_task<false>(write_thread2);
     task_manager.execute_task<false>(write_thread3);
     task_manager.execute_task<false>(read_thread1);
-    close(fd);
+    std::cout << sizeof(io_uring) << std::endl;
 }
 
 #endif

@@ -7,11 +7,7 @@ IO_Request::IO_Request(void* file_handle, void* buffer, uint64_t nbytes, uint64_
     , m_buffer{ buffer }
     , m_nbytes{ nbytes }
     , m_offset{ offset }
-#ifdef __WIN32__
-    , m_control{ offset }
-#elif __linux__
-    , m_control { tls_worker->get_io_uring() }
-#endif
+    , m_io_handle { init_io_handle(offset) }
     , m_type{ type }
     , m_state{ State::init }
 {
@@ -19,6 +15,11 @@ IO_Request::IO_Request(void* file_handle, void* buffer, uint64_t nbytes, uint64_
         read_file(*this);
     else
         write_file(*this);
+}
+
+IO_Request::~IO_Request()
+{
+    free_io_handle(m_io_handle);
 }
 
 void IO_Request::update()

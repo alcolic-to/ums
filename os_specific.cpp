@@ -114,7 +114,7 @@ void write_file(IO_Request& io)
 
 bool io_completed(IO_Request& io)
 {
-    return HasOverlappedIoCompleted(to_ol_ptr(io));
+    return HasOverlappedIoCompleted(to_ol_ptr(io.m_io_handle));
 }
 
 void update_io_state(IO_Request& io)

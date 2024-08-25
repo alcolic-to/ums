@@ -10,7 +10,6 @@ on:
 
 env:
   CMAKE_VERSION: 3.20.0
-  CMAKE_BUILD_TYPE: Release
 
 jobs:
   build-and-test:
@@ -21,6 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        build_type: [ Debug, Release ]
         config:
           - {
               name: "Windows Latest MSVC",
@@ -42,10 +42,10 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Configure
-      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
 
     - name: Build
-      run: cmake --build build --config ${{ env.CMAKE_BUILD_TYPE }}
+      run: cmake --build build --config ${{ matrix.build_type }}
 
     - name: Test
-      run: cd build && ctest -V -C ${{ env.CMAKE_BUILD_TYPE }}
+      run: cd build && ctest -V -C ${{ matrix.build_type }}

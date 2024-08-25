@@ -72,11 +72,10 @@ public:
 
     void context_switch(Worker* prev_worker);
 
-    bool sync_main(Worker* worker);
-    bool sync_yield(Worker* worker);
-    bool sync_wait_event(Worker* worker);
-    bool sync_wait_sleep(Worker* worker);
-    bool sync_io(Worker* worker);
+    template<SyncCtx ctx>
+    void save_worker(Worker* worker);
+
+    bool sync_init(Worker* worker);
 
     template<SyncCtx ctx>
     void sync(Worker* worker);

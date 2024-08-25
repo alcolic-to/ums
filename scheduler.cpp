@@ -292,92 +292,57 @@ void Scheduler::context_switch(Worker* prev_worker)
     prev_worker->wait(lock);
 }
 
-// Synchronization point for the workers for wait event.
+// Synchronization point for the workers that are beeing initialized.
+// We will return whether scheduling is needed or not.
 //
-bool Scheduler::sync_wait_event(Worker* worker)
-{
-    save_waiting(worker);
-    return true; // proceed with scheduling.
-}
-
-// Synchronization point for the workers for sleep.
+// Notes:
+// When worker is started for the first time, it will be parked in this function
+// waiting on condition variable. We will later decide whether to proceed with scheduling based on return value.
+// Since only first started worker on scheduler should enter scheduling code (other workers will already be scheduled
+// when it's their turn to run), we will use flag m_workers_started to help us do this.
+// Also, we are going to notify scheduler thread to continue when we are safely parked, since it is blocked
+// on a condition variable waiting for us.
 //
-bool Scheduler::sync_wait_sleep(Worker* worker)
+bool Scheduler::sync_init(Worker* worker)
 {
-    save_sleeping(worker);
-    return true; // proceed with scheduling.
-}
-
-// Synchronization point for the workers in yield.
-//
-bool Scheduler::sync_yield(Worker* worker)
-{
-    save_runnable(worker);
-    return true; // proceed with scheduling.
-}
-
-// Synchronization point for the workers for I/O operations.
-//
-bool Scheduler::sync_io(Worker* worker)
-{
-    save_pending_io(worker);
-    return true; // proceed with scheduling.
-}
-
-// Synchronization point for the workers in main worker loop.
-//
-bool Scheduler::sync_main(Worker* worker)
-{
-    if (initializing())
-    {
-        save_idle<true>(worker);
-
-        std::unique_lock<std::mutex> lock{ m_workers_mtx };
-
-        worker->notify(lock); // Notify thread that created us to continue
-        worker->wait(lock);   // and go to sleep.
-
-        // If we are the first started worker on scheduler we are going to schedule work;
-        // otherwise our work is already scheduled, so we return false.
-        //
-        if (!m_workers_started)
-            return m_workers_started = true; // proceed with scheduling.
-        else
-            return false; // skip scheduling.
-    }
-    else
-    {
-        save_idle<false>(worker);
+    if (!initializing())
         return true; // proceed with scheduling.
-    }
+
+    std::unique_lock<std::mutex> lock{ m_workers_mtx };
+    worker->notify(lock); // Notify scheduler thread that created us to continue
+    worker->wait(lock);   // and go to sleep.
+
+    return m_workers_started ? false : m_workers_started = true;
 }
 
-// Returns pointer to scheduler's sync member function based on provided sync context.
+// Save worker to proper queue based on synchronization context.
 //
 template<SyncCtx ctx>
-constexpr auto sync_func()
+void Scheduler::save_worker(Worker* worker)
 {
-    if      constexpr (ctx == SyncCtx::main)       return &Scheduler::sync_main;
-    else if constexpr (ctx == SyncCtx::yield)      return &Scheduler::sync_yield;
-    else if constexpr (ctx == SyncCtx::wait_event) return &Scheduler::sync_wait_event;
-    else if constexpr (ctx == SyncCtx::wait_sleep) return &Scheduler::sync_wait_sleep;
-    else if constexpr (ctx == SyncCtx::io)         return &Scheduler::sync_io;
+    if      constexpr (ctx == SyncCtx::main)       initializing() ? save_idle<true>(worker) : save_idle<false>(worker);
+    else if constexpr (ctx == SyncCtx::yield)      save_runnable(worker);
+    else if constexpr (ctx == SyncCtx::wait_event) save_waiting(worker);
+    else if constexpr (ctx == SyncCtx::wait_sleep) save_sleeping(worker);
+    else if constexpr (ctx == SyncCtx::io)         save_pending_io(worker);
 }
 
 // Synchronization point for the workers.
-// We will call sync function based on provided sync type and proceed with scheduling if it returns true.
-// Currently, only important work is done within Scheduler::sync_main on workers initialization.
+// We will save current worker to proper queue, schedule workers and context switch to
+// next worker if needed. For workers initialization, we will enter sync_init function.
 //
 template<SyncCtx ctx>
 void Scheduler::sync(Worker* worker)
 {
-    if ((this->*sync_func<ctx>())(worker))
-    {
-        schedule();
+    save_worker<ctx>(worker);
 
-        if (m_worker != worker)
-            context_switch(worker);
-    }
+    if (!sync_init(worker))
+        return;
+
+    schedule();
+
+    if (m_worker != worker)
+        context_switch(worker);
 }
 
 void Scheduler::exit_workers()

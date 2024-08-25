@@ -2,14 +2,18 @@ name: Build and Test
 
 run-name: ${{ github.actor }} invoked build and test
 
-on: [pull_request]
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
 
 env:
   CMAKE_VERSION: 3.20.0
   CMAKE_BUILD_TYPE: Release
 
 jobs:
-  build:
+  build-and-test:
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
     outputs:

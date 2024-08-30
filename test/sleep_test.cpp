@@ -6,17 +6,17 @@
 
 void sleep_test()
 {
-    cos_sleep(1000 /* miliseconds */);
+    cos_sleep(1000ms);
 }
 
 TEST(Sleep, SimpleSleepTest)
 {
-    std::uint64_t start = get_time_in_ms();
+    auto start = now();
 
     for (std::size_t i = 0; i < 10; ++i)
         task_manager.execute_task<false>(sleep_test);
 
-    std::uint64_t end = get_time_in_ms();
-    std::int64_t diff = 10000 - (end - start);
-    ASSERT_LE(abs(diff), 100);
+    auto end = now();
+    auto diff = 10000ms - (end - start);
+    ASSERT_LE(abs(diff), 100ms);
 }

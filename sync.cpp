@@ -10,12 +10,12 @@ void ConditionalEvent::signal() { m_cond = true; }
 
 bool ConditionalEvent::check() const { return m_cond.load(); }
 
-TimedEvent::TimedEvent(std::uint64_t time_to_sleep_in_ms)
-    : m_time_to_sleep_in_ms(time_to_sleep_in_ms) {}
+TimedEvent::TimedEvent(milliseconds time_to_sleep)
+    : m_time_to_sleep(time_to_sleep) {}
 
 void TimedEvent::wait()
 {
-    m_start_time = get_time_in_ms();
+    m_start_time = now();
     tls_worker->wait_sleep(this);
 }
 
@@ -23,16 +23,15 @@ void TimedEvent::signal() {}
 
 bool TimedEvent::check() const
 {
-    std::uint64_t diff = get_time_in_ms() - m_start_time;
-    return diff >= m_time_to_sleep_in_ms;
+    auto diff = now() - m_start_time;
+    return diff >= m_time_to_sleep;
 }
-
 
 // Sleep for specified amount of time.
 // * This method will yield
 // * Once the time is up, it will wake up the worker.
-void cos_sleep(std::uint32_t miliseconds)
+void cos_sleep(milliseconds time_to_sleep)
 {
-    TimedEvent timed_event(miliseconds);
+    TimedEvent timed_event(time_to_sleep);
     timed_event.wait();
 }

@@ -2,6 +2,7 @@
 #include <random>
 #include <chrono>
 #include <exception>
+#include <thread>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -164,6 +165,11 @@ void test_signal()
     std::cout << f3() << "\n";
 }
 
+void sleep_test()
+{
+    cos_sleep(1000ms);
+}
+
 #if defined _WIN32
 
 HANDLE file = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS | FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH, NULL);
@@ -224,24 +230,27 @@ int main(int argc, char* argv[])
     // task_manager.execute_task<false>(write_to_file);
     // task_manager.execute_task<false>(read_from_file);
 
-    for (int i = 0; i < 10000000; ++i)
-        task_manager.execute_task<true>(f4);
+    // for (int i = 0; i < 10000000; ++i)
+    //     task_manager.execute_task<true>(f4);
+
+    // std::this_thread::sleep_for(1ms);
+
+    // auto start = now();
+
+    for (std::size_t i = 0; i < 10; ++i)
+        task_manager.execute_task<false>(sleep_test);
+
+    // std::cout << duration_cast<milliseconds>(now() - start) << "\n";
 }
 
 #else
 
-void sleep_test()
-{
-    cos_sleep(1000);
-}
-
 int main(int argc, char* argv[])
 {
-    std::uint64_t start = get_time_in_ms();
+    Stopwatch sw("Sleep test");
+
     for (std::size_t i = 0; i < 10; ++i)
         task_manager.execute_task<false>(sleep_test);
-    std::uint64_t end = get_time_in_ms();
-    std::cout << "Total exec time: " << end - start << "ms.\n";
 }
 
 #endif

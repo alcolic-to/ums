@@ -2,6 +2,9 @@
 
 #include <cstdint>
 #include <atomic>
+#include <chrono>
+
+#include "util.h"
 
 class ConditionalEvent final
 {
@@ -17,13 +20,13 @@ class ConditionalEvent final
 class TimedEvent final
 {
     public:
-        TimedEvent(std::uint64_t time_to_sleep_in_ms);
+        TimedEvent(milliseconds time_to_sleep);
         virtual void wait();
         virtual void signal(); 
         virtual bool check() const;
     private:
-        std::uint64_t m_start_time;
-        std::uint64_t m_time_to_sleep_in_ms;
+        Clock::time_point m_start_time;
+        milliseconds m_time_to_sleep;
 };
 
-void cos_sleep(std::uint32_t miliseconds);
+void cos_sleep(milliseconds time_to_sleep);

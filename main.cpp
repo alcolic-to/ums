@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <iostream>
 #include <random>
 #include <chrono>
@@ -14,29 +15,6 @@
 #include "sync_api.h"
 #include "io_api.h"
 
-std::random_device rd;     // only used once to initialise (seed) engine
-std::mt19937 rng(rd());    // random-number engine used (Mersenne-Twister in this case)
-
-class PRNG
-{
-public:
-    PRNG(uint64_t seed) : m_seed(seed) { }
-
-    template<typename T>
-    T rand() { return T(rand64()); }
-
-private:
-    uint64_t m_seed;
-
-    uint64_t rand64()
-    {
-        m_seed ^= m_seed >> 12, m_seed ^= m_seed << 25, m_seed ^= m_seed >> 27;
-        return m_seed * 2685821657736338717LL;
-    }
-};
-
-static PRNG prng{ 1070372 };
-
 using namespace std::chrono_literals;
 
 void f2()
@@ -46,20 +24,18 @@ void f2()
 
 void f1()
 {
-    auto start = std::chrono::high_resolution_clock::now();
+    auto start = now();
 
     std::vector<int> v;
     for (int i = 0; i < 1000; ++i)
         v.push_back(rand());
 
-    std::uniform_int_distribution<int> uni(0, 10);
-    int funcDur = uni(rng);
-    // int funcDur = 1;
+    int funcDur = random() % 11;
 
     int i = 0;
     while (true)
     {
-        auto end = std::chrono::high_resolution_clock::now();
+        auto end = now();
 
         std::chrono::duration<double, std::milli> duration = end - start;
         if (duration.count() > funcDur)
@@ -130,7 +106,7 @@ uint64_t f4()
 void ms3_function()
 {
     uint64_t r = 0;
-    auto start = std::chrono::high_resolution_clock::now();
+    auto start = now();
 
     for (int i = 0; i < 1000; ++i)
     {
@@ -139,7 +115,7 @@ void ms3_function()
         // r += f4();
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
+    auto end = now();
 
     std::chrono::duration<double, std::milli> duration = end - start;
     std::cout << "Total exec time: " << duration.count() << "ms.\n";
@@ -202,7 +178,7 @@ void read_from_file()
 
     auto buf = std::make_unique<char[]>(read_size);
 
-    cos_read_file(file, buf.get(), read_size, (prng.rand<uint64_t>() % read_size) * read_size);
+    cos_read_file(file, buf.get(), read_size, (random() % read_size) * read_size);
     // std::cout << "Read buffer: " << buf.get() << "\n";
 }
 
@@ -216,7 +192,7 @@ void write_to_file()
     // for (int i = 0; i < 10; ++i)
     //     std::cout << prng.rand<uint64_t>() << "\n";
 
-    cos_write_file(file, io_str.data(), io_str.size(), (prng.rand<uint64_t>() % max_file_size) * io_str.size());
+    cos_write_file(file, io_str.data(), io_str.size(), (random() % max_file_size) * io_str.size());
 }
 
 int main(int argc, char* argv[])
@@ -237,10 +213,13 @@ int main(int argc, char* argv[])
 
     // auto start = now();
 
-    for (std::size_t i = 0; i < 10; ++i)
-        task_manager.execute_task<false>(sleep_test);
+    // for (std::size_t i = 0; i < 10; ++i)
+    //     task_manager.execute_task<false>(sleep_test);
 
     // std::cout << duration_cast<milliseconds>(now() - start) << "\n";
+
+    // for (int i = 0; i < 100; ++i)
+    //     std::cout << random() << std::endl;
 }
 
 #else

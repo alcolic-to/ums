@@ -3,8 +3,13 @@
 #ifndef COS_UTIL_H
 #define COS_UTIL_H
 
+#include <cstdint>
+#include <type_traits>
 #include <chrono>
 #include <iostream>
+
+#define stringify2(x) #x
+#define stringify(x) stringify2(x)
 
 using namespace std::chrono;
 using namespace std::chrono_literals;
@@ -47,14 +52,14 @@ public:
     void stop() { m_end = now(); }
     auto elapsed() const { return duration_cast<Duration>(m_end-m_start); }
 
-    static std::string unit_name()
+    std::string unit_name() const
     {
-        if      constexpr (std::is_same_v<Duration, hours>)        return "hours";
-        else if constexpr (std::is_same_v<Duration, minutes>)      return "minutes";
-        else if constexpr (std::is_same_v<Duration, seconds>)      return "seconds";
-        else if constexpr (std::is_same_v<Duration, milliseconds>) return "milliseconds";
-        else if constexpr (std::is_same_v<Duration, microseconds>) return "microseconds";
-        else if constexpr (std::is_same_v<Duration, nanoseconds>)  return "nanoseconds";
+        if      constexpr (std::is_same_v<Duration, hours>)        return "hour(s)";
+        else if constexpr (std::is_same_v<Duration, minutes>)      return "minute(s)";
+        else if constexpr (std::is_same_v<Duration, seconds>)      return "second(s)";
+        else if constexpr (std::is_same_v<Duration, milliseconds>) return "millisecond(s)";
+        else if constexpr (std::is_same_v<Duration, microseconds>) return "microsecond(s)";
+        else if constexpr (std::is_same_v<Duration, nanoseconds>)  return "nanosecond(s)";
         else                                                       return "unknown unit";
     }
 
@@ -63,5 +68,10 @@ private:
     Clock::time_point m_start;
     Clock::time_point m_end;
 };
+
+// Random number generator.
+//
+template<typename T = uint64_t>
+T random();
 
 #endif // COS_UTIL_H

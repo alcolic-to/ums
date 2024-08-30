@@ -21,7 +21,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG>)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG>)
 
-add_library(user_mode_scheduler_lib STATIC cpu.cpp os_specific.cpp scheduler.cpp task_manager.cpp worker.cpp io.cpp sync.cpp)
+add_library(user_mode_scheduler_lib STATIC cpu.cpp os_specific.cpp scheduler.cpp task_manager.cpp worker.cpp io.cpp sync.cpp util.cpp)
 set(COS_LIBRARIES user_mode_scheduler_lib)
 
 add_executable(user_mode_scheduler main.cpp)

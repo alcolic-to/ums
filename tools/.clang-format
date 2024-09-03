@@ -1,0 +1,106 @@
+# .clang-format file based on Stroustrup's PPP style guide
+
+# Note: Clang-format understands also special comments that switch formatting in a delimited range.
+# The code between a comment // clang-format off or /* clang-format off */ up to a comment
+# // clang-format on or /* clang-format on */ will not be formatted.
+# The comments themselves will be formatted (aligned) normally.
+
+Language: Cpp
+Standard: c++20
+
+# General Formatting
+ColumnLimit: 100
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+UseCRLF: false
+
+# Modern cpp style preferred.
+BreakBeforeBraces: Stroustrup
+Cpp11BracedListStyle: true
+
+# Indentation
+IndentCaseLabels: false
+IndentPPDirectives: None
+IndentWrappedFunctionNames: false
+IndentAccessModifiers: false
+IndentRequires: true
+LambdaBodyIndentation: Signature
+NamespaceIndentation: None
+
+# Spaces
+AccessModifierOffset: -4 # needed for some reason...
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyParentheses: false
+SpaceAfterTemplateKeyword: false
+SpaceAfterLogicalNot: false
+SpaceBeforeCaseColon: false
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInConditionalStatement: false
+SpacesInContainerLiterals: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpacesBeforeTrailingComments: 1
+SpacesInLineCommentPrefix:
+    Minimum: 1
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Right
+AlignOperands: true
+AlignTrailingComments: true
+QualifierAlignment: Left
+
+# Pointer and Reference Alignment
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Line Breaks
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortEnumsOnASingleLine: true
+AlwaysBreakTemplateDeclarations: true
+AlwaysBreakBeforeMultilineStrings: false
+
+# Comments
+CommentPragmas: '^ IWYU pragma:'
+IndentExternBlock: Indent
+
+# Miscellaneous
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: false
+BreakConstructorInitializers: BeforeComma
+ContinuationIndentWidth: 4
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+SortUsingDeclarations: true
+CompactNamespaces: true
+FixNamespaceComments: true
+PackConstructorInitializers: CurrentLine
+ReflowComments: true
+RemoveBracesLLVM: true
+SeparateDefinitionBlocks: Always
+
+# Regroup includes so that system includes are first, third library second, and user includes are last.
+IncludeCategories:
+  - Regex:           '<.*>'
+    Priority:        1
+    SortPriority:    1
+  - Regex:           '".*"'
+    Priority:        2
+    SortPriority:    2
+
+IncludeBlocks: Regroup

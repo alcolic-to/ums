@@ -35,7 +35,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 cd "$REPO_ROOT" || exit
 
 # Getting all cpp files except deleted ones.
-FILES=$(git status -uall --porcelain | grep -E '^[^D].*\.(cpp|hpp|h|c|cc)$' | sed -E 's/^\S+\s+//' | tr '\n' ' ')
+FILES=$(git status -uall --porcelain | grep -E "^[^D].*\.(cpp|hpp|h|c|cc)$" | cut -c 4- | tr '\n' ' ')
 
 # Check if there are any changed or new C++ files
 if [[ -z "$FILES" ]]; then

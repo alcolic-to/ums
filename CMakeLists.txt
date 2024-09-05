@@ -19,8 +19,7 @@ if(CLANGTIDY)
     set(CLANG_TIDY_OPTIONS ${CLANGTIDY}
         -extra-arg=-Wno-unknown-warning-option
         -extra-arg=-Wno-ignored-optimization-argument
-        -extra-arg=-Wno-unused-command-line-argument
-        -p)
+        -extra-arg=-Wno-unused-command-line-argument)
 
     set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_OPTIONS})
     message("clang-tidy configured globally.")
@@ -53,3 +52,7 @@ endif()
 
 enable_testing()
 add_subdirectory(test)
+
+message("Disabling clang-tidy for google tests.")
+set_target_properties(gmock PROPERTIES CXX_CLANG_TIDY "")
+set_target_properties(gtest PROPERTIES CXX_CLANG_TIDY "")

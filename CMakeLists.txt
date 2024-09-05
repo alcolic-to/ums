@@ -13,6 +13,21 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # -> compile_commands.json
 
+# Enable clang tidy.
+find_program(CLANGTIDY clang-tidy)
+if(CLANGTIDY)
+    set(CLANG_TIDY_OPTIONS ${CLANGTIDY}
+        -extra-arg=-Wno-unknown-warning-option
+        -extra-arg=-Wno-ignored-optimization-argument
+        -extra-arg=-Wno-unused-command-line-argument
+        -p)
+
+    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_OPTIONS})
+    message("clang-tidy configured globally.")
+else()
+    message(${WARNING_MESSAGE} "clang-tidy requested but executable not found")
+endif()
+
 # Separate bin directory from build directory.
 #
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)

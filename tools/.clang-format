@@ -94,7 +94,7 @@ ReflowComments: true
 RemoveBracesLLVM: true
 SeparateDefinitionBlocks: Always
 
-# Regroup includes so that system includes are first, third library second, and user includes are last.
+# Regroup includes so that system includes are first and user includes are second.
 IncludeCategories:
   - Regex:           '<.*>'
     Priority:        1

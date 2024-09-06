@@ -1,9 +1,8 @@
 #include <chrono>
 #include <cstdint>
-#include <exception>
 #include <iostream>
-#include <random>
 #include <thread>
+#include <vector>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -28,7 +27,7 @@ void f1()
 
     std::vector<int> v;
     for (int i = 0; i < 1000; ++i)
-        v.push_back(rand());
+        v.push_back(random());
 
     int funcDur = random() % 11;
 

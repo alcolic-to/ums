@@ -1,6 +1,10 @@
 #include "worker.h"
 
+#include <cstdint>
+#include <exception>
 #include <iostream>
+#include <memory>
+#include <mutex>
 
 #include "cpu.h"
 #include "io_api.h"

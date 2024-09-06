@@ -1,5 +1,9 @@
 #include "cpu.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+
 #include "config.h"
 #include "os_specific.h"
 

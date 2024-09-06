@@ -1,5 +1,7 @@
 #include <chrono>
+#include <cstdint>
 #include <gtest/gtest.h>
+#include <ratio>
 #include <thread>
 
 #include "task_manager.h"

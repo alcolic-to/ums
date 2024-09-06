@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "sync_api.h"
 #include "util.h"
 #include "worker.h"

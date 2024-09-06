@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "io_api.h"
 #include "os_specific.h"
 #include "worker.h"

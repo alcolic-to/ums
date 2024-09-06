@@ -1,8 +1,12 @@
+#include <chrono>
+#include <cstddef>
 #include <gtest/gtest.h>
 
 #include "sync_api.h"
 #include "task_manager.h"
 #include "util.h"
+
+using namespace std::chrono_literals;
 
 void sleep_test()
 {
@@ -18,5 +22,5 @@ TEST(Sleep, SimpleSleepTest)
 
     auto end = now();
     auto diff = 10000ms - (end - start);
-    ASSERT_LE(abs(diff), 100ms);
+    ASSERT_LE(std::chrono::abs(diff), 100ms);
 }

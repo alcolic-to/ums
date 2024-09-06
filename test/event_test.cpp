@@ -1,11 +1,13 @@
 #include <chrono>
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <iostream>
+#include <mutex>
 #include <thread>
+#include <vector>
 
 #include "sync_api.h"
 #include "task_manager.h"
-#include "util.h"
 
 ConditionalEvent e1;
 ConditionalEvent e2;

@@ -1,5 +1,9 @@
 #include "task_manager.h"
 
+#include <functional>
+#include <memory>
+#include <mutex>
+
 #include "cpu.h"
 #include "scheduler.h"
 

@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "sync_api.h"
-#include "util.h"
 #include "task_manager.h"
+#include "util.h"
 
 void sleep_test()
 {

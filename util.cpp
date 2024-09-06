@@ -1,14 +1,16 @@
-#include <cstdint>
-
 #include "util.h"
 
-class PRNG
-{
+#include <cstdint>
+
+class PRNG {
 public:
-    PRNG(uint64_t seed) : m_seed{ seed } { }
+    PRNG(uint64_t seed) : m_seed{seed} {}
 
     template<typename T>
-    T rand() { return T(rand64()); }
+    T rand()
+    {
+        return T(rand64());
+    }
 
 private:
     uint64_t rand64()
@@ -20,7 +22,7 @@ private:
     uint64_t m_seed;
 };
 
-static PRNG prng{ uint64_t(now().time_since_epoch().count()) };
+static PRNG prng{uint64_t(now().time_since_epoch().count())};
 
 template<typename T>
 T random()

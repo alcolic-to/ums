@@ -3,14 +3,13 @@
 #ifndef COS_TASK_MANAGER_H
 #define COS_TASK_MANAGER_H
 
+#include <condition_variable>
 #include <functional>
 #include <mutex>
-#include <condition_variable>
 
 class CPUs;
 
-class Task
-{
+class Task {
 public:
     enum class State : int { not_started, running, done };
 
@@ -27,8 +26,7 @@ public:
     std::condition_variable m_cv;
 };
 
-class Task_manager final
-{
+class Task_manager final {
 public:
     Task_manager(const CPUs& cpus);
 

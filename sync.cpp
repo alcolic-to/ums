@@ -4,14 +4,22 @@
 
 ConditionalEvent::ConditionalEvent() : m_cond(false) {}
 
-void ConditionalEvent::wait() { tls_worker->wait_event(this); }
+void ConditionalEvent::wait()
+{
+    tls_worker->wait_event(this);
+}
 
-void ConditionalEvent::signal() { m_cond = true; }
+void ConditionalEvent::signal()
+{
+    m_cond = true;
+}
 
-bool ConditionalEvent::check() const { return m_cond.load(); }
+bool ConditionalEvent::check() const
+{
+    return m_cond.load();
+}
 
-TimedEvent::TimedEvent(milliseconds time_to_sleep)
-    : m_time_to_sleep(time_to_sleep) {}
+TimedEvent::TimedEvent(milliseconds time_to_sleep) : m_time_to_sleep(time_to_sleep) {}
 
 void TimedEvent::wait()
 {

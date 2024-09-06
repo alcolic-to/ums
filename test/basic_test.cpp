@@ -8,7 +8,7 @@
 
 void f()
 {
-    std::this_thread::sleep_for (std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
 TEST(BasicTestSuite, BasicTest)
@@ -17,9 +17,7 @@ TEST(BasicTestSuite, BasicTest)
     auto start = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < 1000; ++i)
-    {
         task_manager.execute_task<false>(f);
-    }
 
     auto end = std::chrono::high_resolution_clock::now();
 
@@ -27,5 +25,4 @@ TEST(BasicTestSuite, BasicTest)
     std::cout << "Total exec time: " << duration.count() << "ms." << ENDL;
 
     std::cout << r << ENDL;
-
 }

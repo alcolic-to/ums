@@ -1,19 +1,19 @@
+#include <chrono>
 #include <cstdint>
+#include <exception>
 #include <iostream>
 #include <random>
-#include <chrono>
-#include <exception>
 #include <thread>
 
 #ifdef _WIN32
 #include <windows.h>
 #endif
 
-#include "worker.h"
+#include "io_api.h"
+#include "sync_api.h"
 #include "task_manager.h"
 #include "util.h"
-#include "sync_api.h"
-#include "io_api.h"
+#include "worker.h"
 
 using namespace std::chrono_literals;
 
@@ -33,21 +33,17 @@ void f1()
     int funcDur = random() % 11;
 
     int i = 0;
-    while (true)
-    {
+    while (true) {
         auto end = now();
 
         std::chrono::duration<double, std::milli> duration = end - start;
-        if (duration.count() > funcDur)
-        {
+        if (duration.count() > funcDur) {
             std::cout << "Task execution exceeded time limit of " << duration.count() << "ms.\n";
             break;
         }
 
         if (v[rand() % v.size()] == rand() % v.size() && i++ % 100 == 0)
-        {
             tls_worker->yield();
-        }
     }
 
     return;
@@ -60,11 +56,10 @@ ConditionalEvent e;
 uint64_t f3()
 {
     uint64_t first = 0, second = 1;
-    
+
     // Fibbonaci seq.
     //
-    for (uint64_t i = 2; i < 3000000000; ++i)
-    {
+    for (uint64_t i = 2; i < 3000000000; ++i) {
         uint64_t sum = first + second;
         first = second;
         second = sum;
@@ -90,8 +85,7 @@ uint64_t f4()
 
     // Fibbonaci seq.
     //
-    for (uint64_t i = 2; i < 10000000; ++i)
-    {
+    for (uint64_t i = 2; i < 10000000; ++i) {
         uint64_t sum = first + second;
         first = second;
         second = sum;
@@ -108,8 +102,7 @@ void ms3_function()
     uint64_t r = 0;
     auto start = now();
 
-    for (int i = 0; i < 1000; ++i)
-    {
+    for (int i = 0; i < 1000; ++i) {
         task_manager.execute_task<false>(f4);
         // std::cout << GetCurrentProcessorNumber() << "\n";
         // r += f4();
@@ -128,10 +121,10 @@ void ms3_function()
 void test_signal()
 {
     std::vector<std::thread> v;
-    
+
     for (int i = 0; i < 10; ++i)
-        v.push_back(std::thread{ thread_function });
-    
+        v.push_back(std::thread{thread_function});
+
     for (auto& it : v)
         it.join();
 
@@ -148,7 +141,10 @@ void sleep_test()
 
 #if defined _WIN32
 
-HANDLE file = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS | FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH, NULL);
+HANDLE file = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                         FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS | FILE_FLAG_OVERLAPPED |
+                             FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH,
+                         NULL);
 
 void single_read()
 {
@@ -188,7 +184,7 @@ void write_to_file()
     int max_file_size = write_size * 128;
 
     std::string io_str(write_size, 'a');
-    
+
     // for (int i = 0; i < 10; ++i)
     //     std::cout << prng.rand<uint64_t>() << "\n";
 
@@ -199,15 +195,15 @@ int main(int argc, char* argv[])
 {
     // for (int i = 0; i < 1024; ++i)
     //     task_manager.execute_task<true>(write_to_file);
-    // 
+    //
     // for (int i = 0; i < 1000 * 1024; ++i)
     //     task_manager.execute_task<true>(read_from_file);
 
     // task_manager.execute_task<false>(write_to_file);
     // task_manager.execute_task<false>(read_from_file);
 
-    // for (int i = 0; i < 10000000; ++i)
-    //     task_manager.execute_task<true>(f4);
+    for (int i = 0; i < 10000000; ++i)
+        task_manager.execute_task<true>(f4);
 
     // std::this_thread::sleep_for(1ms);
 

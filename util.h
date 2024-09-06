@@ -3,10 +3,10 @@
 #ifndef COS_UTIL_H
 #define COS_UTIL_H
 
-#include <cstdint>
-#include <type_traits>
 #include <chrono>
+#include <cstdint>
 #include <iostream>
+#include <type_traits>
 
 #define stringify2(x) #x
 #define stringify(x) stringify2(x)
@@ -15,7 +15,10 @@ using namespace std::chrono;
 using namespace std::chrono_literals;
 using Clock = steady_clock;
 
-inline auto now() { return Clock::now(); }
+inline auto now()
+{
+    return Clock::now();
+}
 
 // RAII stopwatch that uses steady_clock for time measurement.
 // You can pass Duration typename that you want to measure in. Default is milliseconds.
@@ -23,24 +26,20 @@ inline auto now() { return Clock::now(); }
 // at the beggining. For example:
 //
 // ... Code not measured ...
-// 
+//
 // {
 //     Stopwatch sw;
 //     ... Code that we want to measure ...
-// 
+//
 //     ... Measurement stops here.
 // }
-// 
+//
 // ... Code not measured ...
 //
-template <typename Duration = milliseconds>
-class Stopwatch
-{
+template<typename Duration = milliseconds>
+class Stopwatch {
 public:
-    Stopwatch(const std::string& name = "Stopwatch")
-        : m_name{ name }
-        , m_start{ now() }
-    { }
+    Stopwatch(const std::string& name = "Stopwatch") : m_name{name}, m_start{now()} {}
 
     ~Stopwatch()
     {
@@ -49,11 +48,14 @@ public:
     }
 
     void restart() { m_start = now(); }
+
     void stop() { m_end = now(); }
-    auto elapsed() const { return duration_cast<Duration>(m_end-m_start); }
+
+    auto elapsed() const { return duration_cast<Duration>(m_end - m_start); }
 
     std::string unit_name() const
     {
+        // clang-format off
         if      constexpr (std::is_same_v<Duration, hours>)        return "hour(s)";
         else if constexpr (std::is_same_v<Duration, minutes>)      return "minute(s)";
         else if constexpr (std::is_same_v<Duration, seconds>)      return "second(s)";
@@ -61,6 +63,7 @@ public:
         else if constexpr (std::is_same_v<Duration, microseconds>) return "microsecond(s)";
         else if constexpr (std::is_same_v<Duration, nanoseconds>)  return "nanosecond(s)";
         else                                                       return "unknown unit";
+        // clang-format on
     }
 
 private:

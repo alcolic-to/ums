@@ -1,26 +1,27 @@
+#include "worker.h"
+
 #include <iostream>
 
-#include "worker.h"
 #include "cpu.h"
+#include "io_api.h"
 #include "os_specific.h"
 #include "scheduler.h"
 #include "sync_api.h"
-#include "io_api.h"
 
 // Creates worker object and starts worker thread on a provided CPU.
 // We will wait for a signal from created thread, so we can continue when it is ready.
 //
 Worker::Worker(uint64_t id, Scheduler& scheduler)
-    : m_id{ id }
-    , m_state{ State::initializing }
-    , m_running{ true }
-    , m_cond_event{ nullptr }
-    , m_timed_event{ nullptr }
-    , m_scheduler{ scheduler }
-    , m_thread{ &Worker::entry_point, this }
+    : m_id{id}
+    , m_state{State::initializing}
+    , m_running{true}
+    , m_cond_event{nullptr}
+    , m_timed_event{nullptr}
+    , m_scheduler{scheduler}
+    , m_thread{&Worker::entry_point, this}
 {
-    std::unique_lock<std::mutex> lock{ m_scheduler.m_workers_mtx };
-    m_cv.wait(lock, [&] { return !m_running; } );
+    std::unique_lock<std::mutex> lock{m_scheduler.m_workers_mtx};
+    m_cv.wait(lock, [&] { return !m_running; });
 }
 
 Worker::~Worker()
@@ -51,8 +52,7 @@ void Worker::yield()
 //
 void Worker::wait_event(ConditionalEvent* event)
 {
-    if (!event->check())
-    {
+    if (!event->check()) {
         m_cond_event = event;
         m_scheduler.sync<SyncCtx::wait_event>(this);
     }
@@ -66,7 +66,8 @@ void Worker::wait_sleep(TimedEvent* event)
 
 void Worker::read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
 {
-    m_io_request = std::make_unique<IO_Request>(file_handle, buffer, nbytes, offset, IO_Request::Type::read);
+    m_io_request =
+        std::make_unique<IO_Request>(file_handle, buffer, nbytes, offset, IO_Request::Type::read);
 
     if (m_io_request->m_state == IO_Request::State::pending)
         m_scheduler.sync<SyncCtx::io>(this);
@@ -74,7 +75,8 @@ void Worker::read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_
 
 void Worker::write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
 {
-    m_io_request = std::make_unique<IO_Request>(file_handle, buffer, nbytes, offset, IO_Request::Type::write);
+    m_io_request =
+        std::make_unique<IO_Request>(file_handle, buffer, nbytes, offset, IO_Request::Type::write);
 
     if (m_io_request->m_state == IO_Request::State::pending)
         m_scheduler.sync<SyncCtx::io>(this);
@@ -89,7 +91,7 @@ void Worker::notify([[maybe_unused]] std::unique_lock<std::mutex>& lock)
 void Worker::wait(std::unique_lock<std::mutex>& lock)
 {
     m_running = false;
-    m_cv.wait(lock, [&] { return m_running; } );
+    m_cv.wait(lock, [&] { return m_running; });
 }
 
 void Worker::entry_point()
@@ -109,19 +111,16 @@ void Worker::main_loop()
 {
     tls_worker = this;
 
-    while (true)
-    {
+    while (true) {
         m_scheduler.sync<SyncCtx::main>(this);
 
         if (exit())
             return;
 
-        try
-        {
+        try {
             m_task->m_func();
         }
-        catch (const std::exception& ex)
-        {
+        catch (const std::exception& ex) {
             std::cout << ex.what() << "\n";
         }
 

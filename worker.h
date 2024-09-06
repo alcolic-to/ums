@@ -8,20 +8,28 @@
 #include <mutex>
 #include <thread>
 
-#include "task_manager.h"
 #include "os_specific.h"
+#include "task_manager.h"
 
 class Scheduler;
 class TimedEvent;
 class ConditionalEvent;
 
-// TODO: Check whether worker should be placed on std::hardware_constructive_interference_size alignment,
-// to avoid false sharing.
+// TODO: Check whether worker should be placed on std::hardware_constructive_interference_size
+// alignment, to avoid false sharing.
 //
-class Worker final
-{
+class Worker final {
 public:
-    enum class State : int { initializing, idle, waiting, pending_io, runnable, sleeping , running, exiting };
+    enum class State : int {
+        initializing,
+        idle,
+        waiting,
+        pending_io,
+        runnable,
+        sleeping,
+        running,
+        exiting
+    };
 
     // Create worker object and start worker thread on a provided CPU.
     //
@@ -50,12 +58,12 @@ public:
     void wait(std::unique_lock<std::mutex>& lock);
 
     constexpr uint64_t id() const { return m_id; }
+
     constexpr State state() const { return m_state; }
 
     bool exit() const;
 
 public:
-
     // TODO: reorganize data members for quick access.
     //
     std::condition_variable m_cv;

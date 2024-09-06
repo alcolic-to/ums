@@ -3,15 +3,15 @@
 #ifndef COS_SCHEDULER_H
 #define COS_SCHEDULER_H
 
-#include <memory>
-#include <vector>
+#include <atomic>
 #include <deque>
 #include <list>
+#include <memory>
 #include <mutex>
-#include <atomic>
+#include <vector>
 
-#include "worker.h" // This can be moved and class Worker can be forward declared if we dispose Worker::State.
 #include "task_manager.h"
+#include "worker.h" // This can be moved and class Worker can be forward declared if we dispose Worker::State.
 
 class CPUs;
 class CPU;
@@ -20,8 +20,7 @@ class CPU;
 //
 enum class SyncCtx : int { main, yield, wait_event, io, wait_sleep };
 
-class Scheduler final
-{
+class Scheduler final {
 public:
     enum class State : int { initializing, running, exiting };
 

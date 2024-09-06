@@ -4,13 +4,12 @@
 #define COS_CPU_H
 
 #include <cstdint>
-#include <vector>
 #include <memory>
+#include <vector>
 
 #include "scheduler.h"
 
-class CPU final
-{
+class CPU final {
 public:
     CPU(uint64_t cpu_id, uint64_t cpu_mask);
 
@@ -21,8 +20,7 @@ public:
     Scheduler m_scheduler;
 };
 
-class CPUs final
-{
+class CPUs final {
 public:
     CPUs();
 

@@ -1,9 +1,10 @@
-#include <cstdint>
-#include <iostream>
-#include <cassert>
-#include <exception>
-
 #include "os_specific.h"
+
+#include <cassert>
+#include <cstdint>
+#include <exception>
+#include <iostream>
+
 #include "io_api.h"
 
 // OS specific preprocessor definitions.
@@ -55,7 +56,8 @@ uint64_t cpus_avail_mask()
 
     GetProcessAffinityMask(GetCurrentProcess(), &procCpuMask, &allCpusMask);
 
-    std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask << ENDL;
+    std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask
+              << ENDL;
 
     return procCpuMask;
 }
@@ -74,12 +76,12 @@ OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl)
 
 void read_file(IO_Request& io)
 {
-    DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+    DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes),
+                                            nullptr, to_ol_ptr(io.m_control)));
 
     // std::cout << "ReadFile: " << read_res << "\n";
 
-    switch (read_res)
-    {
+    switch (read_res) {
     case (ERROR_SUCCESS):
         io.m_state = IO_Request::State::completed;
         break;
@@ -94,12 +96,12 @@ void read_file(IO_Request& io)
 
 void write_file(IO_Request& io)
 {
-    DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes), nullptr, to_ol_ptr(io.m_control)));
+    DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes),
+                                              nullptr, to_ol_ptr(io.m_control)));
 
     // std::cout << "WriteFile: " << write_res << "\n";
 
-    switch (write_res)
-    {
+    switch (write_res) {
     case (ERROR_SUCCESS):
         io.m_state = IO_Request::State::completed;
         break;
@@ -119,19 +121,18 @@ bool io_completed(IO_Control& io_control)
 
 void update_io_state(IO_Request& io)
 {
-    if (io.pending() && !io_completed(io.m_control))
-    {
+    if (io.pending() && !io_completed(io.m_control)) {
         // std::cout << "IO still pending...\n";
         return;
     }
 
     DWORD bytes = 0;
-    DWORD ol_res = bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_control), &bytes, false));
+    DWORD ol_res = bool_to_error(
+        GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_control), &bytes, false));
 
     // std::cout << "GetOverlappedResult: " << ol_res << ", bytes : " << bytes << "\n";
 
-    switch (ol_res)
-    {
+    switch (ol_res) {
     case (ERROR_SUCCESS):
         io.m_state = IO_Request::State::completed;
         break;
@@ -146,9 +147,9 @@ void update_io_state(IO_Request& io)
 
 #elif defined(OS_LINUX)
 
-#include <unistd.h>
-#include <sched.h>
 #include <cstring>
+#include <sched.h>
+#include <unistd.h>
 
 uint32_t cpus_count()
 {
@@ -162,8 +163,7 @@ uint64_t cpus_avail_mask()
     CPU_ZERO(&mask);
     uint64_t cpu_mask = 0;
 
-    if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1)
-    {
+    if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1) {
         std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << ENDL;
         return -1;
     }
@@ -171,10 +171,8 @@ uint64_t cpus_avail_mask()
     int num_cores = CPU_COUNT(&mask);
     std::cout << "Process is allowed to run on " << num_cores << " cores." << ENDL;
 
-    for (std::size_t i = 0; i < cpus_count(); ++i)
-    {
-        if (CPU_ISSET(i, &mask))
-        {
+    for (std::size_t i = 0; i < cpus_count(); ++i) {
+        if (CPU_ISSET(i, &mask)) {
             std::cout << "CPU " << i << " is available." << ENDL;
             cpu_mask |= (1 << i);
         }
@@ -187,14 +185,12 @@ uint64_t cpus_avail_mask()
 //
 void bind_thread(uint64_t cpu_mask)
 {
-    cpu_set_t mask; 
+    cpu_set_t mask;
     CPU_ZERO(&mask);
 
     for (std::size_t i = 0; i < cpus_count(); ++i)
-    {
         if (cpu_mask & (1 << i))
             CPU_SET(i, &mask);
-    }
 
     pthread_t current_thread = pthread_self();
     if (pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
@@ -214,18 +210,31 @@ void print_thread_affinity()
 
     std::cout << "Thread affinity: ";
     for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
-    {
         if (CPU_ISSET(i, &mask))
             std::cout << i << " ";
-    }
 
     std::cout << ENDL;
 }
 
-void read_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
-void write_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
-bool io_completed(IO_Control& io_control) { throw std::logic_error{ "Not implemented" }; }
-void update_io_state(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
+void read_file(IO_Request& io)
+{
+    throw std::logic_error{"Not implemented"};
+}
+
+void write_file(IO_Request& io)
+{
+    throw std::logic_error{"Not implemented"};
+}
+
+bool io_completed(IO_Control& io_control)
+{
+    throw std::logic_error{"Not implemented"};
+}
+
+void update_io_state(IO_Request& io)
+{
+    throw std::logic_error{"Not implemented"};
+}
 
 #elif defined(OS_MAC)
 #include <sys/sysctl.h>
@@ -234,21 +243,16 @@ uint32_t cpus_count()
 {
     int num_cpu;
     size_t len = sizeof(num_cpu);
-    int mib[2] = { CTL_HW, HW_AVAILCPU };
+    int mib[2] = {CTL_HW, HW_AVAILCPU};
 
-    if (sysctl(mib, 2, &num_cpu, &len, nullptr, 0) == -1)
-    {
+    if (sysctl(mib, 2, &num_cpu, &len, nullptr, 0) == -1) {
         mib[1] = HW_NCPU;
         if (sysctl(mib, 2, &num_cpu, &len, nullptr, 0) == -1)
-        {
             return num_cpu = 1;
-        }
     }
 
     if (num_cpu < 1)
-    {
         num_cpu = 1;
-    }
 
     return std::min(static_cast<uint32_t>(num_cpu), MAX_CPUS);
 }
@@ -270,10 +274,25 @@ void bind_thread(uint64_t cpu_mask)
     return;
 }
 
-void read_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
-void write_file(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
-bool io_completed(IO_Control& io_control) { throw std::logic_error{ "Not implemented" }; }
-void update_io_state(IO_Request& io) { throw std::logic_error{ "Not implemented" }; }
+void read_file(IO_Request& io)
+{
+    throw std::logic_error{"Not implemented"};
+}
+
+void write_file(IO_Request& io)
+{
+    throw std::logic_error{"Not implemented"};
+}
+
+bool io_completed(IO_Control& io_control)
+{
+    throw std::logic_error{"Not implemented"};
+}
+
+void update_io_state(IO_Request& io)
+{
+    throw std::logic_error{"Not implemented"};
+}
 
 #else
 static_assert(!"Unknown OS.");

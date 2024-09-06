@@ -5,22 +5,21 @@
 
 #include <cstdint>
 
-#include <cstdint>
-
-struct Overlapped final
-{
+struct Overlapped final {
     unsigned long long m_internal, m_internal_high;
-    union
-    {
-        struct { unsigned long m_offset, m_offset_high; };
+
+    union {
+        struct {
+            unsigned long m_offset, m_offset_high;
+        };
+
         void* m_ptr;
     };
 
     void* m_event;
 };
 
-struct IO_Control final
-{
+struct IO_Control final {
 public:
     IO_Control(uint64_t offset) : m_ol{}
     {
@@ -31,8 +30,7 @@ public:
     Overlapped m_ol;
 };
 
-class IO_Request final
-{
+class IO_Request final {
 public:
     enum class Type : int { read, write };
     enum class State : int { init, error, pending, completed };
@@ -40,8 +38,11 @@ public:
     IO_Request(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset, Type type);
 
     bool completed() const { return m_state == State::completed; }
+
     bool pending() const { return m_state == State::pending; }
+
     bool error() const { return m_state == State::error; }
+
     void update();
 
     void* m_file_handle;

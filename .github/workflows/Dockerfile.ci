@@ -1,0 +1,3 @@
+ARG GIT_SHA
+
+RUN echo $GIT_SHA

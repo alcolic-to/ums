@@ -1,0 +1,21 @@
+name: Docker Build
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build and export CI Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .github
+          file: .github/Dockerfile.ci
+          push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ env.CI_IMAGE_NAME}}:${{ github.sha }}

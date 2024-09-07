@@ -3,18 +3,22 @@
 #ifndef COS_CPU_H
 #define COS_CPU_H
 
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <vector>
 
 #include "scheduler.h"
+#include "config.h"
+
+using Cpu_Mask = std::bitset<CFG_max_cpu_count>;
 
 class CPU final {
 public:
-    CPU(uint64_t cpu_id, uint64_t cpu_mask);
+    CPU(uint64_t cpu_id, Cpu_Mask cpu_mask);
 
     uint64_t m_id;
-    uint64_t m_mask;
+    Cpu_Mask m_mask;
 
     Scheduler m_scheduler;
 };
@@ -27,7 +31,7 @@ public:
 
 private:
     uint32_t m_system_cpus_count;
-    uint64_t m_avail_cpus_mask;
+    Cpu_Mask m_avail_cpus_mask;
     std::vector<std::unique_ptr<CPU>> m_cpus;
 };
 

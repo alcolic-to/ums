@@ -100,7 +100,7 @@ void Worker::wait(std::unique_lock<std::mutex>& lock)
 
 void Worker::entry_point()
 {
-    bind_thread(m_scheduler.m_cpu.m_mask);
+    bind_thread(m_scheduler.m_cpu.m_mask.to_ullong());
 
     std::cout << "Started thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
 

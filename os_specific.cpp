@@ -34,7 +34,7 @@ constexpr uint32_t MAX_CPUS = 64;
 
 // Helper function for getting result from win32 API.
 //
-DWORD bool_to_error(bool b)
+DWORD bool_to_error(bool b) // NOLINT
 {
     return b ? ERROR_SUCCESS : GetLastError();
 }
@@ -76,8 +76,9 @@ OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl)
 
 void read_file(IO_Request& io)
 {
-    DWORD read_res = bool_to_error(ReadFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes),
-                                            nullptr, to_ol_ptr(io.m_control)));
+    DWORD read_res = bool_to_error(
+        bool(ReadFile(io.m_file_handle, io.m_io_buffer.m_buffer, DWORD(io.m_io_buffer.m_size),
+                      nullptr, to_ol_ptr(io.m_control))));
 
     // std::cout << "ReadFile: " << read_res << "\n";
 
@@ -96,8 +97,9 @@ void read_file(IO_Request& io)
 
 void write_file(IO_Request& io)
 {
-    DWORD write_res = bool_to_error(WriteFile(io.m_file_handle, io.m_buffer, DWORD(io.m_nbytes),
-                                              nullptr, to_ol_ptr(io.m_control)));
+    DWORD write_res = bool_to_error(
+        bool(WriteFile(io.m_file_handle, io.m_io_buffer.m_buffer, DWORD(io.m_io_buffer.m_size),
+                       nullptr, to_ol_ptr(io.m_control))));
 
     // std::cout << "WriteFile: " << write_res << "\n";
 

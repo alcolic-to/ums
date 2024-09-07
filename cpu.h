@@ -13,7 +13,6 @@ class CPU final {
 public:
     CPU(uint64_t cpu_id, uint64_t cpu_mask);
 
-public:
     uint64_t m_id;
     uint64_t m_mask;
 

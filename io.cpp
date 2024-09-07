@@ -4,10 +4,9 @@
 #include "os_specific.h"
 #include "worker.h"
 
-IO_Request::IO_Request(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset, Type type)
+IO_Request::IO_Request(void* file_handle, IO_Buffer buffer, uint64_t offset, Type type)
     : m_file_handle{file_handle}
-    , m_buffer{buffer}
-    , m_nbytes{nbytes}
+    , m_io_buffer{buffer}
     , m_offset{offset}
     , m_control{offset}
     , m_type{type}
@@ -24,12 +23,12 @@ void IO_Request::update()
     update_io_state(*this);
 }
 
-void cos_read_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
+void cos_read_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
 {
-    tls_worker->read_file(file_handle, buffer, nbytes, offset);
+    tls_worker->read_file(file_handle, buffer, offset);
 }
 
-void cos_write_file(void* file_handle, void* buffer, uint64_t nbytes, uint64_t offset)
+void cos_write_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
 {
-    tls_worker->write_file(file_handle, buffer, nbytes, offset);
+    tls_worker->write_file(file_handle, buffer, offset);
 }

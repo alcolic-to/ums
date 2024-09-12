@@ -4,7 +4,10 @@
 
 class PRNG {
 public:
-    PRNG(uint64_t seed) : m_seed{seed} {}
+    explicit PRNG(uint64_t seed = uint64_t(now().time_since_epoch().count())) noexcept
+        : m_seed{seed}
+    {
+    }
 
     template<typename T>
     T rand()
@@ -15,19 +18,17 @@ public:
 private:
     uint64_t rand64()
     {
-        m_seed ^= m_seed >> 12, m_seed ^= m_seed << 25, m_seed ^= m_seed >> 27;
-        return m_seed * 2685821657736338717LL;
+        m_seed ^= m_seed >> 12, m_seed ^= m_seed << 25, m_seed ^= m_seed >> 27; // NOLINT
+        return m_seed * 2685821657736338717LL;                                  // NOLINT
     }
 
     uint64_t m_seed;
 };
 
-static PRNG prng{uint64_t(now().time_since_epoch().count())};
-
 template<typename T>
 T random()
 {
-    return prng.rand<T>();
+    return PRNG{}.rand<T>();
 }
 
 template uint8_t random<uint8_t>();

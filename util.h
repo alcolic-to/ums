@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iostream>
 #include <type_traits>
+#include <utility>
 
 #define stringify2(x) #x
 #define stringify(x) stringify2(x)
@@ -15,7 +16,7 @@ using namespace std::chrono;
 using namespace std::chrono_literals;
 using Clock = steady_clock;
 
-inline auto now()
+inline auto now() noexcept
 {
     return Clock::now();
 }
@@ -39,7 +40,7 @@ inline auto now()
 template<typename Duration = milliseconds>
 class Stopwatch {
 public:
-    Stopwatch(const std::string& name = "Stopwatch") : m_name{name}, m_start{now()} {}
+    explicit Stopwatch(std::string name = "Stopwatch") : m_name{std::move(name)}, m_start{now()} {}
 
     ~Stopwatch()
     {
@@ -47,13 +48,18 @@ public:
         std::cout << m_name << " elapsed time: " << elapsed().count() << " " << unit_name() << "\n";
     }
 
+    Stopwatch(const Stopwatch& rhs) = delete;
+    Stopwatch& operator=(const Stopwatch& rhs) = delete;
+    Stopwatch(Stopwatch&& rhs) noexcept = delete;
+    Stopwatch& operator=(Stopwatch&& rhs) = delete;
+
     void restart() { m_start = now(); }
 
     void stop() { m_end = now(); }
 
     auto elapsed() const { return duration_cast<Duration>(m_end - m_start); }
 
-    std::string unit_name() const
+    [[nodiscard]] std::string unit_name() const
     {
         // clang-format off
         if      constexpr (std::is_same_v<Duration, hours>)        return "hour(s)";

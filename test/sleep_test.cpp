@@ -8,6 +8,8 @@
 
 using namespace std::chrono_literals;
 
+// NOLINTBEGIN
+
 void sleep_test()
 {
     cos_sleep(1000ms);
@@ -24,3 +26,5 @@ TEST(Sleep, SimpleSleepTest)
     auto diff = 10000ms - (end - start);
     ASSERT_LE(std::chrono::abs(diff), 100ms);
 }
+
+// NOLINTEND

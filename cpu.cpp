@@ -7,7 +7,12 @@
 #include "config.h"
 #include "os_specific.h"
 
-CPU::CPU(uint64_t cpu_id, Cpu_Mask cpu_mask) : m_id{cpu_id}, m_mask{cpu_mask}, m_scheduler{*this} {}
+CPU::CPU(uint64_t cpu_id, Cpu_Mask cpu_mask) noexcept
+    : m_id{cpu_id}
+    , m_mask{cpu_mask}
+    , m_scheduler{*this}
+{
+}
 
 // Creates new CPU for each bit available in available CPUs mask.
 //
@@ -22,13 +27,14 @@ CPUs::CPUs() : m_system_cpus_count{cpus_count()}, m_avail_cpus_mask{cpus_avail_m
 
 Scheduler& CPUs::min_load_scheduler() const
 {
-    constexpr auto cmp = [](const std::unique_ptr<CPU>& left, const std::unique_ptr<CPU>& right) {
+    // NOLINTNEXTLINE(readability-suspicious-call-argument)
+    const auto cmp = [](const auto& left, const auto& right) {
         return left->m_scheduler.load() < right->m_scheduler.load();
     };
 
     return (*std::min_element(m_cpus.begin(), m_cpus.end(), cmp))->m_scheduler;
 }
 
-// Global cpus.
+// Global CPUs.
 //
 CPUs cpus;

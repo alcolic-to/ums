@@ -1,3 +1,6 @@
+// NOLINTBEGIN
+
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <iostream>
@@ -98,7 +101,6 @@ uint64_t f4()
 
 void ms3_function()
 {
-    uint64_t r = 0;
     auto start = now();
 
     for (int i = 0; i < 1000; ++i) {
@@ -148,7 +150,6 @@ HANDLE file = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, N
 void single_read()
 {
     constexpr int read_size = 8 * 1024;
-    int max_read_size = read_size * 128;
 
     auto buf = std::make_unique<char[]>(read_size);
 
@@ -159,7 +160,6 @@ void single_read()
 void single_write()
 {
     int write_size = 8 * 1024;
-    int max_file_size = write_size * 128;
 
     std::string io_str(write_size, 'a');
 
@@ -169,7 +169,6 @@ void single_write()
 void read_from_file()
 {
     constexpr int read_size = 8 * 1024;
-    int max_read_size = read_size * 128;
 
     auto buf = std::make_unique<char[]>(read_size);
 
@@ -187,8 +186,20 @@ void write_to_file()
     // for (int i = 0; i < 10; ++i)
     //     std::cout << prng.rand<uint64_t>() << "\n";
 
-    cos_write_file(file, {io_str.data(), io_str.size()}, (random() % max_file_size) * io_str.size());
+    cos_write_file(file, {io_str.data(), io_str.size()},
+                   (random() % max_file_size) * io_str.size());
 }
+
+class my_mutex : public std::mutex {
+public:
+    my_mutex() = default;
+
+    void lock() { std::mutex::lock(); };
+
+    void unlock() { std::mutex::unlock(); };
+
+    bool try_lock() { return std::mutex::try_lock(); };
+};
 
 int main(int argc, char* argv[])
 {
@@ -215,6 +226,11 @@ int main(int argc, char* argv[])
 
     // for (int i = 0; i < 100; ++i)
     //     std::cout << random() << std::endl;
+
+    my_mutex mtx;
+
+    std::unique_lock<my_mutex> o{mtx};
+    std::scoped_lock<my_mutex> lock(mtx);
 }
 
 #else
@@ -228,3 +244,5 @@ int main(int argc, char* argv[])
 }
 
 #endif
+
+// NOLINTEND

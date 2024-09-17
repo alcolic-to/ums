@@ -45,11 +45,11 @@ public:
 
     IO_Request(void* file_handle, IO_Buffer buffer, uint64_t offset, Type type);
 
-    bool completed() const { return m_state == State::completed; }
+    [[nodiscard]] bool completed() const { return m_state == State::completed; }
 
-    bool pending() const { return m_state == State::pending; }
+    [[nodiscard]] bool pending() const { return m_state == State::pending; }
 
-    bool error() const { return m_state == State::error; }
+    [[nodiscard]] bool error() const { return m_state == State::error; }
 
     void update();
 

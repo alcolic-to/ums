@@ -2,6 +2,7 @@
 
 // #include <iostream>
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -20,7 +21,7 @@ Scheduler::Scheduler(const CPU& cpu)
     , m_workers_started{false}
     , m_load{0}
 {
-    for (int i = 0; i < CFG_workers_per_cpu; ++i)
+    for (uint32_t i = 0; i < CFG_workers_per_cpu; ++i)
         m_workers.push_back(std::make_unique<Worker>(i, *this));
 
     std::unique_lock<std::mutex> lock{m_workers_mtx};
@@ -98,15 +99,15 @@ void Scheduler::prepare_next_worker()
     m_worker->set_state(Worker::State::running);
 }
 
-void Scheduler::enqueue_task(std::shared_ptr<Task> task)
+void Scheduler::enqueue_task(const std::shared_ptr<Task>& task)
 {
-    std::scoped_lock<std::mutex> lock{m_tasks_mtx};
+    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
     m_tasks.push_back(task);
 }
 
 std::shared_ptr<Task> Scheduler::next_task()
 {
-    std::scoped_lock<std::mutex> lock{m_tasks_mtx};
+    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
     std::shared_ptr<Task> t = m_tasks.front();
     m_tasks.pop_front();
 
@@ -115,7 +116,7 @@ std::shared_ptr<Task> Scheduler::next_task()
 
 bool Scheduler::has_tasks()
 {
-    std::scoped_lock<std::mutex> lock{m_tasks_mtx};
+    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
     return !m_tasks.empty();
 }
 
@@ -202,9 +203,9 @@ void Scheduler::schedule()
         schedule_workers();
     }
 
-    if (should_exit())
+    if (should_exit()) [[unlikely]]
         exit_workers();
-    else
+    else [[likely]]
         prepare_next_worker();
 }
 
@@ -248,50 +249,39 @@ void Scheduler::idle_sleep()
     // std::cout << "Sleep duration: " << duration.count() << "ms.\n";
 }
 
-bool Scheduler::initializing() const
-{
-    return m_state == State::initializing;
-}
-
-bool Scheduler::exiting() const
-{
-    return m_state == State::exiting;
-}
-
 void Scheduler::set_state(State state)
 {
     m_state = state;
 }
 
-Worker* Scheduler::worker() const
-{
-    return m_worker;
-}
-
+// NOLINTBEGIN
+// clang-format off
 class Scheduler_Loads {
 public:
+    static constexpr int loads_size = int(Worker::State::exiting) + 1;
+
     constexpr inline Scheduler_Loads()
     {
-        // clang-format off
         m_loads[int(Worker::State::initializing)] =  0;
-        m_loads[int(Worker::State::idle)] =          0;
-        m_loads[int(Worker::State::waiting)] =       1;
-        m_loads[int(Worker::State::pending_io)] =    2;
-        m_loads[int(Worker::State::runnable)] =     10;
-        m_loads[int(Worker::State::running)] =      10;
-        m_loads[int(Worker::State::exiting)] =      0;
-        // clang-format on
+        m_loads[int(Worker::State::idle)]         =  0;
+        m_loads[int(Worker::State::waiting)]      =  1;
+        m_loads[int(Worker::State::sleeping)]     =  1;
+        m_loads[int(Worker::State::pending_io)]   =  2;
+        m_loads[int(Worker::State::runnable)]     = 10;
+        m_loads[int(Worker::State::running)]      = 10;
+        m_loads[int(Worker::State::exiting)]      =  0;
     }
 
     constexpr inline int operator[](const Worker::State state) const { return m_loads[int(state)]; }
 
 private:
-    int m_loads[int(Worker::State::exiting) + 1] = {0};
+    std::array<int, loads_size> m_loads{};
 };
 
-static constexpr Scheduler_Loads Loads;
+// clang-format on
+// NOLINTEND
 
-static_assert(Loads[Worker::State::runnable] == 10);
+static constexpr Scheduler_Loads Loads;
 
 // Sets new scheduler load based on previous and new worker state.
 //
@@ -337,14 +327,14 @@ void Scheduler::context_switch(Worker* prev_worker)
 //
 bool Scheduler::sync_init(Worker* worker)
 {
-    if (!initializing())
+    if (!initializing()) [[likely]]
         return true; // proceed with scheduling.
 
     std::unique_lock<std::mutex> lock{m_workers_mtx};
     worker->notify(lock); // Notify scheduler thread that created us to continue
     worker->wait(lock);   // and go to sleep.
 
-    return m_workers_started ? false : m_workers_started = true;
+    return m_workers_started ? false : (m_workers_started = true);
 }
 
 // Save worker to proper queue based on synchronization context.
@@ -353,7 +343,10 @@ template<SyncCtx ctx>
 void Scheduler::save_worker(Worker* worker)
 {
     if constexpr (ctx == SyncCtx::main)
-        initializing() ? save_idle<true>(worker) : save_idle<false>(worker);
+        if (initializing()) [[unlikely]]
+            save_idle<true>(worker);
+        else [[likely]]
+            save_idle<false>(worker);
     else if constexpr (ctx == SyncCtx::yield)
         save_runnable(worker);
     else if constexpr (ctx == SyncCtx::wait_event)
@@ -373,7 +366,7 @@ void Scheduler::sync(Worker* worker)
 {
     save_worker<ctx>(worker);
 
-    if (!sync_init(worker))
+    if (!sync_init(worker)) [[unlikely]]
         return;
 
     schedule();

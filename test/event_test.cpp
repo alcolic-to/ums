@@ -9,6 +9,8 @@
 #include "sync_api.h"
 #include "task_manager.h"
 
+// NOLINTBEGIN
+
 ConditionalEvent e1;
 ConditionalEvent e2;
 ConditionalEvent e3;
@@ -69,3 +71,5 @@ TEST(Event, SimpleTest)
     ASSERT_EQ(v[1], 1);
     ASSERT_EQ(v[2], 3);
 }
+
+// NOLINTEND

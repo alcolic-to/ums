@@ -24,8 +24,14 @@ class Scheduler final {
 public:
     enum class State : int { initializing, running, exiting };
 
-    Scheduler(const CPU& cpu);
+    explicit Scheduler(const CPU& cpu);
     ~Scheduler();
+
+    Scheduler(const Scheduler&) = delete;
+    Scheduler& operator=(const Scheduler&) = delete;
+
+    Scheduler(Scheduler&&) noexcept = delete;
+    Scheduler& operator=(Scheduler&&) = delete;
 
     bool has_idle_workers() const;
     bool has_runnable_workers() const;
@@ -42,7 +48,7 @@ public:
 
     void prepare_next_worker();
 
-    void enqueue_task(std::shared_ptr<Task> task);
+    void enqueue_task(const std::shared_ptr<Task>& task);
     std::shared_ptr<Task> next_task();
     bool has_tasks();
 
@@ -58,9 +64,11 @@ public:
 
     void idle_sleep();
 
-    bool exiting() const;
-    bool initializing() const;
-    Worker* worker() const;
+    [[nodiscard]] bool exiting() const { return m_state == State::exiting; }
+
+    [[nodiscard]] bool initializing() const { return m_state == State::initializing; }
+
+    [[nodiscard]] Worker* worker() const { return m_worker; }
 
     void set_state(State state);
 
@@ -82,7 +90,6 @@ public:
     void exit_workers();
     bool should_exit();
 
-public:
     const CPU& m_cpu;
 
     Worker* m_worker;

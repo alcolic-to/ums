@@ -8,9 +8,9 @@
 #include <mutex>
 #include <thread>
 
+#include "io_api.h"
 #include "os_specific.h"
 #include "task_manager.h"
-#include "io_api.h"
 
 class Scheduler;
 class TimedEvent;
@@ -25,9 +25,9 @@ public:
         initializing,
         idle,
         waiting,
+        sleeping,
         pending_io,
         runnable,
-        sleeping,
         running,
         exiting
     };
@@ -38,10 +38,11 @@ public:
 
     ~Worker();
 
-    Worker(const Worker& other) = delete;
-    Worker(const Worker&& other) = delete;
+    Worker(const Worker&) = delete;
+    Worker& operator=(const Worker&) = delete;
 
-    Worker& operator=(const Worker& other) = delete;
+    Worker(Worker&&) noexcept = delete;
+    Worker& operator=(Worker&&) = delete;
 
     void entry_point();
 
@@ -58,13 +59,12 @@ public:
     void notify(std::unique_lock<std::mutex>& lock);
     void wait(std::unique_lock<std::mutex>& lock);
 
-    constexpr uint64_t id() const { return m_id; }
+    [[nodiscard]] constexpr uint64_t id() const { return m_id; }
 
-    constexpr State state() const { return m_state; }
+    [[nodiscard]] constexpr State state() const { return m_state; }
 
-    bool exit() const;
+    [[nodiscard]] bool exit() const;
 
-public:
     // TODO: reorganize data members for quick access.
     //
     std::condition_variable m_cv;

@@ -19,10 +19,10 @@ private:
 
 class TimedEvent final {
 public:
-    TimedEvent(milliseconds time_to_sleep);
+    explicit TimedEvent(milliseconds time_to_sleep);
     virtual void wait();
     virtual void signal();
-    virtual bool check() const;
+    [[nodiscard]] virtual bool check() const;
 
 private:
     Clock::time_point m_start_time;

@@ -8,14 +8,14 @@
 #include <memory>
 #include <vector>
 
-#include "scheduler.h"
 #include "config.h"
+#include "scheduler.h"
 
 using Cpu_Mask = std::bitset<CFG_max_cpu_count>;
 
 class CPU final {
 public:
-    CPU(uint64_t cpu_id, Cpu_Mask cpu_mask);
+    CPU(uint64_t cpu_id, Cpu_Mask cpu_mask) noexcept;
 
     uint64_t m_id;
     Cpu_Mask m_mask;
@@ -27,7 +27,7 @@ class CPUs final {
 public:
     CPUs();
 
-    Scheduler& min_load_scheduler() const;
+    [[nodiscard]] Scheduler& min_load_scheduler() const;
 
 private:
     uint32_t m_system_cpus_count;

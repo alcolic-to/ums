@@ -205,7 +205,7 @@ int main(int argc, char* argv[])
 {
     // for (int i = 0; i < 1024; ++i)
     //     task_manager.execute_task<true>(write_to_file);
-    //
+
     // for (int i = 0; i < 1000 * 1024; ++i)
     //     task_manager.execute_task<true>(read_from_file);
 
@@ -227,10 +227,10 @@ int main(int argc, char* argv[])
     // for (int i = 0; i < 100; ++i)
     //     std::cout << random() << std::endl;
 
-    my_mutex mtx;
-
-    std::unique_lock<my_mutex> o{mtx};
-    std::scoped_lock<my_mutex> lock(mtx);
+    // my_mutex mtx;
+    //
+    // std::unique_lock<my_mutex> o{mtx};
+    // std::scoped_lock<my_mutex> lock(mtx);
 }
 
 #else

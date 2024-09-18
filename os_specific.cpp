@@ -1,8 +1,7 @@
 #include "os_specific.h"
 
-#include <cassert>
+#include <bit>
 #include <cstdint>
-#include <exception>
 #include <iostream>
 
 #include "io_api.h"
@@ -19,13 +18,13 @@
 #define OS_UNKNOWN
 #endif
 
-#define ENDL '\n'
-
-constexpr uint32_t MAX_CPUS = 64;
+constexpr char ENDL = '\n';
 
 // Windows implementations.
 //
 #if defined(OS_WINDOWS)
+
+// NOLINTBEGIN(misc-include-cleaner)
 
 // Reduce size of windows.h includes and include windows.
 //
@@ -34,9 +33,9 @@ constexpr uint32_t MAX_CPUS = 64;
 
 // Helper function for getting result from win32 API.
 //
-DWORD bool_to_error(bool b) // NOLINT
+DWORD bool_to_error(BOOL b) // NOLINT
 {
-    return b ? ERROR_SUCCESS : GetLastError();
+    return b != 0 ? ERROR_SUCCESS : GetLastError();
 }
 
 // Returns number of CPUs in the system.
@@ -71,14 +70,14 @@ void bind_thread(uint64_t cpu_mask)
 
 OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl)
 {
-    return reinterpret_cast<OVERLAPPED*>(&io_ctrl.m_ol);
+    return std::bit_cast<OVERLAPPED*>(&io_ctrl.m_ol);
 }
 
 void read_file(IO_Request& io)
 {
-    DWORD read_res = bool_to_error(
-        bool(ReadFile(io.m_file_handle, io.m_io_buffer.m_buffer, DWORD(io.m_io_buffer.m_size),
-                      nullptr, to_ol_ptr(io.m_control))));
+    const DWORD read_res =
+        bool_to_error(ReadFile(io.m_file_handle, io.m_io_buffer.m_buffer,
+                               DWORD(io.m_io_buffer.m_size), nullptr, to_ol_ptr(io.m_control)));
 
     // std::cout << "ReadFile: " << read_res << "\n";
 
@@ -97,9 +96,9 @@ void read_file(IO_Request& io)
 
 void write_file(IO_Request& io)
 {
-    DWORD write_res = bool_to_error(
-        bool(WriteFile(io.m_file_handle, io.m_io_buffer.m_buffer, DWORD(io.m_io_buffer.m_size),
-                       nullptr, to_ol_ptr(io.m_control))));
+    const DWORD write_res =
+        bool_to_error(WriteFile(io.m_file_handle, io.m_io_buffer.m_buffer,
+                                DWORD(io.m_io_buffer.m_size), nullptr, to_ol_ptr(io.m_control)));
 
     // std::cout << "WriteFile: " << write_res << "\n";
 
@@ -129,8 +128,8 @@ void update_io_state(IO_Request& io)
     }
 
     DWORD bytes = 0;
-    DWORD ol_res = bool_to_error(
-        GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_control), &bytes, false));
+    const DWORD ol_res =
+        bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_control), &bytes, 0));
 
     // std::cout << "GetOverlappedResult: " << ol_res << ", bytes : " << bytes << "\n";
 
@@ -147,6 +146,8 @@ void update_io_state(IO_Request& io)
     }
 }
 
+// NOLINTEND(misc-include-cleaner)
+
 #elif defined(OS_LINUX)
 
 #include <cstring>
@@ -155,7 +156,7 @@ void update_io_state(IO_Request& io)
 
 uint32_t cpus_count()
 {
-    return std::min(MAX_CPUS, static_cast<std::uint32_t>(sysconf(_SC_NPROCESSORS_ONLN)));
+    return sysconf(_SC_NPROCESSORS_ONLN);
 }
 
 uint64_t cpus_avail_mask()
@@ -239,6 +240,7 @@ void update_io_state(IO_Request& io)
 }
 
 #elif defined(OS_MAC)
+#include <exception>
 #include <sys/sysctl.h>
 
 uint32_t cpus_count()
@@ -256,7 +258,7 @@ uint32_t cpus_count()
     if (num_cpu < 1)
         num_cpu = 1;
 
-    return std::min(static_cast<uint32_t>(num_cpu), MAX_CPUS);
+    return num_cpu;
 }
 
 // Getting availability mask for process on OSX is not supported

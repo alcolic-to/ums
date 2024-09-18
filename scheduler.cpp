@@ -275,7 +275,7 @@ public:
     constexpr inline int operator[](const Worker::State state) const { return m_loads[int(state)]; }
 
 private:
-    std::array<int, loads_size> m_loads{};
+    std::array<uint8_t, loads_size> m_loads{};
 };
 
 // clang-format on

@@ -16,10 +16,10 @@ CPU::CPU(uint64_t cpu_id, Cpu_Mask cpu_mask) noexcept
 
 // Creates new CPU for each bit available in available CPUs mask.
 //
-CPUs::CPUs() : m_system_cpus_count{cpus_count()}, m_avail_cpus_mask{cpus_avail_mask()}
+CPUs::CPUs()
+    : m_system_cpus_count{cpus_count()}
+    , m_avail_cpus_mask{Cpu_Mask{cpus_avail_mask()} & CFG_allowed_cpus}
 {
-    m_avail_cpus_mask &= CFG_allowed_cpus;
-
     for (uint64_t cpu_id = 0; cpu_id < m_avail_cpus_mask.size(); ++cpu_id)
         if (m_avail_cpus_mask.test(cpu_id))
             m_cpus.emplace_back(std::make_unique<CPU>(cpu_id, Cpu_Mask{}.set(cpu_id)));

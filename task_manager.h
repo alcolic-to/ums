@@ -43,6 +43,7 @@ public:
     const CPUs& m_cpus;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern Task_manager task_manager;
 
 #endif // COS_TASK_MANAGER_H

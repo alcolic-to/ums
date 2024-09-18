@@ -32,8 +32,6 @@ public:
         exiting
     };
 
-    // Create worker object and start worker thread on a provided CPU.
-    //
     Worker(uint64_t id, Scheduler& scheduler);
 
     ~Worker();
@@ -79,6 +77,7 @@ public:
     std::thread m_thread;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern thread_local Worker* tls_worker;
 
 #endif // COS_WORKER_H

@@ -14,6 +14,9 @@
 #include "task_manager.h"
 #include "worker.h"
 
+// Creates scheduler and workers for provided CPU.
+// After workers are created, starts single worker from idle queue.
+//
 Scheduler::Scheduler(const CPU& cpu)
     : m_cpu{cpu}
     , m_worker{nullptr}

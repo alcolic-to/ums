@@ -25,7 +25,7 @@ public:
 
 class CPUs final {
 public:
-    CPUs();
+    CPUs() noexcept;
 
     [[nodiscard]] Scheduler& min_load_scheduler() const;
 
@@ -35,6 +35,7 @@ private:
     std::vector<std::unique_ptr<CPU>> m_cpus;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern CPUs cpus;
 
 #endif // COS_CPU_H

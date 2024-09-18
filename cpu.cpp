@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <exception>
 #include <memory>
 
 #include "config.h"
@@ -16,7 +17,8 @@ CPU::CPU(uint64_t cpu_id, Cpu_Mask cpu_mask) noexcept
 
 // Creates new CPU for each bit available in available CPUs mask.
 //
-CPUs::CPUs()
+// clang-format off
+CPUs::CPUs() noexcept try
     : m_system_cpus_count{cpus_count()}
     , m_avail_cpus_mask{Cpu_Mask{cpus_avail_mask()} & CFG_allowed_cpus}
 {
@@ -24,6 +26,11 @@ CPUs::CPUs()
         if (m_avail_cpus_mask.test(cpu_id))
             m_cpus.emplace_back(std::make_unique<CPU>(cpu_id, Cpu_Mask{}.set(cpu_id)));
 }
+catch (...) {
+    std::terminate();
+}
+
+// clang-format on
 
 Scheduler& CPUs::min_load_scheduler() const
 {
@@ -34,7 +41,3 @@ Scheduler& CPUs::min_load_scheduler() const
 
     return (*std::min_element(m_cpus.begin(), m_cpus.end(), cmp))->m_scheduler;
 }
-
-// Global CPUs.
-//
-CPUs cpus;

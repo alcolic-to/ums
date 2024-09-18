@@ -134,7 +134,3 @@ void Worker::main_loop()
         m_task.reset();
     }
 }
-
-// Thread local worker pointer.
-//
-thread_local Worker* tls_worker;

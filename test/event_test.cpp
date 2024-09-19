@@ -1,11 +1,15 @@
-#include <gtest/gtest.h>
 #include <chrono>
-#include <thread>
+#include <cstdint>
+#include <gtest/gtest.h>
 #include <iostream>
+#include <mutex>
+#include <thread>
+#include <vector>
 
 #include "sync_api.h"
-#include "util.h"
 #include "task_manager.h"
+
+// NOLINTBEGIN
 
 ConditionalEvent e1;
 ConditionalEvent e2;
@@ -67,3 +71,5 @@ TEST(Event, SimpleTest)
     ASSERT_EQ(v[1], 1);
     ASSERT_EQ(v[2], 3);
 }
+
+// NOLINTEND

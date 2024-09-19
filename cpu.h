@@ -3,37 +3,39 @@
 #ifndef COS_CPU_H
 #define COS_CPU_H
 
+#include <bitset>
 #include <cstdint>
-#include <vector>
 #include <memory>
+#include <vector>
 
+#include "config.h"
 #include "scheduler.h"
 
-class CPU final
-{
-public:
-    CPU(uint64_t cpu_id, uint64_t cpu_mask);
+using Cpu_Mask = std::bitset<CFG_max_cpu_count>;
 
+class CPU final {
 public:
+    CPU(uint64_t cpu_id, Cpu_Mask cpu_mask) noexcept;
+
     uint64_t m_id;
-    uint64_t m_mask;
+    Cpu_Mask m_mask;
 
     Scheduler m_scheduler;
 };
 
-class CPUs final
-{
+class CPUs final {
 public:
-    CPUs();
+    CPUs() noexcept;
 
-    Scheduler& min_load_scheduler() const;
+    [[nodiscard]] Scheduler& min_load_scheduler() const;
 
 private:
     uint32_t m_system_cpus_count;
-    uint64_t m_avail_cpus_mask;
+    Cpu_Mask m_avail_cpus_mask;
     std::vector<std::unique_ptr<CPU>> m_cpus;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern CPUs cpus;
 
 #endif // COS_CPU_H

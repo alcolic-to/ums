@@ -1,26 +1,33 @@
-#include <iostream>
+#include "scheduler.h"
+
+// #include <iostream>
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <memory>
 #include <mutex>
 
-#include "scheduler.h"
-#include "worker.h"
-#include "cpu.h"
 #include "config.h"
-#include "task_manager.h"
+#include "cpu.h"
 #include "io_api.h"
 #include "sync_api.h"
+#include "task_manager.h"
 #include "worker.h"
 
+// Creates scheduler and workers for provided CPU.
+// After workers are created, starts single worker from idle queue.
+//
 Scheduler::Scheduler(const CPU& cpu)
-    : m_cpu{ cpu }
-    , m_worker{ nullptr }
-    , m_state{ State::initializing }
-    , m_workers_started{ false }
-    , m_load{ 0 }
+    : m_cpu{cpu}
+    , m_worker{nullptr}
+    , m_state{State::initializing}
+    , m_workers_started{false}
+    , m_load{0}
 {
-    for (int i = 0; i < CFG_workers_per_cpu; ++i)
+    for (uint32_t i = 0; i < CFG_workers_per_cpu; ++i)
         m_workers.push_back(std::make_unique<Worker>(i, *this));
 
-    std::unique_lock<std::mutex> lock{ m_workers_mtx };
+    std::unique_lock<std::mutex> lock{m_workers_mtx};
 
     set_state(State::running);
     m_worker = m_idle_queue.front();
@@ -32,10 +39,25 @@ Scheduler::~Scheduler()
     set_state(State::exiting);
 }
 
-bool Scheduler::has_idle_workers() const { return !m_idle_queue.empty(); }
-bool Scheduler::has_runnable_workers() const { return !m_runnable_queue.empty(); }
-bool Scheduler::has_waiting_workers() const { return !m_waiting_queue.empty(); }
-bool Scheduler::has_pending_io_workers() const { return !m_pending_io_queue.empty(); }
+bool Scheduler::has_idle_workers() const
+{
+    return !m_idle_queue.empty();
+}
+
+bool Scheduler::has_runnable_workers() const
+{
+    return !m_runnable_queue.empty();
+}
+
+bool Scheduler::has_waiting_workers() const
+{
+    return !m_waiting_queue.empty();
+}
+
+bool Scheduler::has_pending_io_workers() const
+{
+    return !m_pending_io_queue.empty();
+}
 
 void Scheduler::save_runnable(Worker* worker)
 {
@@ -80,15 +102,15 @@ void Scheduler::prepare_next_worker()
     m_worker->set_state(Worker::State::running);
 }
 
-void Scheduler::enqueue_task(std::shared_ptr<Task> task)
+void Scheduler::enqueue_task(const std::shared_ptr<Task>& task)
 {
-    std::scoped_lock<std::mutex> lock{ m_tasks_mtx };
+    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
     m_tasks.push_back(task);
 }
 
 std::shared_ptr<Task> Scheduler::next_task()
 {
-    std::scoped_lock<std::mutex> lock{ m_tasks_mtx };
+    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
     std::shared_ptr<Task> t = m_tasks.front();
     m_tasks.pop_front();
 
@@ -97,7 +119,7 @@ std::shared_ptr<Task> Scheduler::next_task()
 
 bool Scheduler::has_tasks()
 {
-    std::scoped_lock<std::mutex> lock{ m_tasks_mtx };
+    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
     return !m_tasks.empty();
 }
 
@@ -114,8 +136,7 @@ void Scheduler::schedule_idle_worker()
 //
 void Scheduler::schedule_io_workers()
 {
-    auto io_completed = [](Worker* worker)
-    {
+    auto io_completed = [](Worker* worker) {
         worker->m_io_request->update();
         return worker->m_io_request->completed();
     };
@@ -123,8 +144,8 @@ void Scheduler::schedule_io_workers()
     auto begin = m_pending_io_queue.begin();
     auto end = m_pending_io_queue.end();
 
-    for (auto it = std::find_if(begin, end, io_completed); it != end; it = std::find_if(it, end, io_completed))
-    {
+    for (auto it = std::find_if(begin, end, io_completed); it != end;
+         it = std::find_if(it, end, io_completed)) {
         save_runnable(*it);
         it = m_pending_io_queue.erase(it);
     }
@@ -145,8 +166,8 @@ void Scheduler::schedule_waiting_workers()
     auto begin = m_waiting_queue.begin();
     auto end = m_waiting_queue.end();
 
-    for (auto it = std::find_if(begin, end, signaled); it != end; it = std::find_if(it, end, signaled))
-    {
+    for (auto it = std::find_if(begin, end, signaled); it != end;
+         it = std::find_if(it, end, signaled)) {
         save_runnable(*it);
         it = m_waiting_queue.erase(it);
     }
@@ -159,8 +180,8 @@ void Scheduler::schedule_sleeping_workers()
     auto begin = m_sleeping_queue.begin();
     auto end = m_sleeping_queue.end();
 
-    for (auto it = std::find_if(begin, end, signaled); it != end; it = std::find_if(it, end, signaled))
-    {
+    for (auto it = std::find_if(begin, end, signaled); it != end;
+         it = std::find_if(it, end, signaled)) {
         save_runnable(*it);
         it = m_sleeping_queue.erase(it);
     }
@@ -180,15 +201,14 @@ void Scheduler::schedule()
 
     // Idle loop if there is no work.
     //
-    while (!has_runnable_workers() && !should_exit())
-    {
+    while (!has_runnable_workers() && !should_exit()) {
         idle_sleep();
         schedule_workers();
     }
 
-    if (should_exit())
+    if (should_exit()) [[unlikely]]
         exit_workers();
-    else
+    else [[likely]]
         prepare_next_worker();
 }
 
@@ -204,63 +224,67 @@ void Scheduler::idle_sleep()
 
     // tatic int c = 0;
     // onstexpr int sleep_cycle = 1 << 20;
-    // 
+    //
     // f ((++c & (sleep_cycle-1)) == 0)
-    // 
+    //
     // std::cout << "Zzzz...\n";
     // std::this_thread::sleep_for(CFG_idle_sleep);
     // c = 0;
-    // 
+    //
 
     // auto start = std::chrono::high_resolution_clock::now();
-    // 
+    //
     // std::this_thread::sleep_for(CFG_idle_sleep);
-    // 
+    //
     // auto end = std::chrono::high_resolution_clock::now();
-    // 
+    //
     // std::chrono::duration<double, std::milli> duration = end - start;
     // std::cout << "Sleep duration: " << duration.count() << "ms.\n";
 
     // auto start = std::chrono::high_resolution_clock::now();
-    // 
+    //
     // std::unique_lock lock{ m_workers_mtx };
     // m_worker->wait(lock);
-    // 
+    //
     // auto end = std::chrono::high_resolution_clock::now();
-    // 
+    //
     // std::chrono::duration<double, std::milli> duration = end - start;
     // std::cout << "Sleep duration: " << duration.count() << "ms.\n";
 }
 
-bool Scheduler::initializing() const { return m_state == State::initializing; }
-bool Scheduler::exiting() const { return m_state == State::exiting; }
-void Scheduler::set_state(State state) { m_state = state; }
-
-Worker* Scheduler::worker() const { return m_worker; }
-
-class Scheduler_Loads
+void Scheduler::set_state(State state)
 {
+    m_state = state;
+}
+
+// NOLINTBEGIN
+// clang-format off
+class Scheduler_Loads {
 public:
+    static constexpr int loads_size = int(Worker::State::exiting) + 1;
+
     constexpr inline Scheduler_Loads()
     {
-        m_loads[int(Worker::State::initializing)] = 0;
-        m_loads[int(Worker::State::idle)]         = 0;
-        m_loads[int(Worker::State::waiting)]      = 1;
-        m_loads[int(Worker::State::pending_io)]   = 2;
+        m_loads[int(Worker::State::initializing)] =  0;
+        m_loads[int(Worker::State::idle)]         =  0;
+        m_loads[int(Worker::State::waiting)]      =  1;
+        m_loads[int(Worker::State::sleeping)]     =  1;
+        m_loads[int(Worker::State::pending_io)]   =  2;
         m_loads[int(Worker::State::runnable)]     = 10;
         m_loads[int(Worker::State::running)]      = 10;
-        m_loads[int(Worker::State::exiting)]      = 0;
+        m_loads[int(Worker::State::exiting)]      =  0;
     }
 
     constexpr inline int operator[](const Worker::State state) const { return m_loads[int(state)]; }
 
 private:
-    int m_loads[int(Worker::State::exiting) + 1] = { 0 };
+    std::array<uint8_t, loads_size> m_loads{};
 };
 
-static constexpr Scheduler_Loads Loads;
+// clang-format on
+// NOLINTEND
 
-static_assert(Loads[Worker::State::runnable] == 10);
+static constexpr Scheduler_Loads Loads;
 
 // Sets new scheduler load based on previous and new worker state.
 //
@@ -277,17 +301,18 @@ uint64_t Scheduler::load() const
 // Switches thread execution context from previous worker to current.
 //
 // Notes:
-// There is a single mutex on scheduler used for workers synchronization and every worker has it's own condition variable.
-// In order to atomically suspend single worker thread (go to sleep by calling wait) and wake up next,
-// we will take lock on mutex before notifying another thread to wake up. Condition_variable::wait function
-// guarantees that it will unlock mutex and go to sleep atomically and it also guarantees that it will take lock on mutex
-// when wait is done. So when we notify another thread to wake up we are already holding lock on mutex
-// (and notified thread can not wake up until we release lock) so mutex will be unlocked only when we call wait on this thread,
-// which will release lock and wake another thread.
+// There is a single mutex on scheduler used for workers synchronization and every worker has it's
+// own condition variable. In order to atomically suspend single worker thread (go to sleep by
+// calling wait) and wake up next, we will take lock on mutex before notifying another thread to
+// wake up. Condition_variable::wait function guarantees that it will unlock mutex and go to sleep
+// atomically and it also guarantees that it will take lock on mutex when wait is done. So when we
+// notify another thread to wake up we are already holding lock on mutex (and notified thread can
+// not wake up until we release lock) so mutex will be unlocked only when we call wait on this
+// thread, which will release lock and wake another thread.
 //
 void Scheduler::context_switch(Worker* prev_worker)
 {
-    std::unique_lock<std::mutex> lock{ m_workers_mtx };
+    std::unique_lock<std::mutex> lock{m_workers_mtx};
     m_worker->notify(lock);
     prev_worker->wait(lock);
 }
@@ -297,22 +322,22 @@ void Scheduler::context_switch(Worker* prev_worker)
 //
 // Notes:
 // When worker is started for the first time, it will be parked in this function
-// waiting on condition variable. We will later decide whether to proceed with scheduling based on return value.
-// Since only first started worker on scheduler should enter scheduling code (other workers will already be scheduled
-// when it's their turn to run), we will use flag m_workers_started to help us do this.
-// Also, we are going to notify scheduler thread to continue when we are safely parked, since it is blocked
-// on a condition variable waiting for us.
+// waiting on condition variable. We will later decide whether to proceed with scheduling based on
+// return value. Since only first started worker on scheduler should enter scheduling code (other
+// workers will already be scheduled when it's their turn to run), we will use flag
+// m_workers_started to help us do this. Also, we are going to notify scheduler thread to continue
+// when we are safely parked, since it is blocked on a condition variable waiting for us.
 //
 bool Scheduler::sync_init(Worker* worker)
 {
-    if (!initializing())
+    if (!initializing()) [[likely]]
         return true; // proceed with scheduling.
 
-    std::unique_lock<std::mutex> lock{ m_workers_mtx };
+    std::unique_lock<std::mutex> lock{m_workers_mtx};
     worker->notify(lock); // Notify scheduler thread that created us to continue
     worker->wait(lock);   // and go to sleep.
 
-    return m_workers_started ? false : m_workers_started = true;
+    return m_workers_started ? false : (m_workers_started = true);
 }
 
 // Save worker to proper queue based on synchronization context.
@@ -320,11 +345,19 @@ bool Scheduler::sync_init(Worker* worker)
 template<SyncCtx ctx>
 void Scheduler::save_worker(Worker* worker)
 {
-    if      constexpr (ctx == SyncCtx::main)       initializing() ? save_idle<true>(worker) : save_idle<false>(worker);
-    else if constexpr (ctx == SyncCtx::yield)      save_runnable(worker);
-    else if constexpr (ctx == SyncCtx::wait_event) save_waiting(worker);
-    else if constexpr (ctx == SyncCtx::wait_sleep) save_sleeping(worker);
-    else if constexpr (ctx == SyncCtx::io)         save_pending_io(worker);
+    if constexpr (ctx == SyncCtx::main)
+        if (initializing()) [[unlikely]]
+            save_idle<true>(worker);
+        else [[likely]]
+            save_idle<false>(worker);
+    else if constexpr (ctx == SyncCtx::yield)
+        save_runnable(worker);
+    else if constexpr (ctx == SyncCtx::wait_event)
+        save_waiting(worker);
+    else if constexpr (ctx == SyncCtx::wait_sleep)
+        save_sleeping(worker);
+    else if constexpr (ctx == SyncCtx::io)
+        save_pending_io(worker);
 }
 
 // Synchronization point for the workers.
@@ -336,7 +369,7 @@ void Scheduler::sync(Worker* worker)
 {
     save_worker<ctx>(worker);
 
-    if (!sync_init(worker))
+    if (!sync_init(worker)) [[unlikely]]
         return;
 
     schedule();
@@ -347,9 +380,8 @@ void Scheduler::sync(Worker* worker)
 
 void Scheduler::exit_workers()
 {
-    std::unique_lock<std::mutex> lock{ m_workers_mtx };
-    for (Worker* worker : m_idle_queue)
-    {
+    std::unique_lock<std::mutex> lock{m_workers_mtx};
+    for (Worker* worker : m_idle_queue) {
         worker->set_state(Worker::State::exiting);
         worker->notify(lock);
     }
@@ -357,7 +389,8 @@ void Scheduler::exit_workers()
 
 bool Scheduler::should_exit()
 {
-    return exiting() && !has_runnable_workers() && !has_waiting_workers() && !has_pending_io_workers() && !has_tasks();
+    return exiting() && !has_runnable_workers() && !has_waiting_workers() &&
+           !has_pending_io_workers() && !has_tasks();
 }
 
 template void Scheduler::sync<SyncCtx::main>(Worker* worker);

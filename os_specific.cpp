@@ -53,7 +53,7 @@ uint64_t cpus_avail_mask()
     uint64_t procCpuMask = 0; // Available CPUs for this process.
     uint64_t allCpusMask = 0; // All available CPUs in the system.
 
-    GetProcessAffinityMask(GetCurrentProcess(), &procCpuMask, &allCpusMask);
+    GetProcessAffinityMask(GetCurrentProcess(), PDWORD_PTR(&procCpuMask), PDWORD_PTR(&allCpusMask));
 
     std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask
               << ENDL;

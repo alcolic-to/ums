@@ -57,7 +57,7 @@ public:
 
     void stop() { m_end = now(); }
 
-    auto elapsed() const { return duration_cast<Duration>(m_end - m_start); }
+    [[nodiscard]] auto elapsed() const { return duration_cast<Duration>(m_end - m_start); }
 
     [[nodiscard]] std::string unit_name() const
     {

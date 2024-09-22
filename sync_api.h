@@ -1,21 +1,15 @@
 #pragma once
 
+#ifndef COS_SYNC_API_H
+#define COS_SYNC_API_H
+
 #include <atomic>
 #include <chrono>
-#include <cstdint>
+#include <mutex>
+#include <vector>
 
 #include "util.h"
-
-class ConditionalEvent final {
-public:
-    ConditionalEvent();
-    virtual void wait();
-    virtual void signal();
-    virtual bool check() const;
-
-private:
-    std::atomic<bool> m_cond;
-};
+#include "worker.h"
 
 class TimedEvent final {
 public:
@@ -30,3 +24,5 @@ private:
 };
 
 void cos_sleep(milliseconds time_to_sleep);
+
+#endif // COS_SYNC_API_H

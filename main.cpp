@@ -2,8 +2,10 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <iostream>
+#include <memory>
 #include <thread>
 #include <vector>
 
@@ -11,7 +13,9 @@
 #include <windows.h>
 #endif
 
+#include "condition_variable.h"
 #include "io_api.h"
+#include "mutex.h"
 #include "sync_api.h"
 #include "task_manager.h"
 #include "util.h"
@@ -28,7 +32,7 @@ void f1()
 {
     auto start = now();
 
-    std::vector<int> v;
+    std::vector<uint64_t> v;
     for (int i = 0; i < 1000; ++i)
         v.push_back(random());
 
@@ -44,14 +48,12 @@ void f1()
             break;
         }
 
-        if (v[rand() % v.size()] == rand() % v.size() && i++ % 100 == 0)
+        if (v[random() % v.size()] == random() % v.size() && i++ % 100 == 0)
             tls_worker->yield();
     }
 
     return;
 }
-
-ConditionalEvent e;
 
 // Duration of ~1s when plugged in.
 //
@@ -119,22 +121,6 @@ void ms3_function()
     // std::cout << r << "\n";
 }
 
-void test_signal()
-{
-    std::vector<std::thread> v;
-
-    for (int i = 0; i < 10; ++i)
-        v.push_back(std::thread{thread_function});
-
-    for (auto& it : v)
-        it.join();
-
-    std::this_thread::sleep_for(5s);
-    e.signal();
-
-    std::cout << f3() << "\n";
-}
-
 void sleep_test()
 {
     cos_sleep(1000ms);
@@ -190,19 +176,79 @@ void write_to_file()
                    (random() % max_file_size) * io_str.size());
 }
 
-class my_mutex : public std::mutex {
-public:
-    my_mutex() = default;
+static Spinlock sl;
 
-    void lock() { std::mutex::lock(); };
+static uint64_t sum = 0;
 
-    void unlock() { std::mutex::unlock(); };
+void testing_spinlock()
+{
+    // std::scoped_lock<Spinlockic> lock{sl};
+    for (int i = 0; i < 1000000; ++i) {
+        std::scoped_lock<Spinlock> lock{sl};
+        sum += 1;
+    }
+}
 
-    bool try_lock() { return std::mutex::try_lock(); };
-};
+static Mutex m;
+
+// static Spinlock spinlock;
+
+void testing_mutex()
+{
+    // std::scoped_lock<Mutex> lock{m};
+    for (int i = 0; i < 1000000; ++i) {
+        std::scoped_lock<Mutex> lock{m};
+        // std::scoped_lock<Spinlock> lock{spinlock};
+        sum += 1;
+    }
+}
+
+void execute_testing_mutex_tasks()
+{
+    constexpr int tasks_count = 1000;
+
+    std::vector<std::shared_ptr<Task>> tasks;
+    tasks.reserve(tasks_count);
+
+    Stopwatch sw{"Testing mutex"};
+
+    for (int i = 0; i < tasks_count; ++i) {
+        std::shared_ptr<Task> task{std::make_shared<Task>(testing_mutex)};
+        task_manager.enque_task(task);
+        tasks.push_back(std::move(task));
+    }
+
+    for (auto&& task : tasks)
+        task->wait();
+
+    std::cout << sum << "\n";
+}
 
 int main(int argc, char* argv[])
 {
+    //
+    // Mutex m;
+    // std::unique_lock<Mutex> lock{m};
+    // lock.try_lock();
+    // lock.try_lock_for(10ms);
+
+    execute_testing_mutex_tasks();
+
+    //     std::vector<std::thread> threads;
+    //     for (int i = 0; i < 10; ++i)
+    //         threads.push_back(std::thread{testing_spinlock});
+
+    //     for (auto&& thread : threads)
+    //         thread.join();
+
+    //     std::cout << "Sum: " << sum << "\n";
+
+    {
+        // std::scoped_lock<Spinlockic> lock{sl};
+        // for (int i = 0; i < 1; ++i)
+        //     std::this_thread::sleep_for(10s);
+    }
+
     // for (int i = 0; i < 1024; ++i)
     //     task_manager.execute_task<true>(write_to_file);
 
@@ -212,8 +258,19 @@ int main(int argc, char* argv[])
     // task_manager.execute_task<false>(write_to_file);
     // task_manager.execute_task<false>(read_from_file);
 
-    for (int i = 0; i < 10000000; ++i)
-        task_manager.execute_task<true>(f4);
+    // std::atomic<bool> b{false};
+    // b.notify_one();
+    // b.wait(false);
+
+    // std::mutex m;
+    // std::condition_variable cv;
+
+    // std::unique_lock<std::mutex> lock;
+
+    // cv.wait(lock);
+
+    // for (int i = 0; i < 10000000; ++i)
+    //     task_manager.execute_task<true>(f4);
 
     // std::this_thread::sleep_for(1ms);
 

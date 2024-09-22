@@ -18,7 +18,7 @@ class CPU;
 
 // Synchronization context for scheduler.
 //
-enum class SyncCtx : int { main, yield, wait_event, io, wait_sleep };
+enum class SyncCtx : int { main, yield, wait_event, io, wait_sleep, mutex };
 
 class Scheduler final {
 public:

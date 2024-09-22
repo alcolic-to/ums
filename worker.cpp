@@ -52,14 +52,10 @@ void Worker::yield()
     m_scheduler.sync<SyncCtx::yield>(this);
 }
 
-// Wait on a event if it is not signaled.
-//
-void Worker::wait_event(ConditionalEvent* event)
+void Worker::wait_condition()
 {
-    if (!event->check()) {
-        m_cond_event = event;
+    if (!check_cond())
         m_scheduler.sync<SyncCtx::wait_event>(this);
-    }
 }
 
 void Worker::wait_sleep(TimedEvent* event)
@@ -102,11 +98,11 @@ void Worker::entry_point()
 {
     bind_thread(m_scheduler.m_cpu.m_mask.to_ullong());
 
-    std::cout << "Started thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
+    // std::cout << "Started thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
 
     main_loop();
 
-    std::cout << "Ended thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
+    // std::cout << "Ended thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
 }
 
 // Main worker loop.
@@ -128,7 +124,8 @@ void Worker::main_loop()
             std::cout << ex.what() << "\n";
         }
 
-        std::cout << "CPU " << m_scheduler.m_cpu.m_id << ": worker id " << id() << " task done.\n";
+        // std::cout << "CPU " << m_scheduler.m_cpu.m_id << ": worker id " << id() << " task
+        // done.\n";
 
         m_task->notify();
         m_task.reset();

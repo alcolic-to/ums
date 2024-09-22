@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #ifndef COS_WORKER_H
 #define COS_WORKER_H
 
@@ -49,13 +50,22 @@ public:
     void yield();
     void read_file(void* file_handle, IO_Buffer buffer, uint64_t offset);
     void write_file(void* file_handle, IO_Buffer buffer, uint64_t offset);
-    void wait_event(ConditionalEvent* event);
+    void wait_condition();
     void wait_sleep(TimedEvent* event);
 
     void set_state(State state);
 
     void notify(std::unique_lock<std::mutex>& lock);
     void wait(std::unique_lock<std::mutex>& lock);
+
+    void set_cond() noexcept { m_cond.test_and_set(std::memory_order_relaxed); };
+
+    void clear_cond() noexcept { m_cond.clear(std::memory_order_relaxed); };
+
+    [[nodiscard]] bool check_cond() const noexcept
+    {
+        return m_cond.test(std::memory_order_relaxed);
+    };
 
     [[nodiscard]] constexpr uint64_t id() const { return m_id; }
 
@@ -71,6 +81,7 @@ public:
     bool m_running; // Flag used for spurious wakeup check.
     ConditionalEvent* m_cond_event;
     TimedEvent* m_timed_event;
+    std::atomic_flag m_cond;
     std::shared_ptr<Task> m_task;
     std::unique_ptr<IO_Request> m_io_request;
     Scheduler& m_scheduler;

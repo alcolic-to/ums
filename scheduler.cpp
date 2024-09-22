@@ -161,7 +161,7 @@ void Scheduler::schedule_idle_workers()
 //
 void Scheduler::schedule_waiting_workers()
 {
-    auto signaled = [](Worker* worker) { return worker->m_cond_event->check(); };
+    auto signaled = [](Worker* worker) { return worker->check_cond(); };
 
     auto begin = m_waiting_queue.begin();
     auto end = m_waiting_queue.end();
@@ -352,7 +352,7 @@ void Scheduler::save_worker(Worker* worker)
             save_idle<false>(worker);
     else if constexpr (ctx == SyncCtx::yield)
         save_runnable(worker);
-    else if constexpr (ctx == SyncCtx::wait_event)
+    else if constexpr (ctx == SyncCtx::wait_event || ctx == SyncCtx::mutex)
         save_waiting(worker);
     else if constexpr (ctx == SyncCtx::wait_sleep)
         save_sleeping(worker);
@@ -398,3 +398,4 @@ template void Scheduler::sync<SyncCtx::yield>(Worker* worker);
 template void Scheduler::sync<SyncCtx::wait_event>(Worker* worker);
 template void Scheduler::sync<SyncCtx::io>(Worker* worker);
 template void Scheduler::sync<SyncCtx::wait_sleep>(Worker* worker);
+template void Scheduler::sync<SyncCtx::mutex>(Worker* worker);

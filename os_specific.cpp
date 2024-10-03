@@ -30,6 +30,8 @@ constexpr char ENDL = '\n';
 //
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#undef min
+#undef max
 
 // Helper function for getting result from win32 API.
 //

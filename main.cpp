@@ -11,12 +11,13 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#undef min
+#undef max
 #endif
 
 #include "condition_variable.h"
 #include "io_api.h"
 #include "mutex.h"
-#include "sync_api.h"
 #include "task_manager.h"
 #include "util.h"
 #include "worker.h"
@@ -123,7 +124,7 @@ void ms3_function()
 
 void sleep_test()
 {
-    cos_sleep(1000ms);
+    tls_worker->sleep_for(1000ms);
 }
 
 #if defined _WIN32
@@ -226,68 +227,12 @@ void execute_testing_mutex_tasks()
 
 int main(int argc, char* argv[])
 {
-    //
-    // Mutex m;
-    // std::unique_lock<Mutex> lock{m};
-    // lock.try_lock();
-    // lock.try_lock_for(10ms);
+    Stopwatch<microseconds> s{"Sleep for stopwatch"};
+    std::cout << "Entering sleep for!\n";
 
-    execute_testing_mutex_tasks();
+    task_manager.execute_task<false>([] { tls_worker->sleep_for(5s); });
 
-    //     std::vector<std::thread> threads;
-    //     for (int i = 0; i < 10; ++i)
-    //         threads.push_back(std::thread{testing_spinlock});
-
-    //     for (auto&& thread : threads)
-    //         thread.join();
-
-    //     std::cout << "Sum: " << sum << "\n";
-
-    {
-        // std::scoped_lock<Spinlockic> lock{sl};
-        // for (int i = 0; i < 1; ++i)
-        //     std::this_thread::sleep_for(10s);
-    }
-
-    // for (int i = 0; i < 1024; ++i)
-    //     task_manager.execute_task<true>(write_to_file);
-
-    // for (int i = 0; i < 1000 * 1024; ++i)
-    //     task_manager.execute_task<true>(read_from_file);
-
-    // task_manager.execute_task<false>(write_to_file);
-    // task_manager.execute_task<false>(read_from_file);
-
-    // std::atomic<bool> b{false};
-    // b.notify_one();
-    // b.wait(false);
-
-    // std::mutex m;
-    // std::condition_variable cv;
-
-    // std::unique_lock<std::mutex> lock;
-
-    // cv.wait(lock);
-
-    // for (int i = 0; i < 10000000; ++i)
-    //     task_manager.execute_task<true>(f4);
-
-    // std::this_thread::sleep_for(1ms);
-
-    // auto start = now();
-
-    // for (std::size_t i = 0; i < 10; ++i)
-    //     task_manager.execute_task<false>(sleep_test);
-
-    // std::cout << duration_cast<milliseconds>(now() - start) << "\n";
-
-    // for (int i = 0; i < 100; ++i)
-    //     std::cout << random() << std::endl;
-
-    // my_mutex mtx;
-    //
-    // std::unique_lock<my_mutex> o{mtx};
-    // std::scoped_lock<my_mutex> lock(mtx);
+    std::cout << "Exiting sleep for!\n";
 }
 
 #else

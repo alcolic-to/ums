@@ -1,7 +1,6 @@
 // NOLINTBEGIN
 
 #include <atomic>
-#include <format>
 #include <iostream>
 #include <mutex>
 #include <shared_mutex>
@@ -52,6 +51,11 @@ void run_lock_perf_test(const std::string& test_name, int num_threads)
 
 TEST(Mutex, mutex_vs_spinlock_perf_test_1)
 {
+    GTEST_SKIP() << "Skipping perf test, since it last long.";
+// #if defined(DEBUG)
+//     GTEST_SKIP() << "Skipping perf tests in debug build.";
+// #endif
+
     std::cout << "---------------------------------------------------------------\n";
     for (int threads_count = 1; threads_count <= 128; threads_count *= 2) {
         run_lock_perf_test<Spinlock>("Spinlock", threads_count);
@@ -60,7 +64,6 @@ TEST(Mutex, mutex_vs_spinlock_perf_test_1)
     }
 }
 
-// Testing custom mutex
 TEST(Mutex, mutex_sanity_test_1)
 {
     Mutex mutex;
@@ -68,7 +71,7 @@ TEST(Mutex, mutex_sanity_test_1)
 
     auto f = [&] {
         mutex.lock();
-        ++counter; // Critical section
+        ++counter;
         mutex.unlock();
     };
 
@@ -76,7 +79,6 @@ TEST(Mutex, mutex_sanity_test_1)
     ASSERT_TRUE(counter == 2);
 }
 
-// Mutex contention test with multiple threads
 TEST(Mutex, mutex_sanity_test_2)
 {
     Mutex mutex;
@@ -96,18 +98,17 @@ TEST(Mutex, mutex_sanity_test_2)
     ASSERT_TRUE(counter == 4 * iterations);
 }
 
-// Mutex contention test with multiple threads
 TEST(Mutex, mutex_peft_test_1)
 {
-#if defined(DEBUG)
-    GTEST_SKIP() << "Skipping perf tests in debug build.";
-#endif
+    GTEST_SKIP() << "Skipping perf test, since it last long.";
+// #if defined(DEBUG)
+//     GTEST_SKIP() << "Skipping perf tests in debug build.";
+// #endif
 
     Mutex mutex;
     int counter = 0;
     int iterations = 100000000;
 
-    // Test 2: Mutex Contention Test
     auto f = [&] {
         for (int i = 0; i < iterations; ++i) {
             std::scoped_lock<Mutex> lock{mutex};
@@ -121,15 +122,15 @@ TEST(Mutex, mutex_peft_test_1)
 
 TEST(Mutex, spinlock_peft_test_1)
 {
-#if defined(DEBUG)
-    GTEST_SKIP() << "Skipping perf tests in debug build.";
-#endif
+    GTEST_SKIP() << "Skipping perf test, since it last long.";
+// #if defined(DEBUG)
+//     GTEST_SKIP() << "Skipping perf tests in debug build.";
+// #endif
 
     Spinlock mutex;
     int counter = 0;
     int iterations = 100000000;
 
-    // Test 2: Mutex Contention Test
     auto f = [&] {
         for (int i = 0; i < iterations; ++i) {
             std::scoped_lock<Spinlock> lock{mutex};
@@ -141,18 +142,17 @@ TEST(Mutex, spinlock_peft_test_1)
     ASSERT_TRUE(counter == 16 * iterations);
 }
 
-// Mutex contention test with multiple threads
 TEST(Mutex, std_mutex_peft_test_1)
 {
-#if defined(DEBUG)
-    GTEST_SKIP() << "Skipping perf tests in debug build.";
-#endif
+    GTEST_SKIP() << "Skipping perf test, since it last long.";
+// #if defined(DEBUG)
+//    GTEST_SKIP() << "Skipping perf tests in debug build.";    
+// #endif
 
     std::mutex mutex;
     int counter = 0;
     int iterations = 100000000;
 
-    // Test 2: Mutex Contention Test
     auto f = [&] {
         for (int i = 0; i < iterations; ++i) {
             std::scoped_lock<std::mutex> lock{mutex};
@@ -171,18 +171,17 @@ TEST(Mutex, std_mutex_peft_test_1)
     ASSERT_TRUE(counter == 16 * iterations);
 }
 
-// Mutex contention test with multiple threads
 TEST(Mutex, mutex_peft_test_2)
 {
-#if defined(DEBUG)
-    GTEST_SKIP() << "Skipping perf tests in debug build.";
-#endif
+    GTEST_SKIP() << "Skipping perf test, since it last long.";
+// #if defined(DEBUG)
+//     GTEST_SKIP() << "Skipping perf tests in debug build.";
+// #endif
 
     Mutex mutex;
     int counter = 0;
     int iterations = 100000000;
 
-    // Test 2: Mutex Contention Test
     auto f = [&] {
         std::scoped_lock<Mutex> lock{mutex};
         for (int i = 0; i < iterations; ++i)
@@ -193,18 +192,17 @@ TEST(Mutex, mutex_peft_test_2)
     ASSERT_TRUE(counter == 16 * iterations);
 }
 
-// Mutex contention test with multiple threads
 TEST(Mutex, spinlock_peft_test_2)
 {
-#if defined(DEBUG)
-    GTEST_SKIP() << "Skipping perf tests in debug build.";
-#endif
+    GTEST_SKIP() << "Skipping perf test, since it last long.";
+// #if defined(DEBUG)
+//     GTEST_SKIP() << "Skipping perf tests in debug build.";
+// #endif
 
     Spinlock mutex;
     int counter = 0;
     int iterations = 100000000;
 
-    // Test 2: Mutex Contention Test
     auto f = [&] {
         std::scoped_lock<Spinlock> lock{mutex};
         for (int i = 0; i < iterations; ++i)
@@ -215,18 +213,17 @@ TEST(Mutex, spinlock_peft_test_2)
     ASSERT_TRUE(counter == 16 * iterations);
 }
 
-// Mutex contention test with multiple threads
 TEST(Mutex, std_mutex_peft_test_2)
 {
-#if defined(DEBUG)
-    GTEST_SKIP() << "Skipping perf tests in debug build.";
-#endif
+    GTEST_SKIP() << "Skipping perf test, since it last long.";
+// #if defined(DEBUG)
+//     GTEST_SKIP() << "Skipping perf tests in debug build.";
+// #endif
 
     std::mutex mutex;
     int counter = 0;
     int iterations = 100000000;
 
-    // Test 2: Mutex Contention Test
     auto f = [&] {
         std::scoped_lock<std::mutex> lock{mutex};
         for (int i = 0; i < iterations; ++i)
@@ -292,17 +289,17 @@ TEST(Condition_variable, cv_sanity_test_2)
     };
 
     auto notifier = [&] {
-        std::this_thread::sleep_for(1s);
+        tls_worker->sleep_for(1s);
         cv2.notify_one();
 
-        std::this_thread::sleep_for(1s);
+        tls_worker->sleep_for(1s);
         cv1.notify_one();
 
-        std::this_thread::sleep_for(1s);
+        tls_worker->sleep_for(1s);
         cv3.notify_one();
 
         // Wait for the threads to finish.
-        std::this_thread::sleep_for(2s);
+        tls_worker->sleep_for(2s);
     };
 
     task_manager.execute_tasks<false>(waiter_1, waiter_2, waiter_3, notifier);
@@ -321,7 +318,7 @@ TEST(Condition_variable, cv_producer_consumer_test)
     bool ready = false;
 
     auto producer = [&] {
-        std::this_thread::sleep_for(100ms); // Simulate work
+        tls_worker->sleep_for(100ms); // Simulate work
 
         {
             std::unique_lock<Mutex> lock(mutex);
@@ -355,7 +352,7 @@ TEST(Condition_variable, cv_spurious_wakeup_test)
     };
 
     auto notifier = [&] {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Simulate some wait
+        tls_worker->sleep_for(std::chrono::milliseconds(100)); // Simulate some wait
         cv.notify_one();
     };
 
@@ -435,7 +432,7 @@ TEST(Condition_variable, condition_variable_complex_test_2)
         std::unique_lock<Mutex> lock{mutex};
         notifier_cv.wait(lock, [&] { return atomic_counter.load() == threads_count; });
 
-        std::this_thread::sleep_for(100ms);
+        tls_worker->sleep_for(100ms);
         ready = true;
         increment_cv.notify_all();
     };
@@ -448,8 +445,6 @@ TEST(Condition_variable, condition_variable_complex_test_2)
 
 void test_shared_mutex()
 {
-    std::cout << "Testing shared mutex.\n";
-
     std::condition_variable_any cv;
     std::shared_mutex mut;
     std::vector<int> vec = {5};

@@ -36,8 +36,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG>)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG>)
 
-set(CPP_FILES cpu.cpp os_specific.cpp scheduler.cpp task_manager.cpp worker.cpp io.cpp sync.cpp util.cpp cos.cpp mutex.cpp condition_variable.cpp)
-set(HPP_FILES cpu.h os_specific.h scheduler.h task_manager.h worker.h io_api.h sync_api.h util.h config.h mutex.h condition_variable.h)
+set(CPP_FILES cpu.cpp os_specific.cpp scheduler.cpp task_manager.cpp worker.cpp io.cpp util.cpp cos.cpp mutex.cpp condition_variable.cpp)
+set(HPP_FILES cpu.h os_specific.h scheduler.h task_manager.h worker.h io_api.h  util.h config.h mutex.h condition_variable.h)
 set(ALL_FILES ${CPP_FILES} ${HPP_FILES})
 
 add_library(user_mode_scheduler_lib STATIC ${CPP_FILES})

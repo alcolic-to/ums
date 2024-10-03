@@ -15,8 +15,9 @@
 using namespace std::chrono;
 using namespace std::chrono_literals;
 using Clock = steady_clock;
+using Time_point = std::chrono::time_point<Clock>;
 
-inline auto now() noexcept
+inline Time_point now() noexcept
 {
     return Clock::now();
 }

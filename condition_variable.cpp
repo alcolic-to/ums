@@ -11,9 +11,9 @@ void Condition_variable::wait(std::unique_lock<Mutex>& lock)
     add_waiter();
 
     {
-        tls_worker->clear_cond();
+        tls_worker->clear_wait_info();
         const scoped_unlock<std::unique_lock<Mutex>> l{lock};
-        tls_worker->wait_condition();
+        tls_worker->wait_cond_or_sleep();
     }
 
     remove_waiter();

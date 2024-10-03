@@ -18,7 +18,7 @@ class CPU;
 
 // Synchronization context for scheduler.
 //
-enum class SyncCtx : int { main, yield, wait_event, io, wait_sleep, mutex };
+enum class SyncCtx : int { main, yield, wait_cond_or_sleep, io };
 
 class Scheduler final {
 public:
@@ -40,7 +40,6 @@ public:
 
     void save_runnable(Worker* worker);
     void save_waiting(Worker* worker);
-    void save_sleeping(Worker* worker);
     void save_pending_io(Worker* worker);
 
     template<bool back>
@@ -97,7 +96,6 @@ public:
     std::deque<Worker*> m_idle_queue;
     std::list<Worker*> m_waiting_queue;
     std::list<Worker*> m_pending_io_queue;
-    std::list<Worker*> m_sleeping_queue;
 
     std::mutex m_workers_mtx;
     std::mutex m_tasks_mtx;

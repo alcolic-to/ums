@@ -2,9 +2,9 @@
 #include <cstddef>
 #include <gtest/gtest.h>
 
-#include "sync_api.h"
 #include "task_manager.h"
 #include "util.h"
+#include "worker.h"
 
 using namespace std::chrono_literals;
 
@@ -12,7 +12,7 @@ using namespace std::chrono_literals;
 
 void sleep_test()
 {
-    cos_sleep(1000ms);
+    tls_worker->sleep_for(1000ms);
 }
 
 TEST(Sleep, SimpleSleepTest)

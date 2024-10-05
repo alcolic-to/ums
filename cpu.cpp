@@ -20,7 +20,7 @@ CPU::CPU(uint64_t cpu_id, Cpu_Mask cpu_mask) noexcept
 // clang-format off
 CPUs::CPUs() noexcept try
     : m_system_cpus_count{cpus_count()}
-    , m_avail_cpus_mask{Cpu_Mask{cpus_avail_mask()} & CFG_allowed_cpus}
+    , m_avail_cpus_mask{Cpu_Mask{cpus_avail_mask()} & CFG_allowed_cpus} 
 {
     for (uint64_t cpu_id = 0; cpu_id < m_avail_cpus_mask.size(); ++cpu_id)
         if (m_avail_cpus_mask.test(cpu_id))

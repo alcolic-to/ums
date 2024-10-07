@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "condition_variable.h"
+#include "cpu.h"
 #include "gtest/gtest.h"
 #include "mutex.h"
 #include "task_manager.h"
@@ -243,6 +244,9 @@ TEST(Mutex, std_mutex_peft_test_2)
 
 TEST(Condition_variable, cv_sanity_test_1)
 {
+    if (cpus.workers_count() < 2)
+        GTEST_SKIP() << "At least 2 workers needed for this test.";
+
     Mutex mutex;
     Condition_variable cv;
     bool ready = false;
@@ -266,6 +270,9 @@ TEST(Condition_variable, cv_sanity_test_1)
 
 TEST(Condition_variable, cv_sanity_test_2)
 {
+    if (cpus.workers_count() < 4)
+        GTEST_SKIP() << "At least 4 workers needed for this test.";
+
     Mutex mtx;
     Condition_variable cv1, cv2, cv3;
     std::vector<std::uint8_t> v;
@@ -312,6 +319,9 @@ TEST(Condition_variable, cv_sanity_test_2)
 
 TEST(Condition_variable, cv_producer_consumer_test)
 {
+    if (cpus.workers_count() < 2)
+        GTEST_SKIP() << "At least 2 workers needed for this test.";
+
     Mutex mutex;
     Condition_variable cv;
     int data = 0;
@@ -341,6 +351,9 @@ TEST(Condition_variable, cv_producer_consumer_test)
 
 TEST(Condition_variable, cv_spurious_wakeup_test)
 {
+    if (cpus.workers_count() < 2)
+        GTEST_SKIP() << "At least 2 workers needed for this test.";
+
     Mutex mutex;
     Condition_variable cv;
     bool ready = false;
@@ -362,6 +375,9 @@ TEST(Condition_variable, cv_spurious_wakeup_test)
 // https://github.com/microsoft/STL/blob/1e312b38db8df1dfbea17adc344454feb8d00dd9/tests/std/include/test_header_units_and_modules.hpp#L150
 TEST(Condition_variable, condition_variable_complex_test_1)
 {
+    if (cpus.workers_count() < 2)
+        GTEST_SKIP() << "At least 2 workers needed for this test.";
+
     Condition_variable cv;
     Mutex mtx;
     std::vector<int> vec = {5};
@@ -399,6 +415,9 @@ TEST(Condition_variable, condition_variable_complex_test_1)
 
 TEST(Condition_variable, condition_variable_complex_test_2)
 {
+    if (cpus.workers_count() < 9)
+        GTEST_SKIP() << "At least 9 workers needed for this test.";
+
     Mutex mutex;
     Condition_variable increment_cv;
     Condition_variable notifier_cv;
@@ -929,6 +948,9 @@ void test_vso_1253916()
 
 TEST(STL_Mutex, mutex_test)
 {
+    if (cpus.count() < 3)
+        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+
     task_manager.execute_task<false>([] {
         mutex_test_fixture<Mutex> fixture;
         fixture.test_lockable();
@@ -937,11 +959,17 @@ TEST(STL_Mutex, mutex_test)
 
 TEST(STL_Mutex, nonmember_lock_test)
 {
+    if (cpus.count() < 3)
+        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+
     task_manager.execute_task<false>([] { test_nonmember_lock(); });
 }
 
 TEST(STL_Mutex, nonmember_try_lock_test)
 {
+    if (cpus.count() < 3)
+        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+
     task_manager.execute_task<false>([] { test_nonmember_try_lock(); });
 }
 

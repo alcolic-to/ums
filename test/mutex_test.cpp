@@ -507,36 +507,36 @@ void test_shared_mutex()
     std::abort();
 }
 
-class event {
+class Event {
 public:
-    event() = default;
+    Event() = default;
 
     void signal()
     {
-        std::unique_lock<std::mutex> lock(mtx);
+        std::unique_lock<Mutex> lock(mtx);
         is_set = true;
         cv.notify_all();
     }
 
     void wait()
     {
-        std::unique_lock<std::mutex> lock(mtx);
+        std::unique_lock<Mutex> lock(mtx);
         cv.wait(lock, [this]() { return is_set; });
         is_set = false; // reset after wait
     }
 
 private:
-    std::mutex mtx;
-    std::condition_variable cv;
+    Mutex mtx;
+    Condition_variable cv;
     bool is_set = false;
 };
 
-template<typename Mutex>
+template<typename _Mutex>
 class other_mutex_thread {
 public:
     enum class message { idle, shutdown, lock, tryLock, unlock, unlockDelayed };
 
-    explicit other_mutex_thread(Mutex& targetMtx)
+    explicit other_mutex_thread(_Mutex& targetMtx)
         : mtx(targetMtx)
         , currentMessage(message::idle)
         , tryLockSuccess(false)
@@ -605,9 +605,9 @@ private:
         foregroundEvent.wait();
     }
 
-    Mutex& mtx;
-    event backgroundEvent;
-    event foregroundEvent;
+    _Mutex& mtx;
+    Event backgroundEvent;
+    Event foregroundEvent;
     message currentMessage;
     bool tryLockSuccess;
 };
@@ -633,7 +633,7 @@ struct throwing_mutex {
     void unlock() {}
 };
 
-template<typename Mutex>
+template<typename _Mutex>
 struct mutex_test_fixture {
     mutex_test_fixture() : mtx(), mtx2(), ot(mtx) {}
 
@@ -650,24 +650,24 @@ struct mutex_test_fixture {
         ASSERT_TRUE(!mtx.try_lock());
         ot.unlock();
 
-        test_guard<std::lock_guard<Mutex>>();
-        test_guard<std::unique_lock<Mutex>>();
+        test_guard<std::lock_guard<_Mutex>>();
+        test_guard<std::unique_lock<_Mutex>>();
 
         { // unique_lock constructor, move constructor, move assignment
-            std::unique_lock<Mutex> ulOuter;
-            STATIC_ASSERT(noexcept(std::unique_lock<Mutex>()));
+            std::unique_lock<_Mutex> ulOuter;
+            STATIC_ASSERT(noexcept(std::unique_lock<_Mutex>()));
             ASSERT_TRUE(!ulOuter.owns_lock());
             ASSERT_TRUE(!ulOuter);
             ASSERT_TRUE(ulOuter.mutex() == nullptr);
 
             {
-                std::unique_lock<Mutex> ul(mtx);
+                std::unique_lock<_Mutex> ul(mtx);
                 ASSERT_TRUE(!ot.try_lock());
                 ASSERT_TRUE(ul.owns_lock());
                 ASSERT_TRUE(static_cast<bool>(ul));
                 ASSERT_TRUE(ul.mutex() == &mtx);
 
-                std::unique_lock<Mutex> ulMoveConstructed(std::move(ul));
+                std::unique_lock<_Mutex> ulMoveConstructed(std::move(ul));
                 ASSERT_TRUE(!ul);
                 ASSERT_TRUE(ul.mutex() == nullptr);
                 ASSERT_TRUE(static_cast<bool>(ulMoveConstructed));
@@ -681,15 +681,15 @@ struct mutex_test_fixture {
         }
 
         { // unique_lock defer
-            STATIC_ASSERT(noexcept(std::unique_lock<Mutex>(mtx, std::defer_lock)));
-            std::unique_lock<Mutex> ul(mtx, std::defer_lock);
+            STATIC_ASSERT(noexcept(std::unique_lock<_Mutex>(mtx, std::defer_lock)));
+            std::unique_lock<_Mutex> ul(mtx, std::defer_lock);
             ASSERT_TRUE(!ul);
             ASSERT_TRUE(ot.try_lock());
             ot.unlock();
         }
 
         { // unique_lock try_to_lock success
-            std::unique_lock<Mutex> ul(mtx, std::try_to_lock);
+            std::unique_lock<_Mutex> ul(mtx, std::try_to_lock);
             ASSERT_TRUE(static_cast<bool>(ul));
             ASSERT_TRUE(!ot.try_lock());
         }
@@ -697,15 +697,15 @@ struct mutex_test_fixture {
         ASSERT_TRUE(ot.try_lock());
 
         { // unique_lock try_to_lock failure
-            std::unique_lock<Mutex> ul(mtx, std::try_to_lock);
+            std::unique_lock<_Mutex> ul(mtx, std::try_to_lock);
             ASSERT_TRUE(!ul);
         }
 
         ot.unlock();
 
         { // swap with empty object
-            std::unique_lock<Mutex> ulLeft(mtx);
-            std::unique_lock<Mutex> ulRight;
+            std::unique_lock<_Mutex> ulLeft(mtx);
+            std::unique_lock<_Mutex> ulRight;
             ASSERT_TRUE(static_cast<bool>(ulLeft));
             ASSERT_TRUE(!ulRight);
             std::swap(ulLeft, ulRight);
@@ -714,8 +714,8 @@ struct mutex_test_fixture {
         }
 
         { // swap objects
-            std::unique_lock<Mutex> ulLeft(mtx);
-            std::unique_lock<Mutex> ulRight(mtx2);
+            std::unique_lock<_Mutex> ulLeft(mtx);
+            std::unique_lock<_Mutex> ulRight(mtx2);
             ASSERT_TRUE(ulLeft.mutex() == &mtx);
             ASSERT_TRUE(ulRight.mutex() == &mtx2);
             STATIC_ASSERT(noexcept(std::swap(ulLeft, ulRight)));
@@ -729,7 +729,7 @@ struct mutex_test_fixture {
         }
 
         { // lock/try_lock/unlock
-            std::unique_lock<Mutex> ul(mtx);
+            std::unique_lock<_Mutex> ul(mtx);
             ASSERT_TRUE(!ot.try_lock());
             ul.unlock();
             ASSERT_TRUE(ot.try_lock());
@@ -741,7 +741,7 @@ struct mutex_test_fixture {
         }
 
         { // release
-            std::unique_lock<Mutex> ul(mtx);
+            std::unique_lock<_Mutex> ul(mtx);
             ASSERT_TRUE(&mtx == ul.release());
         }
 
@@ -780,20 +780,20 @@ struct mutex_test_fixture {
                     }) < std::chrono::hours(1));
         mtx.unlock();
         ASSERT_TRUE(time_execution([this] {
-                        std::unique_lock<Mutex> ul(mtx, std::defer_lock);
+                        std::unique_lock<_Mutex> ul(mtx, std::defer_lock);
                         ASSERT_TRUE(ul.try_lock_for(std::chrono::hours(24)));
                     }) < std::chrono::hours(1));
         ASSERT_TRUE(time_execution([this] {
-                        std::unique_lock<Mutex> ul(mtx, std::chrono::hours(24));
+                        std::unique_lock<_Mutex> ul(mtx, std::chrono::hours(24));
                         ASSERT_TRUE(ul.owns_lock());
                     }) < std::chrono::hours(1));
         ASSERT_TRUE(time_execution([this] {
-                        std::unique_lock<Mutex> ul(mtx, std::defer_lock);
+                        std::unique_lock<_Mutex> ul(mtx, std::defer_lock);
                         ASSERT_TRUE(ul.try_lock_until(std::chrono::system_clock::now() +
                                                       std::chrono::hours(24)));
                     }) < std::chrono::hours(1));
         ASSERT_TRUE(time_execution([this] {
-                        std::unique_lock<Mutex> ul(mtx, std::chrono::system_clock::now() +
+                        std::unique_lock<_Mutex> ul(mtx, std::chrono::system_clock::now() +
                                                             std::chrono::hours(24));
                         ASSERT_TRUE(ul.owns_lock());
                     }) < std::chrono::hours(1));
@@ -829,9 +829,9 @@ struct mutex_test_fixture {
         ot.unlock();
     }
 
-    Mutex mtx;
-    Mutex mtx2;
-    other_mutex_thread<Mutex> ot;
+    _Mutex mtx;
+    _Mutex mtx2;
+    other_mutex_thread<_Mutex> ot;
 };
 
 // TODO: Replace std::recursive_mutex, std::timed_mutex, std::recursive_timed_mutex
@@ -948,7 +948,7 @@ void test_vso_1253916()
 
 TEST(STL_Mutex, mutex_test)
 {
-    if (cpus.count() < 3)
+    if (cpus.workers_count() < 3)
         GTEST_SKIP() << "At least 3 CPUs needed for this test.";
 
     task_manager.execute_task<false>([] {
@@ -959,16 +959,26 @@ TEST(STL_Mutex, mutex_test)
 
 TEST(STL_Mutex, nonmember_lock_test)
 {
-    if (cpus.count() < 3)
-        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+    GTEST_SKIP() << "Skipping test since we did not implement other mutex types."
+                 << "Some system mutexes (like std::recursive_timed_mutex) "
+                 << "might wait on a condition variable, which will block our scheduler, "
+                 << "hence we must skip this test.";
+
+    // if (cpus.workers_count() < 3)
+    //     GTEST_SKIP() << "At least 3 CPUs needed for this test.";
 
     task_manager.execute_task<false>([] { test_nonmember_lock(); });
 }
 
 TEST(STL_Mutex, nonmember_try_lock_test)
 {
-    if (cpus.count() < 3)
-        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+    GTEST_SKIP() << "Skipping test since we did not implement other mutex types."
+                 << "Some system mutexes (like std::recursive_timed_mutex) "
+                 << "might wait on a condition variable, which will block our scheduler, "
+                 << "hence we must skip this test.";
+
+    // if (cpus.workers_count() < 3)
+    //     GTEST_SKIP() << "At least 3 CPUs needed for this test.";
 
     task_manager.execute_task<false>([] { test_nonmember_try_lock(); });
 }

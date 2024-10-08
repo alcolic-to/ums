@@ -24,6 +24,10 @@ private:
     std::atomic_flag m_lock;
 };
 
+// TODO: Make distinct (spin)lock for mutex with CAS and instead of single atomic flag, plece all lock
+// info into the lock variable, since we are aligning it on 64 bytes. We can put there owner id,
+// type of mutex etc.
+//
 class Mutex {
 public:
     void lock();

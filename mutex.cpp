@@ -96,6 +96,8 @@ void Mutex::lock()
         tls_worker->yield();
 };
 
+// TODO: Check whether we should just single try lock.
+//
 bool Mutex::try_lock() noexcept
 {
     return m_lock.try_lock();

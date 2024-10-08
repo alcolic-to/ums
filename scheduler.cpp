@@ -10,7 +10,6 @@
 #include "config.h"
 #include "cpu.h"
 #include "io_api.h"
-#include "sync_api.h"
 #include "task_manager.h"
 #include "worker.h"
 
@@ -82,12 +81,6 @@ void Scheduler::save_waiting(Worker* worker)
     worker->set_state(Worker::State::waiting);
 }
 
-void Scheduler::save_sleeping(Worker* worker)
-{
-    m_sleeping_queue.push_back(worker);
-    worker->set_state(Worker::State::sleeping);
-}
-
 void Scheduler::save_pending_io(Worker* worker)
 {
     m_pending_io_queue.push_back(worker);
@@ -137,6 +130,7 @@ void Scheduler::schedule_idle_worker()
 void Scheduler::schedule_io_workers()
 {
     auto io_completed = [](Worker* worker) {
+        // TODO: Check both completed and error.
         worker->m_io_request->update();
         return worker->m_io_request->completed();
     };
@@ -157,33 +151,19 @@ void Scheduler::schedule_idle_workers()
         schedule_idle_worker();
 }
 
-// Moves workers from waiting to runnable queue if worker's event is signaled.
+// Moves workers from waiting to runnable queue if worker's wait is done.
 //
 void Scheduler::schedule_waiting_workers()
 {
-    auto signaled = [](Worker* worker) { return worker->m_cond_event->check(); };
+    auto checker = [](Worker* worker) { return worker->check_wait_info(); };
 
     auto begin = m_waiting_queue.begin();
     auto end = m_waiting_queue.end();
 
-    for (auto it = std::find_if(begin, end, signaled); it != end;
-         it = std::find_if(it, end, signaled)) {
+    for (auto it = std::find_if(begin, end, checker); it != end;
+         it = std::find_if(it, end, checker)) {
         save_runnable(*it);
         it = m_waiting_queue.erase(it);
-    }
-}
-
-void Scheduler::schedule_sleeping_workers()
-{
-    auto signaled = [](Worker* worker) { return worker->m_timed_event->check(); };
-
-    auto begin = m_sleeping_queue.begin();
-    auto end = m_sleeping_queue.end();
-
-    for (auto it = std::find_if(begin, end, signaled); it != end;
-         it = std::find_if(it, end, signaled)) {
-        save_runnable(*it);
-        it = m_sleeping_queue.erase(it);
     }
 }
 
@@ -191,7 +171,6 @@ void Scheduler::schedule_workers()
 {
     schedule_io_workers();
     schedule_waiting_workers();
-    schedule_sleeping_workers();
     schedule_idle_workers();
 }
 
@@ -268,7 +247,6 @@ public:
         m_loads[int(Worker::State::initializing)] =  0;
         m_loads[int(Worker::State::idle)]         =  0;
         m_loads[int(Worker::State::waiting)]      =  1;
-        m_loads[int(Worker::State::sleeping)]     =  1;
         m_loads[int(Worker::State::pending_io)]   =  2;
         m_loads[int(Worker::State::runnable)]     = 10;
         m_loads[int(Worker::State::running)]      = 10;
@@ -352,10 +330,8 @@ void Scheduler::save_worker(Worker* worker)
             save_idle<false>(worker);
     else if constexpr (ctx == SyncCtx::yield)
         save_runnable(worker);
-    else if constexpr (ctx == SyncCtx::wait_event)
+    else if constexpr (ctx == SyncCtx::wait_cond_or_sleep)
         save_waiting(worker);
-    else if constexpr (ctx == SyncCtx::wait_sleep)
-        save_sleeping(worker);
     else if constexpr (ctx == SyncCtx::io)
         save_pending_io(worker);
 }
@@ -395,6 +371,5 @@ bool Scheduler::should_exit()
 
 template void Scheduler::sync<SyncCtx::main>(Worker* worker);
 template void Scheduler::sync<SyncCtx::yield>(Worker* worker);
-template void Scheduler::sync<SyncCtx::wait_event>(Worker* worker);
+template void Scheduler::sync<SyncCtx::wait_cond_or_sleep>(Worker* worker);
 template void Scheduler::sync<SyncCtx::io>(Worker* worker);
-template void Scheduler::sync<SyncCtx::wait_sleep>(Worker* worker);

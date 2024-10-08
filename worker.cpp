@@ -10,7 +10,6 @@
 #include "io_api.h"
 #include "os_specific.h"
 #include "scheduler.h"
-#include "sync_api.h"
 
 // Creates worker object and starts worker thread on a provided CPU.
 // We will wait for a signal from created thread, so we can continue when it is ready.
@@ -19,8 +18,6 @@ Worker::Worker(uint64_t id, Scheduler& scheduler)
     : m_id{id}
     , m_state{State::initializing}
     , m_running{true}
-    , m_cond_event{nullptr}
-    , m_timed_event{nullptr}
     , m_scheduler{scheduler}
     , m_thread{&Worker::entry_point, this}
 {
@@ -52,20 +49,10 @@ void Worker::yield()
     m_scheduler.sync<SyncCtx::yield>(this);
 }
 
-// Wait on a event if it is not signaled.
-//
-void Worker::wait_event(ConditionalEvent* event)
+void Worker::wait_cond_or_sleep()
 {
-    if (!event->check()) {
-        m_cond_event = event;
-        m_scheduler.sync<SyncCtx::wait_event>(this);
-    }
-}
-
-void Worker::wait_sleep(TimedEvent* event)
-{
-    m_timed_event = event;
-    m_scheduler.sync<SyncCtx::wait_sleep>(this);
+    if (!check_wait_info())
+        m_scheduler.sync<SyncCtx::wait_cond_or_sleep>(this);
 }
 
 void Worker::read_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
@@ -102,11 +89,11 @@ void Worker::entry_point()
 {
     bind_thread(m_scheduler.m_cpu.m_mask.to_ullong());
 
-    std::cout << "Started thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
+    // std::cout << "Started thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
 
     main_loop();
 
-    std::cout << "Ended thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
+    // std::cout << "Ended thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
 }
 
 // Main worker loop.
@@ -128,7 +115,8 @@ void Worker::main_loop()
             std::cout << ex.what() << "\n";
         }
 
-        std::cout << "CPU " << m_scheduler.m_cpu.m_id << ": worker id " << id() << " task done.\n";
+        // std::cout << "CPU " << m_scheduler.m_cpu.m_id << ": worker id " << id() << " task
+        // done.\n";
 
         m_task->notify();
         m_task.reset();

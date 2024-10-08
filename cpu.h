@@ -28,6 +28,8 @@ public:
     CPUs() noexcept;
 
     [[nodiscard]] Scheduler& min_load_scheduler() const;
+    [[nodiscard]] uint32_t workers_count() const;
+    [[nodiscard]] uint32_t count() const;
 
 private:
     uint32_t m_system_cpus_count;

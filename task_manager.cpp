@@ -31,13 +31,18 @@ void Task::operator()()
 
 Task_manager::Task_manager(const CPUs& cpus) noexcept : m_cpus{cpus} {}
 
+void Task_manager::enque_task(const std::shared_ptr<Task>& task)
+{
+    Scheduler& best_scheduler = m_cpus.min_load_scheduler();
+    best_scheduler.enqueue_task(task);
+}
+
 template<bool async>
 void Task_manager::execute_task(const std::function<void()>& func)
 {
     const std::shared_ptr<Task> task = std::make_shared<Task>(func);
 
-    Scheduler& best_scheduler = m_cpus.min_load_scheduler();
-    best_scheduler.enqueue_task(task);
+    enque_task(task);
 
     if constexpr (!async)
         task->wait();

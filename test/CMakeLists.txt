@@ -5,4 +5,4 @@ include(Utils)
 
 add_cos_test("${CMAKE_CURRENT_SOURCE_DIR}/basic_test.cpp")
 add_cos_test("${CMAKE_CURRENT_SOURCE_DIR}/sleep_test.cpp")
-add_cos_test("${CMAKE_CURRENT_SOURCE_DIR}/event_test.cpp")
+add_cos_test("${CMAKE_CURRENT_SOURCE_DIR}/mutex_test.cpp")

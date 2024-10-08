@@ -20,7 +20,7 @@ CPU::CPU(uint64_t cpu_id, Cpu_Mask cpu_mask) noexcept
 // clang-format off
 CPUs::CPUs() noexcept try
     : m_system_cpus_count{cpus_count()}
-    , m_avail_cpus_mask{Cpu_Mask{cpus_avail_mask()} & CFG_allowed_cpus}
+    , m_avail_cpus_mask{Cpu_Mask{cpus_avail_mask()} & CFG_allowed_cpus} 
 {
     for (uint64_t cpu_id = 0; cpu_id < m_avail_cpus_mask.size(); ++cpu_id)
         if (m_avail_cpus_mask.test(cpu_id))
@@ -40,4 +40,18 @@ Scheduler& CPUs::min_load_scheduler() const
     };
 
     return (*std::min_element(m_cpus.begin(), m_cpus.end(), cmp))->m_scheduler;
+}
+
+[[nodiscard]] uint32_t CPUs::workers_count() const
+{
+    uint32_t c = 0;
+    for (const auto& cpu : m_cpus)
+        c += cpu->m_scheduler.m_workers.size();
+
+    return c;
+}
+
+[[nodiscard]] uint32_t CPUs::count() const
+{
+    return m_cpus.size();
 }

@@ -27,14 +27,17 @@ else()
     message(${WARNING_MESSAGE} "clang-tidy requested but executable not found")
 endif()
 
+# For quick clang-tidy disable, just uncomment next line.
+# set(CMAKE_CXX_CLANG_TIDY "")
+
 # Separate bin directory from build directory.
 #
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG>)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/$<CONFIG>)
 
-set(CPP_FILES cpu.cpp os_specific.cpp scheduler.cpp task_manager.cpp worker.cpp io.cpp sync.cpp util.cpp cos.cpp)
-set(HPP_FILES cpu.h os_specific.h scheduler.h task_manager.h worker.h io_api.h sync_api.h util.h config.h)
+set(CPP_FILES cpu.cpp os_specific.cpp scheduler.cpp task_manager.cpp worker.cpp io.cpp util.cpp cos.cpp mutex.cpp condition_variable.cpp)
+set(HPP_FILES cpu.h os_specific.h scheduler.h task_manager.h worker.h io_api.h  util.h config.h mutex.h condition_variable.h)
 set(ALL_FILES ${CPP_FILES} ${HPP_FILES})
 
 add_library(user_mode_scheduler_lib STATIC ${CPP_FILES})
@@ -45,8 +48,21 @@ add_executable(user_mode_scheduler main.cpp)
 target_link_libraries(user_mode_scheduler PRIVATE ${COS_LIBRARIES})
 target_include_directories(user_mode_scheduler PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
+if (MSVC)
+    add_compile_definitions($<$<CONFIG:Debug>:DEBUG>)
+else()
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_definitions(-DDEBUG)
+    endif()
+endif()
+
 SET(CMAKE_CXX_FLAGS  "-Wall")
-if(MSVC)
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-interference-size")
+endif()
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 endif()
 
@@ -55,4 +71,6 @@ add_subdirectory(test)
 
 message("Disabling clang-tidy for google tests.")
 set_target_properties(gmock PROPERTIES CXX_CLANG_TIDY "")
+set_target_properties(gmock_main PROPERTIES CXX_CLANG_TIDY "")
 set_target_properties(gtest PROPERTIES CXX_CLANG_TIDY "")
+set_target_properties(gtest_main PROPERTIES CXX_CLANG_TIDY "")

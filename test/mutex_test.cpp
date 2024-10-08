@@ -53,9 +53,9 @@ void run_lock_perf_test(const std::string& test_name, int num_threads)
 TEST(Mutex, mutex_vs_spinlock_perf_test_1)
 {
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-// #if defined(DEBUG)
-//     GTEST_SKIP() << "Skipping perf tests in debug build.";
-// #endif
+    // #if defined(DEBUG)
+    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
+    // #endif
 
     std::cout << "---------------------------------------------------------------\n";
     for (int threads_count = 1; threads_count <= 128; threads_count *= 2) {
@@ -102,9 +102,9 @@ TEST(Mutex, mutex_sanity_test_2)
 TEST(Mutex, mutex_peft_test_1)
 {
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-// #if defined(DEBUG)
-//     GTEST_SKIP() << "Skipping perf tests in debug build.";
-// #endif
+    // #if defined(DEBUG)
+    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
+    // #endif
 
     Mutex mutex;
     int counter = 0;
@@ -124,9 +124,9 @@ TEST(Mutex, mutex_peft_test_1)
 TEST(Mutex, spinlock_peft_test_1)
 {
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-// #if defined(DEBUG)
-//     GTEST_SKIP() << "Skipping perf tests in debug build.";
-// #endif
+    // #if defined(DEBUG)
+    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
+    // #endif
 
     Spinlock mutex;
     int counter = 0;
@@ -146,9 +146,9 @@ TEST(Mutex, spinlock_peft_test_1)
 TEST(Mutex, std_mutex_peft_test_1)
 {
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-// #if defined(DEBUG)
-//    GTEST_SKIP() << "Skipping perf tests in debug build.";    
-// #endif
+    // #if defined(DEBUG)
+    //    GTEST_SKIP() << "Skipping perf tests in debug build.";
+    // #endif
 
     std::mutex mutex;
     int counter = 0;
@@ -175,9 +175,9 @@ TEST(Mutex, std_mutex_peft_test_1)
 TEST(Mutex, mutex_peft_test_2)
 {
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-// #if defined(DEBUG)
-//     GTEST_SKIP() << "Skipping perf tests in debug build.";
-// #endif
+    // #if defined(DEBUG)
+    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
+    // #endif
 
     Mutex mutex;
     int counter = 0;
@@ -196,9 +196,9 @@ TEST(Mutex, mutex_peft_test_2)
 TEST(Mutex, spinlock_peft_test_2)
 {
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-// #if defined(DEBUG)
-//     GTEST_SKIP() << "Skipping perf tests in debug build.";
-// #endif
+    // #if defined(DEBUG)
+    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
+    // #endif
 
     Spinlock mutex;
     int counter = 0;
@@ -217,9 +217,9 @@ TEST(Mutex, spinlock_peft_test_2)
 TEST(Mutex, std_mutex_peft_test_2)
 {
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-// #if defined(DEBUG)
-//     GTEST_SKIP() << "Skipping perf tests in debug build.";
-// #endif
+    // #if defined(DEBUG)
+    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
+    // #endif
 
     std::mutex mutex;
     int counter = 0;
@@ -794,7 +794,7 @@ struct mutex_test_fixture {
                     }) < std::chrono::hours(1));
         ASSERT_TRUE(time_execution([this] {
                         std::unique_lock<_Mutex> ul(mtx, std::chrono::system_clock::now() +
-                                                            std::chrono::hours(24));
+                                                             std::chrono::hours(24));
                         ASSERT_TRUE(ul.owns_lock());
                     }) < std::chrono::hours(1));
     }
@@ -959,7 +959,7 @@ TEST(STL_Mutex, mutex_test)
 
 TEST(STL_Mutex, nonmember_lock_test)
 {
-    GTEST_SKIP() << "Skipping test since we did not implement other mutex types."
+    GTEST_SKIP() << "Skipping test since we did not implement other mutex types. "
                  << "Some system mutexes (like std::recursive_timed_mutex) "
                  << "might wait on a condition variable, which will block our scheduler, "
                  << "hence we must skip this test.";
@@ -972,7 +972,7 @@ TEST(STL_Mutex, nonmember_lock_test)
 
 TEST(STL_Mutex, nonmember_try_lock_test)
 {
-    GTEST_SKIP() << "Skipping test since we did not implement other mutex types."
+    GTEST_SKIP() << "Skipping test since we did not implement other mutex types. "
                  << "Some system mutexes (like std::recursive_timed_mutex) "
                  << "might wait on a condition variable, which will block our scheduler, "
                  << "hence we must skip this test.";

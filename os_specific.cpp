@@ -35,14 +35,14 @@ constexpr char ENDL = '\n';
 
 // Helper function for getting result from win32 API.
 //
-DWORD bool_to_error(BOOL b) // NOLINT
+DWORD bool_to_error(BOOL b) noexcept // NOLINT
 {
     return b != 0 ? ERROR_SUCCESS : GetLastError();
 }
 
 // Returns number of CPUs in the system.
 //
-uint32_t cpus_count()
+uint32_t cpus_count() noexcept
 {
     return GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
 }
@@ -50,7 +50,7 @@ uint32_t cpus_count()
 // Returns availability mask for this process.
 // Example: returns 15 (0b0000000000001111) -> 4 CPUs are available (0, 1, 2, 3).
 //
-uint64_t cpus_avail_mask()
+uint64_t cpus_avail_mask() noexcept
 {
     uint64_t procCpuMask = 0; // Available CPUs for this process.
     uint64_t allCpusMask = 0; // All available CPUs in the system.
@@ -65,17 +65,17 @@ uint64_t cpus_avail_mask()
 
 // Binds current thread to to provided CPU.
 //
-void bind_thread(uint64_t cpu_mask)
+void bind_thread(uint64_t cpu_mask) noexcept
 {
     SetThreadAffinityMask(GetCurrentThread(), cpu_mask);
 }
 
-OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl)
+OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl) noexcept
 {
     return std::bit_cast<OVERLAPPED*>(&io_ctrl.m_ol);
 }
 
-void read_file(IO_Request& io)
+void read_file(IO_Request& io) noexcept
 {
     const DWORD read_res =
         bool_to_error(ReadFile(io.m_file_handle, io.m_io_buffer.m_buffer,
@@ -96,7 +96,7 @@ void read_file(IO_Request& io)
     }
 }
 
-void write_file(IO_Request& io)
+void write_file(IO_Request& io) noexcept
 {
     const DWORD write_res =
         bool_to_error(WriteFile(io.m_file_handle, io.m_io_buffer.m_buffer,
@@ -117,12 +117,12 @@ void write_file(IO_Request& io)
     }
 }
 
-bool io_completed(IO_Control& io_control)
+bool io_completed(IO_Control& io_control) noexcept
 {
     return HasOverlappedIoCompleted(to_ol_ptr(io_control));
 }
 
-void update_io_state(IO_Request& io)
+void update_io_state(IO_Request& io) noexcept
 {
     if (io.pending() && !io_completed(io.m_control)) {
         // std::cout << "IO still pending...\n";
@@ -156,12 +156,12 @@ void update_io_state(IO_Request& io)
 #include <sched.h>
 #include <unistd.h>
 
-uint32_t cpus_count()
+uint32_t cpus_count() noexcept
 {
     return sysconf(_SC_NPROCESSORS_ONLN);
 }
 
-uint64_t cpus_avail_mask()
+uint64_t cpus_avail_mask() noexcept
 {
     pid_t pid = getpid();
     cpu_set_t mask;
@@ -188,7 +188,7 @@ uint64_t cpus_avail_mask()
 
 // Binds current thread to provided CPU.
 //
-void bind_thread(uint64_t cpu_mask)
+void bind_thread(uint64_t cpu_mask) noexcept
 {
     cpu_set_t mask;
     CPU_ZERO(&mask);
@@ -221,22 +221,22 @@ void print_thread_affinity()
     std::cout << ENDL;
 }
 
-void read_file(IO_Request& io)
+void read_file(IO_Request& io) noexcept
 {
     throw std::logic_error{"Not implemented"};
 }
 
-void write_file(IO_Request& io)
+void write_file(IO_Request& io) noexcept
 {
     throw std::logic_error{"Not implemented"};
 }
 
-bool io_completed(IO_Control& io_control)
+bool io_completed(IO_Control& io_control) noexcept
 {
     throw std::logic_error{"Not implemented"};
 }
 
-void update_io_state(IO_Request& io)
+void update_io_state(IO_Request& io) noexcept
 {
     throw std::logic_error{"Not implemented"};
 }
@@ -245,7 +245,7 @@ void update_io_state(IO_Request& io)
 #include <exception>
 #include <sys/sysctl.h>
 
-uint32_t cpus_count()
+uint32_t cpus_count() noexcept
 {
     int num_cpu;
     size_t len = sizeof(num_cpu);
@@ -265,7 +265,7 @@ uint32_t cpus_count()
 
 // Getting availability mask for process on OSX is not supported
 // Instead, we return all available CPUs
-uint64_t cpus_avail_mask()
+uint64_t cpus_avail_mask() noexcept
 {
     uint64_t procCpuMask = 0; // This process is only allowed to run on these CPUs.
     for (uint32_t i = 0; i < cpus_count(); ++i)
@@ -275,27 +275,27 @@ uint64_t cpus_avail_mask()
 }
 
 // Binding thread to CPU is not supported on OSX
-void bind_thread(uint64_t cpu_mask)
+void bind_thread(uint64_t cpu_mask) noexcept
 {
     return;
 }
 
-void read_file(IO_Request& io)
+void read_file(IO_Request& io) noexcept
 {
     throw std::logic_error{"Not implemented"};
 }
 
-void write_file(IO_Request& io)
+void write_file(IO_Request& io) noexcept
 {
     throw std::logic_error{"Not implemented"};
 }
 
-bool io_completed(IO_Control& io_control)
+bool io_completed(IO_Control& io_control) noexcept
 {
     throw std::logic_error{"Not implemented"};
 }
 
-void update_io_state(IO_Request& io)
+void update_io_state(IO_Request& io) noexcept
 {
     throw std::logic_error{"Not implemented"};
 }

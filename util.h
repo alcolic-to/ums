@@ -41,9 +41,13 @@ inline Time_point now() noexcept
 template<typename Duration = milliseconds>
 class Stopwatch {
 public:
-    explicit Stopwatch(std::string name = "Stopwatch") : m_name{std::move(name)}, m_start{now()} {}
+    explicit Stopwatch(std::string name = "Stopwatch") noexcept
+        : m_name{std::move(name)}
+        , m_start{now()}
+    {
+    }
 
-    ~Stopwatch()
+    ~Stopwatch() noexcept
     {
         stop();
         std::cout << m_name << " elapsed time: " << elapsed().count() << " " << unit_name() << "\n";
@@ -54,13 +58,13 @@ public:
     Stopwatch(Stopwatch&& rhs) noexcept = delete;
     Stopwatch& operator=(Stopwatch&& rhs) = delete;
 
-    void restart() { m_start = now(); }
+    void restart() noexcept { m_start = now(); }
 
-    void stop() { m_end = now(); }
+    void stop() noexcept { m_end = now(); }
 
-    [[nodiscard]] auto elapsed() const { return duration_cast<Duration>(m_end - m_start); }
+    [[nodiscard]] auto elapsed() const noexcept { return duration_cast<Duration>(m_end - m_start); }
 
-    [[nodiscard]] std::string unit_name() const
+    [[nodiscard]] std::string unit_name() const noexcept
     {
         // clang-format off
         if      constexpr (std::is_same_v<Duration, hours>)        return "hour(s)";
@@ -82,6 +86,6 @@ private:
 // Random number generator.
 //
 template<typename T = uint64_t>
-T random();
+T random() noexcept;
 
 #endif // COS_UTIL_H

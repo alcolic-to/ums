@@ -26,7 +26,7 @@ struct Overlapped final {
 
 struct IO_Control final {
 public:
-    explicit IO_Control(uint64_t offset) : m_ol{}
+    explicit IO_Control(uint64_t offset) noexcept : m_ol{}
     {
         constexpr uint32_t ON_BITS_32 = 0xFFFFFFFF;
         constexpr uint8_t HIGH_BITS_OFFSET = 32;
@@ -43,15 +43,15 @@ public:
     enum class Type : int { read, write };
     enum class State : int { init, error, pending, completed };
 
-    IO_Request(void* file_handle, IO_Buffer buffer, uint64_t offset, Type type);
+    IO_Request(void* file_handle, IO_Buffer buffer, uint64_t offset, Type type) noexcept;
 
-    [[nodiscard]] bool completed() const { return m_state == State::completed; }
+    [[nodiscard]] bool completed() const noexcept { return m_state == State::completed; }
 
-    [[nodiscard]] bool pending() const { return m_state == State::pending; }
+    [[nodiscard]] bool pending() const noexcept { return m_state == State::pending; }
 
-    [[nodiscard]] bool error() const { return m_state == State::error; }
+    [[nodiscard]] bool error() const noexcept { return m_state == State::error; }
 
-    void update();
+    void update() noexcept;
 
     void* m_file_handle;
     IO_Buffer m_io_buffer;

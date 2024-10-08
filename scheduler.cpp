@@ -33,27 +33,27 @@ Scheduler::Scheduler(const CPU& cpu)
     m_worker->notify(lock);
 }
 
-Scheduler::~Scheduler()
+Scheduler::~Scheduler() noexcept
 {
     set_state(State::exiting);
 }
 
-bool Scheduler::has_idle_workers() const
+bool Scheduler::has_idle_workers() const noexcept
 {
     return !m_idle_queue.empty();
 }
 
-bool Scheduler::has_runnable_workers() const
+bool Scheduler::has_runnable_workers() const noexcept
 {
     return !m_runnable_queue.empty();
 }
 
-bool Scheduler::has_waiting_workers() const
+bool Scheduler::has_waiting_workers() const noexcept
 {
     return !m_waiting_queue.empty();
 }
 
-bool Scheduler::has_pending_io_workers() const
+bool Scheduler::has_pending_io_workers() const noexcept
 {
     return !m_pending_io_queue.empty();
 }
@@ -87,7 +87,7 @@ void Scheduler::save_pending_io(Worker* worker)
     worker->set_state(Worker::State::pending_io);
 }
 
-void Scheduler::prepare_next_worker()
+void Scheduler::prepare_next_worker() noexcept
 {
     m_worker = m_runnable_queue.front();
     m_runnable_queue.pop_front();
@@ -97,22 +97,16 @@ void Scheduler::prepare_next_worker()
 
 void Scheduler::enqueue_task(const std::shared_ptr<Task>& task)
 {
-    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
-    m_tasks.push_back(task);
+    m_tasks.enque(task);
 }
 
-std::shared_ptr<Task> Scheduler::next_task()
+std::shared_ptr<Task> Scheduler::next_task() noexcept
 {
-    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
-    std::shared_ptr<Task> t = m_tasks.front();
-    m_tasks.pop_front();
-
-    return t;
+    return m_tasks.deque();
 }
 
-bool Scheduler::has_tasks()
+bool Scheduler::has_tasks() const noexcept
 {
-    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
     return !m_tasks.empty();
 }
 
@@ -191,47 +185,9 @@ void Scheduler::schedule()
         prepare_next_worker();
 }
 
-void Scheduler::idle_sleep()
-{
-    // std::cout << "Idle sleep.\n";
+void Scheduler::idle_sleep() const noexcept {}
 
-    // TODO: Check what should be done here.
-    // TODO: Release CPU (sleep) only when our time slice expires.
-    // TODO: Check why there is a problem with sync tasks execution
-    // if there is a sleep after task is done.
-    //
-
-    // tatic int c = 0;
-    // onstexpr int sleep_cycle = 1 << 20;
-    //
-    // f ((++c & (sleep_cycle-1)) == 0)
-    //
-    // std::cout << "Zzzz...\n";
-    // std::this_thread::sleep_for(CFG_idle_sleep);
-    // c = 0;
-    //
-
-    // auto start = std::chrono::high_resolution_clock::now();
-    //
-    // std::this_thread::sleep_for(CFG_idle_sleep);
-    //
-    // auto end = std::chrono::high_resolution_clock::now();
-    //
-    // std::chrono::duration<double, std::milli> duration = end - start;
-    // std::cout << "Sleep duration: " << duration.count() << "ms.\n";
-
-    // auto start = std::chrono::high_resolution_clock::now();
-    //
-    // std::unique_lock lock{ m_workers_mtx };
-    // m_worker->wait(lock);
-    //
-    // auto end = std::chrono::high_resolution_clock::now();
-    //
-    // std::chrono::duration<double, std::milli> duration = end - start;
-    // std::cout << "Sleep duration: " << duration.count() << "ms.\n";
-}
-
-void Scheduler::set_state(State state)
+void Scheduler::set_state(State state) noexcept
 {
     m_state = state;
 }
@@ -266,12 +222,12 @@ static constexpr Scheduler_Loads Loads;
 
 // Sets new scheduler load based on previous and new worker state.
 //
-void Scheduler::manage_load(Worker::State prev_state, Worker::State new_state)
+void Scheduler::manage_load(Worker::State prev_state, Worker::State new_state) noexcept
 {
     m_load += Loads[new_state] - Loads[prev_state];
 }
 
-uint64_t Scheduler::load() const
+uint64_t Scheduler::load() const noexcept
 {
     return m_load + m_tasks.size() * Loads[Worker::State::runnable];
 }
@@ -363,7 +319,7 @@ void Scheduler::exit_workers()
     }
 }
 
-bool Scheduler::should_exit()
+bool Scheduler::should_exit() const noexcept
 {
     return exiting() && !has_runnable_workers() && !has_waiting_workers() &&
            !has_pending_io_workers() && !has_tasks();

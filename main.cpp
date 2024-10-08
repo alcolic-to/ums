@@ -35,7 +35,7 @@ void f1()
 
     std::vector<uint64_t> v;
     for (int i = 0; i < 1000; ++i)
-        v.push_back(random());
+        v.push_back(random<uint8_t>());
 
     int funcDur = random() % 11;
 
@@ -49,7 +49,7 @@ void f1()
             break;
         }
 
-        if (v[random() % v.size()] == random() % v.size() && i++ % 100 == 0)
+        if (v[random() % v.size()] == random<uint8_t>() % v.size() && i++ % 100 == 0)
             tls_worker->yield();
     }
 
@@ -140,7 +140,7 @@ void single_read()
 
     auto buf = std::make_unique<char[]>(read_size);
 
-    cos_read_file(file, {buf.get(), read_size}, 0);
+    cos_read_file(file, IO_Buffer{buf.get(), read_size}, 0);
     std::cout << "Read buffer: " << buf.get() << "\n";
 }
 
@@ -227,12 +227,15 @@ void execute_testing_mutex_tasks()
 
 int main(int argc, char* argv[])
 {
-    Stopwatch<microseconds> s{"Sleep for stopwatch"};
-    std::cout << "Entering sleep for!\n";
+    // Stopwatch<microseconds> s{"Sleep for stopwatch"};
+    // std::cout << "Entering sleep for!\n";
 
-    task_manager.execute_task<false>([] { tls_worker->sleep_for(5s); });
+    // task_manager.execute_task<false>([] { tls_worker->sleep_for(5s); });
 
-    std::cout << "Exiting sleep for!\n";
+    // std::cout << "Exiting sleep for!\n";
+
+    for (int i = 0; i < 1000; ++i)
+        task_manager.execute_task<true>(f1);
 }
 
 #else

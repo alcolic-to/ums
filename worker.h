@@ -46,16 +46,16 @@ public:
         wait_cond_or_sleep();
     }
 
-    void set_state(State state);
+    void set_state(State state) noexcept;
 
-    void notify(std::unique_lock<std::mutex>& lock);
+    void notify(std::unique_lock<std::mutex>& lock) noexcept;
     void wait(std::unique_lock<std::mutex>& lock);
 
-    [[nodiscard]] constexpr uint64_t id() const { return m_id; }
+    [[nodiscard]] constexpr uint64_t id() const noexcept { return m_id; }
 
-    [[nodiscard]] constexpr State state() const { return m_state; }
+    [[nodiscard]] constexpr State state() const noexcept { return m_state; }
 
-    [[nodiscard]] bool exit() const;
+    [[nodiscard]] bool exit() const noexcept;
 
     // Helper struct used for info about waiting worker. Worker will sleep
     // until condition is set or until sleep time expires. This helper struct

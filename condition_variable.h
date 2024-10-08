@@ -34,7 +34,7 @@ public:
 
 private:
     void add_waiter();
-    void remove_waiter() noexcept;
+    void remove_waiter();
     void notify_waiter() noexcept;
 
     Spinlock m_waiters_lock;

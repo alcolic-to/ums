@@ -15,6 +15,15 @@ constexpr std::size_t cache_line_size = 64;
 
 class alignas(cache_line_size) Spinlock {
 public:
+    Spinlock() noexcept = default;
+    ~Spinlock() noexcept = default;
+
+    Spinlock(const Spinlock&) = delete;
+    Spinlock& operator=(const Spinlock&) = delete;
+
+    Spinlock(Spinlock&&) noexcept = delete;
+    Spinlock& operator=(Spinlock&&) = delete;
+
     void lock() noexcept;
     bool try_lock() noexcept;
     bool single_try_lock() noexcept;
@@ -24,12 +33,21 @@ private:
     std::atomic_flag m_lock;
 };
 
-// TODO: Make distinct (spin)lock for mutex with CAS and instead of single atomic flag, plece all lock
-// info into the lock variable, since we are aligning it on 64 bytes. We can put there owner id,
-// type of mutex etc.
+// TODO: Make distinct (spin)lock for mutex with CAS and instead of single atomic flag, plece all
+// lock info into the lock variable, since we are aligning it on 64 bytes. We can put there owner
+// id, type of mutex etc.
 //
 class Mutex {
 public:
+    Mutex() noexcept = default;
+    ~Mutex() noexcept = default;
+
+    Mutex(const Mutex&) = delete;
+    Mutex& operator=(const Mutex&) = delete;
+
+    Mutex(Mutex&&) noexcept = delete;
+    Mutex& operator=(Mutex&&) = delete;
+
     void lock();
     bool try_lock() noexcept;
     void unlock() noexcept;

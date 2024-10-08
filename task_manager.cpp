@@ -7,9 +7,13 @@
 #include "cpu.h"
 #include "scheduler.h"
 
-Task::Task() : m_state{State::not_started} {}
+Task::Task() noexcept : m_state{State::not_started} {}
 
-Task::Task(const std::function<void()>& function) : m_func{function}, m_state{State::not_started} {}
+Task::Task(const std::function<void()>& function) noexcept
+    : m_func{function}
+    , m_state{State::not_started}
+{
+}
 
 void Task::wait()
 {
@@ -17,7 +21,7 @@ void Task::wait()
     m_cv.wait(lock, [&] { return m_state == Task::State::done; });
 }
 
-void Task::notify()
+void Task::notify() noexcept
 {
     const std::unique_lock<std::mutex> lock{m_mtx};
     m_state = State::done;

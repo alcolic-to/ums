@@ -97,22 +97,16 @@ void Scheduler::prepare_next_worker()
 
 void Scheduler::enqueue_task(const std::shared_ptr<Task>& task)
 {
-    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
-    m_tasks.push_back(task);
+    m_tasks.enque(task);
 }
 
 std::shared_ptr<Task> Scheduler::next_task()
 {
-    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
-    std::shared_ptr<Task> t = m_tasks.front();
-    m_tasks.pop_front();
-
-    return t;
+    return m_tasks.deque();
 }
 
-bool Scheduler::has_tasks()
+bool Scheduler::has_tasks() const noexcept
 {
-    const std::scoped_lock<std::mutex> lock{m_tasks_mtx};
     return !m_tasks.empty();
 }
 
@@ -193,42 +187,6 @@ void Scheduler::schedule()
 
 void Scheduler::idle_sleep()
 {
-    // std::cout << "Idle sleep.\n";
-
-    // TODO: Check what should be done here.
-    // TODO: Release CPU (sleep) only when our time slice expires.
-    // TODO: Check why there is a problem with sync tasks execution
-    // if there is a sleep after task is done.
-    //
-
-    // tatic int c = 0;
-    // onstexpr int sleep_cycle = 1 << 20;
-    //
-    // f ((++c & (sleep_cycle-1)) == 0)
-    //
-    // std::cout << "Zzzz...\n";
-    // std::this_thread::sleep_for(CFG_idle_sleep);
-    // c = 0;
-    //
-
-    // auto start = std::chrono::high_resolution_clock::now();
-    //
-    // std::this_thread::sleep_for(CFG_idle_sleep);
-    //
-    // auto end = std::chrono::high_resolution_clock::now();
-    //
-    // std::chrono::duration<double, std::milli> duration = end - start;
-    // std::cout << "Sleep duration: " << duration.count() << "ms.\n";
-
-    // auto start = std::chrono::high_resolution_clock::now();
-    //
-    // std::unique_lock lock{ m_workers_mtx };
-    // m_worker->wait(lock);
-    //
-    // auto end = std::chrono::high_resolution_clock::now();
-    //
-    // std::chrono::duration<double, std::milli> duration = end - start;
-    // std::cout << "Sleep duration: " << duration.count() << "ms.\n";
 }
 
 void Scheduler::set_state(State state)

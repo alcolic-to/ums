@@ -10,13 +10,13 @@ public:
     }
 
     template<typename T>
-    T rand()
+    T rand() noexcept
     {
         return T(rand64());
     }
 
 private:
-    uint64_t rand64()
+    uint64_t rand64() noexcept
     {
         m_seed ^= m_seed >> 12, m_seed ^= m_seed << 25, m_seed ^= m_seed >> 27; // NOLINT
         return m_seed * 2685821657736338717LL;                                  // NOLINT
@@ -26,12 +26,12 @@ private:
 };
 
 template<typename T>
-T random()
+T random() noexcept
 {
     return PRNG{}.rand<T>();
 }
 
-template uint8_t random<uint8_t>();
-template uint16_t random<uint16_t>();
-template uint32_t random<uint32_t>();
-template uint64_t random<uint64_t>();
+template uint8_t random<uint8_t>() noexcept;
+template uint16_t random<uint16_t>() noexcept;
+template uint32_t random<uint32_t>() noexcept;
+template uint64_t random<uint64_t>() noexcept;

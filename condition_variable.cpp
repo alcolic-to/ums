@@ -41,7 +41,7 @@ void Condition_variable::add_waiter()
 // which one will be first awaken, so we must call std::erase
 // to remove worker, instead of pop_front.
 //
-void Condition_variable::remove_waiter() noexcept
+void Condition_variable::remove_waiter()
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
     std::erase(m_waiters, tls_worker);

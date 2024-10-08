@@ -13,11 +13,11 @@ class Task {
 public:
     enum class State : int { not_started, running, done };
 
-    Task();
-    explicit Task(const std::function<void()>& function);
+    Task() noexcept;
+    explicit Task(const std::function<void()>& function) noexcept;
 
     void wait();
-    void notify();
+    void notify() noexcept;
     void operator()();
 
     std::function<void()> m_func;
@@ -29,7 +29,7 @@ public:
 class Task_manager final {
 public:
     explicit Task_manager(const CPUs& cpus) noexcept;
-    ~Task_manager() = default;
+    ~Task_manager() noexcept = default;
 
     Task_manager(const Task_manager& rhs) = delete;
     Task_manager& operator=(const Task_manager& rhs) = delete;

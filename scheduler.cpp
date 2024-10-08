@@ -33,27 +33,27 @@ Scheduler::Scheduler(const CPU& cpu)
     m_worker->notify(lock);
 }
 
-Scheduler::~Scheduler()
+Scheduler::~Scheduler() noexcept
 {
     set_state(State::exiting);
 }
 
-bool Scheduler::has_idle_workers() const
+bool Scheduler::has_idle_workers() const noexcept
 {
     return !m_idle_queue.empty();
 }
 
-bool Scheduler::has_runnable_workers() const
+bool Scheduler::has_runnable_workers() const noexcept
 {
     return !m_runnable_queue.empty();
 }
 
-bool Scheduler::has_waiting_workers() const
+bool Scheduler::has_waiting_workers() const noexcept
 {
     return !m_waiting_queue.empty();
 }
 
-bool Scheduler::has_pending_io_workers() const
+bool Scheduler::has_pending_io_workers() const noexcept
 {
     return !m_pending_io_queue.empty();
 }
@@ -87,7 +87,7 @@ void Scheduler::save_pending_io(Worker* worker)
     worker->set_state(Worker::State::pending_io);
 }
 
-void Scheduler::prepare_next_worker()
+void Scheduler::prepare_next_worker() noexcept
 {
     m_worker = m_runnable_queue.front();
     m_runnable_queue.pop_front();
@@ -100,7 +100,7 @@ void Scheduler::enqueue_task(const std::shared_ptr<Task>& task)
     m_tasks.enque(task);
 }
 
-std::shared_ptr<Task> Scheduler::next_task()
+std::shared_ptr<Task> Scheduler::next_task() noexcept
 {
     return m_tasks.deque();
 }
@@ -185,11 +185,9 @@ void Scheduler::schedule()
         prepare_next_worker();
 }
 
-void Scheduler::idle_sleep()
-{
-}
+void Scheduler::idle_sleep() const noexcept {}
 
-void Scheduler::set_state(State state)
+void Scheduler::set_state(State state) noexcept
 {
     m_state = state;
 }
@@ -224,12 +222,12 @@ static constexpr Scheduler_Loads Loads;
 
 // Sets new scheduler load based on previous and new worker state.
 //
-void Scheduler::manage_load(Worker::State prev_state, Worker::State new_state)
+void Scheduler::manage_load(Worker::State prev_state, Worker::State new_state) noexcept
 {
     m_load += Loads[new_state] - Loads[prev_state];
 }
 
-uint64_t Scheduler::load() const
+uint64_t Scheduler::load() const noexcept
 {
     return m_load + m_tasks.size() * Loads[Worker::State::runnable];
 }
@@ -321,7 +319,7 @@ void Scheduler::exit_workers()
     }
 }
 
-bool Scheduler::should_exit()
+bool Scheduler::should_exit() const noexcept
 {
     return exiting() && !has_runnable_workers() && !has_waiting_workers() &&
            !has_pending_io_workers() && !has_tasks();

@@ -32,7 +32,7 @@ catch (...) {
 
 // clang-format on
 
-Scheduler& CPUs::min_load_scheduler() const
+Scheduler& CPUs::min_load_scheduler() const noexcept
 {
     // NOLINTNEXTLINE(readability-suspicious-call-argument)
     const auto cmp = [](const auto& left, const auto& right) {
@@ -42,7 +42,7 @@ Scheduler& CPUs::min_load_scheduler() const
     return (*std::min_element(m_cpus.begin(), m_cpus.end(), cmp))->m_scheduler;
 }
 
-[[nodiscard]] uint32_t CPUs::workers_count() const
+[[nodiscard]] uint32_t CPUs::workers_count() const noexcept
 {
     uint32_t c = 0;
     for (const auto& cpu : m_cpus)
@@ -51,7 +51,7 @@ Scheduler& CPUs::min_load_scheduler() const
     return c;
 }
 
-[[nodiscard]] uint32_t CPUs::count() const
+[[nodiscard]] uint32_t CPUs::count() const noexcept
 {
     return m_cpus.size();
 }

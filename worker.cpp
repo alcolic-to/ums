@@ -31,13 +31,13 @@ Worker::~Worker()
         m_thread.join();
 }
 
-void Worker::set_state(Worker::State state)
+void Worker::set_state(Worker::State state) noexcept
 {
     m_scheduler.manage_load(m_state, state);
     m_state = state;
 }
 
-bool Worker::exit() const
+bool Worker::exit() const noexcept
 {
     return m_state == State::exiting;
 }
@@ -73,7 +73,7 @@ void Worker::write_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
         m_scheduler.sync<SyncCtx::io>(this);
 }
 
-void Worker::notify([[maybe_unused]] std::unique_lock<std::mutex>& lock)
+void Worker::notify([[maybe_unused]] std::unique_lock<std::mutex>& lock) noexcept
 {
     m_running = true;
     m_cv.notify_one();

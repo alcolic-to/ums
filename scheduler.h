@@ -26,7 +26,7 @@ public:
     enum class State : int { initializing, running, exiting };
 
     explicit Scheduler(const CPU& cpu);
-    ~Scheduler();
+    ~Scheduler() noexcept;
 
     Scheduler(const Scheduler&) = delete;
     Scheduler& operator=(const Scheduler&) = delete;
@@ -34,10 +34,10 @@ public:
     Scheduler(Scheduler&&) noexcept = delete;
     Scheduler& operator=(Scheduler&&) = delete;
 
-    bool has_idle_workers() const;
-    bool has_runnable_workers() const;
-    bool has_waiting_workers() const;
-    bool has_pending_io_workers() const;
+    bool has_idle_workers() const noexcept;
+    bool has_runnable_workers() const noexcept;
+    bool has_waiting_workers() const noexcept;
+    bool has_pending_io_workers() const noexcept;
 
     void save_runnable(Worker* worker);
     void save_waiting(Worker* worker);
@@ -46,10 +46,10 @@ public:
     template<bool back>
     void save_idle(Worker* worker);
 
-    void prepare_next_worker();
+    void prepare_next_worker() noexcept;
 
     void enqueue_task(const std::shared_ptr<Task>& task);
-    std::shared_ptr<Task> next_task();
+    std::shared_ptr<Task> next_task() noexcept;
     bool has_tasks() const noexcept;
 
     void schedule_idle_worker();
@@ -62,20 +62,18 @@ public:
 
     void schedule();
 
-    void idle_sleep();
+    void idle_sleep() const noexcept;
 
-    [[nodiscard]] bool exiting() const { return m_state == State::exiting; }
+    [[nodiscard]] bool exiting() const noexcept { return m_state == State::exiting; }
 
-    [[nodiscard]] bool initializing() const { return m_state == State::initializing; }
+    [[nodiscard]] bool initializing() const noexcept { return m_state == State::initializing; }
 
-    [[nodiscard]] Worker* worker() const { return m_worker; }
+    [[nodiscard]] Worker* worker() const noexcept { return m_worker; }
 
-    void set_state(State state);
+    void set_state(State state) noexcept;
 
-    void manage_load(Worker::State prev_state, Worker::State new_state);
-    void inc_load();
-    void dec_load();
-    uint64_t load() const;
+    void manage_load(Worker::State prev_state, Worker::State new_state) noexcept;
+    uint64_t load() const noexcept;
 
     void context_switch(Worker* prev_worker);
 
@@ -88,7 +86,7 @@ public:
     void sync(Worker* worker);
 
     void exit_workers();
-    bool should_exit();
+    bool should_exit() const noexcept;
 
     class Tasks {
     public:
@@ -103,7 +101,7 @@ public:
         // This function is only executed by scheduler (single threaded), so
         // caller just needs to check once if there are tasks and call this function.
         //
-        std::shared_ptr<Task> deque()
+        std::shared_ptr<Task> deque() noexcept
         {
             const std::scoped_lock<Spinlock> l{m_lock};
 
@@ -122,10 +120,11 @@ public:
         [[nodiscard]] bool empty() const noexcept { return size() == 0; }
 
     private:
-        // TODO: Crate nonaligned spinlock for this.
+        // TODO: Crate nonaligned spinlock for this and align whole struct on a cache line.
+        //
         Spinlock m_lock;
         std::deque<std::shared_ptr<Task>> m_tasks;
-        std::atomic<std::size_t> m_size;
+        std::atomic<std::size_t> m_size{0};
     };
 
     const CPU& m_cpu;

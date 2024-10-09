@@ -18,6 +18,7 @@ class Scheduler;
 
 class Worker final {
 public:
+    friend class Scheduler;
     enum class State : int { initializing, idle, waiting, pending_io, runnable, running, exiting };
 
     Worker(uint64_t id, Scheduler& scheduler);
@@ -57,23 +58,24 @@ public:
 
     [[nodiscard]] bool exit() const noexcept;
 
+private:
     // Helper struct used for info about waiting worker. Worker will sleep
     // until condition is set or until sleep time expires. This helper struct
     // is useful for mutex and condition variable, since there are functions which
     // requires waiting on a condition with some timeout.
     //
     struct Wait_info {
-        std::atomic_flag m_cond{};
-        Time_point m_sleep_time_point{Time_point::min()};
+        std::atomic<bool> m_cond{false};
+        Time_point m_sleep_time_point{Time_point::max()};
     };
 
-    void set_cond() noexcept { m_wait_info.m_cond.test_and_set(std::memory_order_relaxed); };
+    void set_cond() noexcept { m_wait_info.m_cond.store(true, std::memory_order_relaxed); };
 
-    void clear_cond() noexcept { m_wait_info.m_cond.clear(std::memory_order_relaxed); };
+    void clear_cond() noexcept { m_wait_info.m_cond.store(false, std::memory_order_relaxed); };
 
     [[nodiscard]] bool check_cond() const noexcept
     {
-        return m_wait_info.m_cond.test(std::memory_order_relaxed);
+        return m_wait_info.m_cond.load(std::memory_order_relaxed);
     };
 
     void set_sleep(Time_point sleep_time_point) noexcept
@@ -81,12 +83,17 @@ public:
         m_wait_info.m_sleep_time_point = sleep_time_point;
     }
 
-    void clear_sleep() noexcept { m_wait_info.m_sleep_time_point = Time_point::min(); }
+    void clear_sleep() noexcept { m_wait_info.m_sleep_time_point = Time_point::max(); }
 
     [[nodiscard]] bool check_sleep() const noexcept
     {
-        return m_wait_info.m_sleep_time_point != Time_point::min() &&
-               m_wait_info.m_sleep_time_point <= now();
+        return now() >= m_wait_info.m_sleep_time_point;
+    }
+
+public:
+    [[nodiscard]] Time_point sleep_time_point() const noexcept
+    {
+        return m_wait_info.m_sleep_time_point;
     }
 
     void set_wait_info(bool cond, Time_point sleep_time_point) noexcept
@@ -107,12 +114,14 @@ public:
 
     [[nodiscard]] bool check_wait_info() const noexcept { return check_cond() || check_sleep(); }
 
+    void notify_waiter() noexcept;
+
     // TODO: reorganize data members for quick access.
     //
     std::condition_variable m_cv;
     uint64_t m_id;
-    State m_state;
-    bool m_running; // Flag used for spurious wakeup check.
+    State m_state{State::initializing};
+    bool m_running{true}; // Flag used for spurious wakeup check.
     Wait_info m_wait_info;
     std::shared_ptr<Task> m_task;
     std::unique_ptr<IO_Request> m_io_request;

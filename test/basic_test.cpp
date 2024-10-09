@@ -2,9 +2,9 @@
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <ratio>
-#include <thread>
 
 #include "task_manager.h"
+#include "worker.h"
 
 using namespace std::chrono_literals;
 
@@ -12,7 +12,7 @@ using namespace std::chrono_literals;
 
 void f()
 {
-    std::this_thread::sleep_for(10ms);
+    tls_worker->sleep_for(10ms);
 }
 
 TEST(BasicTestSuite, BasicTest)

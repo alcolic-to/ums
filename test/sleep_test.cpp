@@ -1,5 +1,6 @@
+
+
 #include <chrono>
-#include <cstddef>
 #include <gtest/gtest.h>
 
 #include "task_manager.h"
@@ -10,21 +11,24 @@ using namespace std::chrono_literals;
 
 // NOLINTBEGIN
 
-void sleep_test()
+void sleep_test(const uint32_t iterations, const auto sleep_time)
 {
-    tls_worker->sleep_for(1000ms);
+    auto start = now();
+
+    for (uint32_t i = 0; i < iterations; ++i)
+        task_manager.execute_task<false>([&] { tls_worker->sleep_for(sleep_time); });
+
+    auto duration = now() - start;
+    auto expected_duration = iterations * sleep_time;
+
+    ASSERT_LE(std::chrono::abs(expected_duration - duration), 20ms);
 }
 
 TEST(Sleep, SimpleSleepTest)
 {
-    auto start = now();
-
-    for (std::size_t i = 0; i < 10; ++i)
-        task_manager.execute_task<false>(sleep_test);
-
-    auto end = now();
-    auto diff = 10000ms - (end - start);
-    ASSERT_LE(std::chrono::abs(diff), 100ms);
+    for (uint32_t i = 1; i <= 5; ++i)
+        for (uint32_t sleep_ms = 1; sleep_ms <= 512; sleep_ms *= 2)
+            sleep_test(i, std::chrono::milliseconds{sleep_ms});
 }
 
 // NOLINTEND

@@ -23,7 +23,7 @@ enum class SyncCtx : int { main, yield, wait_cond_or_sleep, io };
 
 class Scheduler final {
 public:
-    enum class State : int { initializing, running, exiting };
+    enum class State : int { initializing, running, idle, exiting };
 
     explicit Scheduler(const CPU& cpu);
     ~Scheduler() noexcept;
@@ -62,11 +62,16 @@ public:
 
     void schedule();
 
-    void idle_sleep() const noexcept;
-
-    [[nodiscard]] bool exiting() const noexcept { return m_state == State::exiting; }
+    void idle_sleep() noexcept;
+    void notify() noexcept;
 
     [[nodiscard]] bool initializing() const noexcept { return m_state == State::initializing; }
+
+    [[nodiscard]] bool running() const noexcept { return m_state == State::running; }
+
+    [[nodiscard]] bool idle() const noexcept { return m_state == State::idle; }
+
+    [[nodiscard]] bool exiting() const noexcept { return m_state == State::exiting; }
 
     [[nodiscard]] Worker* worker() const noexcept { return m_worker; }
 
@@ -74,6 +79,8 @@ public:
 
     void manage_load(Worker::State prev_state, Worker::State new_state) noexcept;
     uint64_t load() const noexcept;
+
+    auto waiters_info() const noexcept;
 
     void context_switch(Worker* prev_worker);
 
@@ -86,8 +93,19 @@ public:
     void sync(Worker* worker);
 
     void exit_workers();
+    void exit();
+
+    bool has_work() const noexcept;
+
+    void signal_exit() noexcept { m_exit.store(true, std::memory_order_relaxed); }
+
+    bool exit_signaled() const noexcept { return m_exit.load(std::memory_order_relaxed); }
+
     bool should_exit() const noexcept;
 
+    // Since we are only accessing size under lock, all memory operations can be
+    // relaxed, because Spinlock has acquire-release memory order.
+    //
     class Tasks {
     public:
         void enque(const std::shared_ptr<Task>& task)
@@ -120,7 +138,7 @@ public:
         [[nodiscard]] bool empty() const noexcept { return size() == 0; }
 
     private:
-        // TODO: Crate nonaligned spinlock for this and align whole struct on a cache line.
+        // TODO: Create nonaligned spinlock for this and align whole struct on a cache line.
         //
         Spinlock m_lock;
         std::deque<std::shared_ptr<Task>> m_tasks;
@@ -128,17 +146,20 @@ public:
     };
 
     const CPU& m_cpu;
-    Worker* m_worker;
+    Worker* m_worker{nullptr};
     std::deque<Worker*> m_runnable_queue;
     std::deque<Worker*> m_idle_queue;
     std::list<Worker*> m_waiting_queue;
     std::list<Worker*> m_pending_io_queue;
 
     std::mutex m_workers_mtx;
+    std::mutex m_mtx;
+    std::condition_variable m_cv;
     Tasks m_tasks;
-    std::atomic<State> m_state;
-    bool m_workers_started;
-    uint64_t m_load;
+    State m_state{State::initializing};
+    bool m_workers_started{false};
+    uint64_t m_load{0};
+    std::atomic<bool> m_exit{false};
 
     // TODO: Create workers in place next to each other.
     //

@@ -11,17 +11,13 @@
 #include "cpu.h"
 #include "io_api.h"
 #include "task_manager.h"
+#include "util.h"
 #include "worker.h"
 
 // Creates scheduler and workers for provided CPU.
 // After workers are created, starts single worker from idle queue.
 //
-Scheduler::Scheduler(const CPU& cpu)
-    : m_cpu{cpu}
-    , m_worker{nullptr}
-    , m_state{State::initializing}
-    , m_workers_started{false}
-    , m_load{0}
+Scheduler::Scheduler(const CPU& cpu) : m_cpu{cpu}
 {
     for (uint32_t i = 0; i < CFG_workers_per_cpu; ++i)
         m_workers.push_back(std::make_unique<Worker>(i, *this));
@@ -35,7 +31,8 @@ Scheduler::Scheduler(const CPU& cpu)
 
 Scheduler::~Scheduler() noexcept
 {
-    set_state(State::exiting);
+    signal_exit();
+    notify();
 }
 
 bool Scheduler::has_idle_workers() const noexcept
@@ -98,6 +95,7 @@ void Scheduler::prepare_next_worker() noexcept
 void Scheduler::enqueue_task(const std::shared_ptr<Task>& task)
 {
     m_tasks.enque(task);
+    notify();
 }
 
 std::shared_ptr<Task> Scheduler::next_task() noexcept
@@ -124,9 +122,8 @@ void Scheduler::schedule_idle_worker()
 void Scheduler::schedule_io_workers()
 {
     auto io_completed = [](Worker* worker) {
-        // TODO: Check both completed and error.
         worker->m_io_request->update();
-        return worker->m_io_request->completed();
+        return !worker->m_io_request->pending();
     };
 
     auto begin = m_pending_io_queue.begin();
@@ -161,6 +158,24 @@ void Scheduler::schedule_waiting_workers()
     }
 }
 
+// Returns struct which holds info about workers in a waiting queue (whether any condition is
+// signaled and earliest wait time point for all waiters).
+//
+auto Scheduler::waiters_info() const noexcept
+{
+    struct waiters_info {
+        bool m_cond{false};
+        Time_point m_earliest_wait{Time_point::max()};
+    } result;
+
+    for (const auto& worker : m_waiting_queue) {
+        result.m_cond |= worker->check_cond();
+        result.m_earliest_wait = std::min(result.m_earliest_wait, worker->sleep_time_point());
+    }
+
+    return result;
+}
+
 void Scheduler::schedule_workers()
 {
     schedule_io_workers();
@@ -180,12 +195,69 @@ void Scheduler::schedule()
     }
 
     if (should_exit()) [[unlikely]]
-        exit_workers();
+        exit();
     else [[likely]]
         prepare_next_worker();
 }
 
-void Scheduler::idle_sleep() const noexcept {}
+void Scheduler::notify() noexcept
+{
+    if (!FS_idle_sleep_allowed)
+        return;
+
+    const std::unique_lock<std::mutex> lock{m_mtx};
+    m_cv.notify_one();
+}
+
+// Idle sleep if there is no work.
+// Our sleep is determined by waiting workers. We have to wait until any waiting worker's condition
+// is signaled or earlies sleep time expires for all waiting workers. This function is called after
+// initial workers scheduling when there are no runnable workers.
+//
+// NOTE:
+// Since scheduler is going to sleep, we need to signal it every time new task arrives,
+// earlies sleep time expires, any condition variable or exit is signaled.
+// At any moment new task can come, condition might me signaled etc., so we need to check
+// everything under lock before going to sleep and all scheduler notifications must be done under
+// lock to avoid race conditions.
+// In order to allow precise sleep time (15ms or less) we must include idle_sleep_threshold.
+// Since windows clock is not that precise (clock cycle is ~15ms) and OS scheduler can delay
+// wake up of any sleeping thread, we choose arbitrary value for idle_sleep_threshold of 20ms.
+// Note that all functions trying to notify scheduler are blocked until we all of our checks
+// are done under lock. One potential problem is that OS scheduler might schedule worker out if
+// mutex is locked in this function and we are, for example, trying to add new task from another
+// worker which must notify scheduler.
+//
+void Scheduler::idle_sleep() noexcept
+{
+    if (!FS_idle_sleep_allowed)
+        return;
+
+    // For pending I/O workers, we will just keep scheduling until I/O is done.
+    // TODO: Check whether we can aford to sleep for I/O operations.
+    //
+    if (has_pending_io_workers())
+        return;
+
+    std::unique_lock<std::mutex> lock{m_mtx};
+
+    if (has_tasks() && has_idle_workers())
+        return;
+
+    if (exit_signaled() && !has_waiting_workers() && !has_tasks())
+        return;
+
+    auto wait_info{waiters_info()};
+    wait_info.m_earliest_wait -= CFG_idle_sleep_threshold;
+
+    if (wait_info.m_cond || now() >= wait_info.m_earliest_wait)
+        return;
+
+    set_state(State::idle);
+    m_cv.wait_until(lock, wait_info.m_earliest_wait);
+
+    set_state(State::running);
+}
 
 void Scheduler::set_state(State state) noexcept
 {
@@ -319,10 +391,21 @@ void Scheduler::exit_workers()
     }
 }
 
+void Scheduler::exit()
+{
+    set_state(State::exiting);
+    exit_workers();
+}
+
+bool Scheduler::has_work() const noexcept
+{
+    return has_runnable_workers() || has_waiting_workers() || has_pending_io_workers() ||
+           has_tasks();
+}
+
 bool Scheduler::should_exit() const noexcept
 {
-    return exiting() && !has_runnable_workers() && !has_waiting_workers() &&
-           !has_pending_io_workers() && !has_tasks();
+    return exit_signaled() && !has_work();
 }
 
 template void Scheduler::sync<SyncCtx::main>(Worker* worker);

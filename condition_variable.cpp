@@ -28,7 +28,7 @@ void Condition_variable::notify_all() noexcept
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
     for (auto&& waiter : m_waiters)
-        waiter->set_cond();
+        waiter->notify_waiter();
 }
 
 void Condition_variable::add_waiter()
@@ -51,5 +51,5 @@ void Condition_variable::notify_waiter() noexcept
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
     if (!m_waiters.empty())
-        m_waiters.front()->set_cond();
+        m_waiters.front()->notify_waiter();
 }

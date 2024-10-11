@@ -2,7 +2,7 @@
 
 #include <bit>
 #include <cstdint>
-#include <iostream>
+#include <iostream> // NOLINT
 
 #include "io_api.h"
 
@@ -17,8 +17,6 @@
 #else
 #define OS_UNKNOWN
 #endif
-
-constexpr char ENDL = '\n';
 
 // Windows implementations.
 //
@@ -57,8 +55,8 @@ uint64_t cpus_avail_mask() noexcept
 
     GetProcessAffinityMask(GetCurrentProcess(), PDWORD_PTR(&procCpuMask), PDWORD_PTR(&allCpusMask));
 
-    std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask
-              << ENDL;
+    // std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask
+    //           << "\n";
 
     return procCpuMask;
 }
@@ -169,16 +167,18 @@ uint64_t cpus_avail_mask() noexcept
     uint64_t cpu_mask = 0;
 
     if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1) {
-        std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << ENDL;
+        std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << "\n";
         return -1;
     }
 
     int num_cores = CPU_COUNT(&mask);
-    std::cout << "Process is allowed to run on " << num_cores << " cores." << ENDL;
+    std::cout << "Process is allowed to run on " << num_cores << " cores."
+              << "\n";
 
     for (std::size_t i = 0; i < cpus_count(); ++i) {
         if (CPU_ISSET(i, &mask)) {
-            std::cout << "CPU " << i << " is available." << ENDL;
+            std::cout << "CPU " << i << " is available."
+                      << "\n";
             cpu_mask |= (1 << i);
         }
     }
@@ -199,7 +199,7 @@ void bind_thread(uint64_t cpu_mask) noexcept
 
     pthread_t current_thread = pthread_self();
     if (pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-        std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << ENDL;
+        std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << "\n";
 
     print_thread_affinity();
 }
@@ -211,14 +211,14 @@ void print_thread_affinity()
 
     pthread_t current_thread = pthread_self();
     if (pthread_getaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-        std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << ENDL;
+        std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << "\n";
 
     std::cout << "Thread affinity: ";
     for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
         if (CPU_ISSET(i, &mask))
             std::cout << i << " ";
 
-    std::cout << ENDL;
+    std::cout << "\n";
 }
 
 void read_file(IO_Request& io) noexcept

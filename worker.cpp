@@ -16,8 +16,6 @@
 //
 Worker::Worker(uint64_t id, Scheduler& scheduler)
     : m_id{id}
-    , m_state{State::initializing}
-    , m_running{true}
     , m_scheduler{scheduler}
     , m_thread{&Worker::entry_point, this}
 {
@@ -83,6 +81,14 @@ void Worker::wait(std::unique_lock<std::mutex>& lock)
 {
     m_running = false;
     m_cv.wait(lock, [&] { return m_running; });
+}
+
+// We must notify scheduler that our condition is set, because it might be sleeping.
+//
+void Worker::notify_waiter() noexcept
+{
+    set_cond();
+    m_scheduler.notify();
 }
 
 void Worker::entry_point()

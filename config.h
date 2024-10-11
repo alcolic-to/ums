@@ -10,10 +10,17 @@
 using namespace std::chrono_literals;
 
 // clang-format off
-constexpr uint32_t                       CFG_max_cpu_count   = 64;
-constexpr std::bitset<CFG_max_cpu_count> CFG_allowed_cpus    = 0b00001111;
-constexpr uint32_t                       CFG_workers_per_cpu = 16;
-constexpr auto                           CFG_idle_sleep      = 20ns;
+
+// Feature switch section.
+
+constexpr bool FS_idle_sleep_allowed = true;
+
+// Config section.
+
+constexpr uint32_t                       CFG_max_cpu_count        = 64;
+constexpr std::bitset<CFG_max_cpu_count> CFG_allowed_cpus         = 0b00001111;
+constexpr uint32_t                       CFG_workers_per_cpu      = 16;
+constexpr auto                           CFG_idle_sleep_threshold = 20ms;
 // clang-format on
 
 #endif // COS_CONFIG_H

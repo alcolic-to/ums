@@ -227,15 +227,18 @@ void execute_testing_mutex_tasks()
 
 int main(int argc, char* argv[])
 {
-    // Stopwatch<microseconds> s{"Sleep for stopwatch"};
+    Stopwatch<microseconds> s{"Sleep for stopwatch"};
     // std::cout << "Entering sleep for!\n";
 
     // task_manager.execute_task<false>([] { tls_worker->sleep_for(5s); });
 
     // std::cout << "Exiting sleep for!\n";
 
-    for (int i = 0; i < 1000; ++i)
+    for (int i = 0; i < 100; ++i) {
+        if (i % 10 == 0)
+            std::this_thread::sleep_for(1s);
         task_manager.execute_task<true>(f1);
+    }
 }
 
 #else

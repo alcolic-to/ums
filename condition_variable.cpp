@@ -7,6 +7,11 @@
 #include "spinlock.h"
 #include "worker.h"
 
+Condition_variable::~Condition_variable() noexcept
+{
+    notify_all();
+}
+
 void Condition_variable::wait(std::unique_lock<Mutex>& lock)
 {
     add_waiter();

@@ -11,11 +11,10 @@ enum class lock_type : uint32_t { lock, try_lock, single_try_lock };
 enum class lock_error : uint32_t { success, deadlock, timeout };
 
 static_assert(std::atomic<std::thread::id>::is_always_lock_free);
-const std::thread::id empty_tid{};
 
 class Spinlock {
 public:
-    Spinlock() noexcept = default;
+    Spinlock() noexcept;
     ~Spinlock() noexcept = default;
 
     Spinlock(const Spinlock&) = delete;
@@ -30,7 +29,7 @@ public:
     void unlock() noexcept;
 
 private:
-    std::atomic<std::thread::id> m_tid{empty_tid};
+    std::atomic<std::thread::id> m_tid;
 };
 
 #endif // COS_SPINLOCK_H

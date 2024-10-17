@@ -118,7 +118,7 @@ void Worker::main_loop()
             m_task->m_func();
         }
         catch (const std::exception& ex) {
-            std::cout << ex.what() << "\n";
+            std::cout << "Unhandled user exception: " << ex.what() << "\n";
         }
 
         // std::cout << "CPU " << m_scheduler.m_cpu.m_id << ": worker id " << id() << " task

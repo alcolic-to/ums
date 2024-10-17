@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <thread>
 #include <vector>
 
@@ -18,6 +20,7 @@
 #include "condition_variable.h"
 #include "io_api.h"
 #include "mutex.h"
+#include "spinlock.h"
 #include "task_manager.h"
 #include "util.h"
 #include "worker.h"
@@ -225,20 +228,42 @@ void execute_testing_mutex_tasks()
     std::cout << sum << "\n";
 }
 
+std::mutex mtx;
+std::condition_variable cv;
+std::atomic<bool> wake_up_signaled{false};
+
+Mutex mlock;
+
+void f()
+{
+    std::this_thread::sleep_for(1s);
+    mlock.lock();
+    mlock.lock();
+    // wake_up_signaled.store(true, std::memory_order_relaxed);
+    // cv.notify_one();
+}
+
 int main(int argc, char* argv[])
 {
-    Stopwatch<microseconds> s{"Sleep for stopwatch"};
-    // std::cout << "Entering sleep for!\n";
+    // Stopwatch s{"Stopwatch"};
 
-    // task_manager.execute_task<false>([] { tls_worker->sleep_for(5s); });
+    // std::jthread t{f};
 
-    // std::cout << "Exiting sleep for!\n";
+    // while (true) {
+    //     std::unique_lock lock{mtx};
+    //     std::this_thread::sleep_for(5s);
+    //     cv.wait(lock, [&] { return wake_up_signaled.load(std::memory_order_relaxed); });
+    //     wake_up_signaled.store(false, std::memory_order_relaxed);
+    // }
 
-    for (int i = 0; i < 100; ++i) {
-        if (i % 10 == 0)
-            std::this_thread::sleep_for(1s);
-        task_manager.execute_task<true>(f1);
-    }
+    task_manager.execute_task(f);
+    std::this_thread::sleep_for(1s);
+
+    // slock.lock();
+    // slock.lock();
+    mlock.lock();
+    std::this_thread::sleep_for(1s);
+    mlock.unlock();
 }
 
 #else

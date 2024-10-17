@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "mutex.h"
+#include "spinlock.h"
 #include "worker.h"
 
 void Condition_variable::wait(std::unique_lock<Mutex>& lock)

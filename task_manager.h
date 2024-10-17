@@ -39,7 +39,7 @@ public:
 
     void enque_task(const std::shared_ptr<Task>& task);
 
-    template<bool async>
+    template<bool async = true>
     void execute_task(const std::function<void()>& func);
 
     template<bool async, typename Fn, typename... Fns>
@@ -57,7 +57,7 @@ public:
     {
     }
 
-    template<bool async, typename... Fns>
+    template<bool async = true, typename... Fns>
     constexpr void execute_tasks(Fns... fns)
     {
         std::vector<std::shared_ptr<Task>> tasks;

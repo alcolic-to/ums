@@ -50,12 +50,13 @@ void run_lock_perf_test(const std::string& test_name, int num_threads)
     ASSERT_TRUE(counter == num_threads * iter_count);
 }
 
+// #define RUN_PERF_TESTS
+
 TEST(Mutex, mutex_vs_spinlock_perf_test_1)
 {
+#ifndef RUN_PERF_TESTS
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-    // #if defined(DEBUG)
-    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
-    // #endif
+#endif
 
     std::cout << "---------------------------------------------------------------\n";
     for (int threads_count = 1; threads_count <= 128; threads_count *= 2) {
@@ -99,12 +100,27 @@ TEST(Mutex, mutex_sanity_test_2)
     ASSERT_TRUE(counter == 4 * iterations);
 }
 
+TEST(Mutex, mutex_sanity_test_3)
+{
+    task_manager.execute_task<false>([] {
+        try {
+            Mutex mutex;
+
+            mutex.lock();
+            mutex.lock();
+        }
+        catch (std::system_error& ex) {
+            ASSERT_TRUE(ex.code() ==
+                        std::make_error_code(std::errc::resource_deadlock_would_occur));
+        }
+    });
+}
+
 TEST(Mutex, mutex_peft_test_1)
 {
+#ifndef RUN_PERF_TESTS
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-    // #if defined(DEBUG)
-    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
-    // #endif
+#endif
 
     Mutex mutex;
     int counter = 0;
@@ -123,10 +139,9 @@ TEST(Mutex, mutex_peft_test_1)
 
 TEST(Mutex, spinlock_peft_test_1)
 {
+#ifndef RUN_PERF_TESTS
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-    // #if defined(DEBUG)
-    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
-    // #endif
+#endif
 
     Spinlock mutex;
     int counter = 0;
@@ -145,10 +160,9 @@ TEST(Mutex, spinlock_peft_test_1)
 
 TEST(Mutex, std_mutex_peft_test_1)
 {
+#ifndef RUN_PERF_TESTS
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-    // #if defined(DEBUG)
-    //    GTEST_SKIP() << "Skipping perf tests in debug build.";
-    // #endif
+#endif
 
     std::mutex mutex;
     int counter = 0;
@@ -174,10 +188,9 @@ TEST(Mutex, std_mutex_peft_test_1)
 
 TEST(Mutex, mutex_peft_test_2)
 {
+#ifndef RUN_PERF_TESTS
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-    // #if defined(DEBUG)
-    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
-    // #endif
+#endif
 
     Mutex mutex;
     int counter = 0;
@@ -195,10 +208,9 @@ TEST(Mutex, mutex_peft_test_2)
 
 TEST(Mutex, spinlock_peft_test_2)
 {
+#ifndef RUN_PERF_TESTS
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-    // #if defined(DEBUG)
-    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
-    // #endif
+#endif
 
     Spinlock mutex;
     int counter = 0;
@@ -216,10 +228,9 @@ TEST(Mutex, spinlock_peft_test_2)
 
 TEST(Mutex, std_mutex_peft_test_2)
 {
+#ifndef RUN_PERF_TESTS
     GTEST_SKIP() << "Skipping perf test, since it last long.";
-    // #if defined(DEBUG)
-    //     GTEST_SKIP() << "Skipping perf tests in debug build.";
-    // #endif
+#endif
 
     std::mutex mutex;
     int counter = 0;

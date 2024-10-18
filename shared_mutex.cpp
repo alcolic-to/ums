@@ -12,6 +12,9 @@ Shared_mutex::~Shared_mutex() noexcept
     const std::lock_guard<Mutex> lock{m_mutex};
 }
 
+// TODO: Check whether exception should be thrown in case of a deadlock.
+// STL implementation does nothing in case of a deadlock.
+//
 void Shared_mutex::lock()
 {
     std::unique_lock<Mutex> lk{m_mutex};

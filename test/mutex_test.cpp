@@ -25,7 +25,7 @@
 
 STATIC_ASSERT(std::is_standard_layout_v<Spinlock>);
 STATIC_ASSERT(std::is_standard_layout_v<Mutex>); // N4928 [thread.mutex.class]/3
-// STATIC_ASSERT(std::is_standard_layout_v<recursive_mutex>); // N4928 [thread.mutex.recursive]/2
+STATIC_ASSERT(std::is_standard_layout_v<Recursive_mutex>); // N4928 [thread.mutex.recursive]/2
 // STATIC_ASSERT(std::is_standard_layout_v<timed_mutex>); // N4928 [thread.timedmutex.class]/2
 // STATIC_ASSERT(std::is_standard_layout_v<recursive_timed_mutex>); // N4928 [thread.timedmutex.recursive]/2
 // STATIC_ASSERT(std::is_standard_layout_v<Shared_mutex>); // N4928 [thread.sharedmutex.class]/2
@@ -34,7 +34,7 @@ STATIC_ASSERT(std::is_standard_layout_v<Mutex>); // N4928 [thread.mutex.class]/3
 
 // nothrow-destructibility required by N4928 [res.on.exception.handling]/3
 STATIC_ASSERT(std::is_nothrow_destructible_v<Mutex>);
-// STATIC_ASSERT(std::is_nothrow_destructible_v<recursive_mutex>);
+STATIC_ASSERT(std::is_nothrow_destructible_v<Recursive_mutex>);
 // STATIC_ASSERT(std::is_nothrow_destructible_v<timed_mutex>);
 // STATIC_ASSERT(std::is_nothrow_destructible_v<recursive_timed_mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Shared_mutex>);
@@ -44,7 +44,7 @@ STATIC_ASSERT(std::is_nothrow_destructible_v<std::shared_lock<Shared_mutex>>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Condition_variable>);
 
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Mutex>); // N4928 [thread.mutex.class]
-// STATIC_ASSERT(std::is_nothrow_default_constructible_v<recursive_mutex>); // strengthened
+STATIC_ASSERT(std::is_nothrow_default_constructible_v<Recursive_mutex>); // strengthened
 // STATIC_ASSERT(std::is_nothrow_default_constructible_v<timed_mutex>); // strengthened
 // STATIC_ASSERT(std::is_nothrow_default_constructible_v<recursive_timed_mutex>); // strengthened
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Shared_mutex>); // strengthened
@@ -60,7 +60,7 @@ STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Sh
 
 // Also test mandatory and strengthened exception specification for try_lock().
 STATIC_ASSERT(noexcept(std::declval<Mutex&>().try_lock())); // strengthened
-// STATIC_ASSERT(noexcept(std::declval<recursive_mutex&>().try_lock())); // N4928 [thread.mutex.recursive]
+STATIC_ASSERT(noexcept(std::declval<Recursive_mutex&>().try_lock())); // N4928 [thread.mutex.recursive]
 // STATIC_ASSERT(noexcept(std::declval<timed_mutex&>().try_lock())); // strengthened
 // STATIC_ASSERT(noexcept(std::declval<recursive_timed_mutex&>().try_lock())); // N4928 [thread.timedmutex.recursive]
 STATIC_ASSERT(noexcept(std::declval<Shared_mutex&>().try_lock())); // strengthened
@@ -864,7 +864,7 @@ void test_nonmember_lock()
     Mutex mtx;
     other_mutex_thread<Mutex> ot(mtx);
 
-    std::recursive_mutex rMtx;
+    Recursive_mutex rMtx;
     std::timed_mutex tMtx;
 
     std::recursive_timed_mutex rtMtx;
@@ -912,7 +912,7 @@ void test_nonmember_try_lock()
     Mutex mtx;
     other_mutex_thread<Mutex> ot(mtx);
 
-    std::recursive_mutex rMtx;
+    Recursive_mutex rMtx;
     std::timed_mutex tMtx;
 
     std::recursive_timed_mutex rtMtx;
@@ -1009,7 +1009,60 @@ TEST(STL_Mutex, nonmember_try_lock_test)
 // Shared mutex tests.
 // *******************
 
-TEST(STL_Shared_mutex, sanity_test)
+TEST(Shared_mutex, mutex_sanity_test_1)
+{
+    Shared_mutex mutex;
+    int counter = 0;
+
+    auto f = [&] {
+        mutex.lock();
+        ++counter;
+        mutex.unlock();
+    };
+
+    task_manager.execute_tasks<false>(f, f);
+    ASSERT_TRUE(counter == 2);
+}
+
+TEST(Shared_mutex, mutex_sanity_test_2)
+{
+    Shared_mutex mutex;
+    int counter = 0;
+    int iterations = 100000;
+
+    // Test 2: Mutex Contention Test
+    auto f = [&] {
+        for (int i = 0; i < iterations; ++i) {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        }
+    };
+
+    task_manager.execute_tasks<false>(f, f, f, f);
+    ASSERT_TRUE(counter == 4 * iterations);
+}
+
+TEST(Shared_mutex, mutex_sanity_test_3)
+{
+    GTEST_SKIP() << "Skipping test. Not implement throwing for deadlock on shared mutex.";
+
+    task_manager.execute_task<false>([] {
+        try {
+            Shared_mutex mutex;
+
+            mutex.lock();
+            mutex.lock();
+            ASSERT_TRUE(false);
+        }
+        catch (std::system_error& ex) {
+            ASSERT_TRUE(ex.code() ==
+                        std::make_error_code(std::errc::resource_deadlock_would_occur));
+        }
+    });
+}
+
+TEST(Shared_mutex, sanity_test_4)
 {
     std::condition_variable_any cv;
     Shared_mutex mut;
@@ -1359,6 +1412,84 @@ TEST(STL_Shared_mutex, complex_tests)
     test_try_lock_and_try_lock_shared<Shared_mutex>();
 }
 
+TEST(Recursive_mutex, mutex_sanity_test_1)
+{
+    Recursive_mutex mutex;
+    int counter = 0;
+
+    auto f = [&] {
+        mutex.lock();
+        ++counter;
+        mutex.unlock();
+    };
+
+    task_manager.execute_tasks<false>(f, f);
+    ASSERT_TRUE(counter == 2);
+}
+
+TEST(Recursive_mutex, mutex_sanity_test_2)
+{
+    Recursive_mutex mutex;
+    int counter = 0;
+    int iterations = 100000;
+
+    // Test 2: Mutex Contention Test
+    auto f = [&] {
+        for (int i = 0; i < iterations; ++i) {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        }
+    };
+
+    task_manager.execute_tasks<false>(f, f, f, f);
+    ASSERT_TRUE(counter == 4 * iterations);
+}
+
+TEST(Recursive_mutex, mutex_sanity_test_3)
+{
+    task_manager.execute_task<false>([] {
+        Recursive_mutex mutex;
+
+        mutex.lock();
+        mutex.lock();
+        mutex.unlock();
+        mutex.unlock();
+    });
+
+    ASSERT_TRUE(true);
+}
+
+TEST(Recursive_mutex, sanity_test_4)
+{
+    GTEST_SKIP() << "Skipping test since it lasts long, especially for debug build.";
+
+    task_manager.execute_task<false>([] {
+        try {
+            Recursive_mutex mutex;
+
+            while (true)
+                mutex.lock();
+        }
+        catch (std::system_error& ex) {
+            ASSERT_TRUE(ex.code() ==
+                        std::make_error_code(std::errc::resource_unavailable_try_again));
+        }
+    });
+}
+
+TEST(STL_Recursive_mutex, recursive_mutex_test_fixture)
+{
+    if (cpus.workers_count() < 3)
+        GTEST_SKIP() << "At least 3 workers needed for this test.";
+
+    task_manager.execute_task<false>([] {
+        mutex_test_fixture<Recursive_mutex> fixture;
+        fixture.test_lockable();
+        fixture.test_recursive_lockable();
+    });
+}
+
 // int main() {
 //     test_one_writer<shared_mutex>();
 //     test_multiple_readers<shared_mutex>();
@@ -1384,12 +1515,6 @@ TEST(STL_Shared_mutex, complex_tests)
 //         mutex_test_fixture<std::timed_mutex> fixture;
 //         fixture.test_lockable();
 //         fixture.test_timed_lockable();
-//     }
-
-//     {
-//         mutex_test_fixture<std::recursive_mutex> fixture;
-//         fixture.test_lockable();
-//         fixture.test_recursive_lockable();
 //     }
 
 //     {

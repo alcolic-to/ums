@@ -34,12 +34,15 @@ void cpu_pause() noexcept
 }
 
 using mo = std::memory_order;
+const std::thread::id empty_tid{};
 
 inline bool CAS(std::atomic<std::thread::id>& tid, std::thread::id& expected,
-                std::thread::id desired) noexcept
+                const std::thread::id desired) noexcept
 {
     return tid.compare_exchange_weak(expected, desired, mo::acquire, mo::relaxed);
 }
+
+Spinlock::Spinlock() noexcept : m_tid{empty_tid} {}
 
 // Acquires lock by setting current thread id to m_tid.
 // In case of a deadlock returns lock_error::deadlock.

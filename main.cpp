@@ -20,6 +20,7 @@
 #include "condition_variable.h"
 #include "io_api.h"
 #include "mutex.h"
+#include "shared_mutex.h"
 #include "spinlock.h"
 #include "task_manager.h"
 #include "util.h"
@@ -243,27 +244,27 @@ void f()
     // cv.notify_one();
 }
 
+// Shared_mutex smutex;
+
 int main(int argc, char* argv[])
 {
     // Stopwatch s{"Stopwatch"};
 
-    // std::jthread t{f};
+    Shared_mutex smutex;
 
-    // while (true) {
-    //     std::unique_lock lock{mtx};
-    //     std::this_thread::sleep_for(5s);
-    //     cv.wait(lock, [&] { return wake_up_signaled.load(std::memory_order_relaxed); });
-    //     wake_up_signaled.store(false, std::memory_order_relaxed);
-    // }
+    for (int i = 0; i < 1; ++i) {
+        task_manager.execute_task([&] {
+            smutex.lock_shared();
+            tls_worker->sleep_for(2s);
+            smutex.unlock_shared();
+        });
+    }
 
-    task_manager.execute_task(f);
-    std::this_thread::sleep_for(1s);
-
-    // slock.lock();
-    // slock.lock();
-    mlock.lock();
-    std::this_thread::sleep_for(1s);
-    mlock.unlock();
+    task_manager.execute_task([&] {
+        smutex.lock();
+        // tls_worker->sleep_for(10s);
+        smutex.unlock();
+    });
 }
 
 #else

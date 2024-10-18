@@ -12,7 +12,7 @@
 class Condition_variable {
 public:
     Condition_variable() noexcept = default;
-    ~Condition_variable() noexcept = default;
+    ~Condition_variable() noexcept;
 
     Condition_variable(const Condition_variable&) = delete;
     Condition_variable& operator=(const Condition_variable&) = delete;

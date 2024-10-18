@@ -11,8 +11,61 @@
 #include "cpu.h"
 #include "gtest/gtest.h"
 #include "mutex.h"
+#include "shared_mutex.h"
 #include "task_manager.h"
 #include "util.h"
+#include "worker.h"
+
+#define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
+
+// Condition_variable and shared mutex does not have standard layout because
+// they have std::vector inside.
+
+// clang-format off
+
+STATIC_ASSERT(std::is_standard_layout_v<Spinlock>);
+STATIC_ASSERT(std::is_standard_layout_v<Mutex>); // N4928 [thread.mutex.class]/3
+// STATIC_ASSERT(std::is_standard_layout_v<recursive_mutex>); // N4928 [thread.mutex.recursive]/2
+// STATIC_ASSERT(std::is_standard_layout_v<timed_mutex>); // N4928 [thread.timedmutex.class]/2
+// STATIC_ASSERT(std::is_standard_layout_v<recursive_timed_mutex>); // N4928 [thread.timedmutex.recursive]/2
+// STATIC_ASSERT(std::is_standard_layout_v<Shared_mutex>); // N4928 [thread.sharedmutex.class]/2
+// STATIC_ASSERT(std::is_standard_layout_v<std::shared_timed_mutex>); // N4928 [thread.sharedtimedmutex.class]/2
+// STATIC_ASSERT(std::is_standard_layout_v<Condition_variable>); // N4928 [thread.condition.condvar]/1
+
+// nothrow-destructibility required by N4928 [res.on.exception.handling]/3
+STATIC_ASSERT(std::is_nothrow_destructible_v<Mutex>);
+// STATIC_ASSERT(std::is_nothrow_destructible_v<recursive_mutex>);
+// STATIC_ASSERT(std::is_nothrow_destructible_v<timed_mutex>);
+// STATIC_ASSERT(std::is_nothrow_destructible_v<recursive_timed_mutex>);
+STATIC_ASSERT(std::is_nothrow_destructible_v<Shared_mutex>);
+// STATIC_ASSERT(std::is_nothrow_destructible_v<shared_timed_mutex>);
+STATIC_ASSERT(std::is_nothrow_destructible_v<std::shared_lock<Shared_mutex>>);
+// STATIC_ASSERT(std::is_nothrow_destructible_v<shared_lock<shared_timed_mutex>>);
+STATIC_ASSERT(std::is_nothrow_destructible_v<Condition_variable>);
+
+STATIC_ASSERT(std::is_nothrow_default_constructible_v<Mutex>); // N4928 [thread.mutex.class]
+// STATIC_ASSERT(std::is_nothrow_default_constructible_v<recursive_mutex>); // strengthened
+// STATIC_ASSERT(std::is_nothrow_default_constructible_v<timed_mutex>); // strengthened
+// STATIC_ASSERT(std::is_nothrow_default_constructible_v<recursive_timed_mutex>); // strengthened
+STATIC_ASSERT(std::is_nothrow_default_constructible_v<Shared_mutex>); // strengthened
+// STATIC_ASSERT(std::is_nothrow_default_constructible_v<shared_timed_mutex>); // strengthened
+STATIC_ASSERT(std::is_nothrow_default_constructible_v<std::shared_lock<Shared_mutex>>); // N4928 [thread.lock.shared.cons]/1
+// STATIC_ASSERT(std::is_nothrow_default_constructible_v<std::shared_lock<shared_timed_mutex>>); // N4928 [thread.lock.shared.cons]/1
+STATIC_ASSERT(std::is_nothrow_default_constructible_v<Condition_variable>); // strengthened
+
+STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Shared_mutex&, std::adopt_lock_t>); // strengthened
+STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Shared_mutex&, const std::adopt_lock_t&>); // strengthened
+// STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<std::shared_timed_mutex>, std::shared_timed_mutex&, std::adopt_lock_t>); // strengthened
+// STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<shared_timed_mutex>, shared_timed_mutex&, const adopt_lock_t&>); // strengthened
+
+// Also test mandatory and strengthened exception specification for try_lock().
+STATIC_ASSERT(noexcept(std::declval<Mutex&>().try_lock())); // strengthened
+// STATIC_ASSERT(noexcept(std::declval<recursive_mutex&>().try_lock())); // N4928 [thread.mutex.recursive]
+// STATIC_ASSERT(noexcept(std::declval<timed_mutex&>().try_lock())); // strengthened
+// STATIC_ASSERT(noexcept(std::declval<recursive_timed_mutex&>().try_lock())); // N4928 [thread.timedmutex.recursive]
+STATIC_ASSERT(noexcept(std::declval<Shared_mutex&>().try_lock())); // strengthened
+
+// clang-format on
 
 template<class Lockable>
 void run_lock_perf_test(const std::string& test_name, int num_threads)
@@ -473,50 +526,8 @@ TEST(Condition_variable, condition_variable_complex_test_2)
     ASSERT_TRUE(atomic_counter.load() == 2 * threads_count);
 }
 
-void test_shared_mutex()
-{
-    std::condition_variable_any cv;
-    std::shared_mutex mut;
-    std::vector<int> vec = {5};
-
-    std::thread odd{[&] {
-        std::unique_lock<std::shared_mutex> lk{mut};
-
-        while (vec.size() < 6) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 1);
-            cv.notify_one();
-        }
-    }};
-
-    std::thread even{[&] {
-        std::unique_lock<std::shared_mutex> lk{mut};
-
-        while (vec.size() < 7) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 2);
-            cv.notify_one();
-        }
-    }};
-
-    odd.join();
-    even.join();
-
-    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
-    ASSERT_TRUE(vec == expected_val);
-}
-
 // Mext section is slightly modified stl mutex tests:
 // https://github.com/microsoft/STL/blob/1e312b38db8df1dfbea17adc344454feb8d00dd9/tests/std/tests/VSO_0226079_mutex/test.cpp
-#define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
-
-[[noreturn]] void api_unexpected(const char* const api_name)
-{
-    std::perror(api_name);
-    std::abort();
-}
 
 class Event {
 public:
@@ -957,7 +968,7 @@ void test_vso_1253916()
     do_shared_locked_things(std::shared_lock<std::shared_mutex>{mtx});
 }
 
-TEST(STL_Mutex, mutex_test)
+TEST(STL_Mutex, mutex_test_fixture)
 {
     if (cpus.workers_count() < 3)
         GTEST_SKIP() << "At least 3 CPUs needed for this test.";
@@ -994,16 +1005,381 @@ TEST(STL_Mutex, nonmember_try_lock_test)
     task_manager.execute_task<false>([] { test_nonmember_try_lock(); });
 }
 
+// *******************
+// Shared mutex tests.
+// *******************
+
+TEST(STL_Shared_mutex, sanity_test)
+{
+    std::condition_variable_any cv;
+    Shared_mutex mut;
+    std::vector<int> vec = {5};
+
+    auto odd = [&] {
+        std::unique_lock<Shared_mutex> lk{mut};
+
+        while (vec.size() < 6) {
+            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
+            const int n = vec.back();
+            vec.push_back(n * 10 + 1);
+            cv.notify_one();
+        }
+    };
+
+    auto even = [&] {
+        std::unique_lock<Shared_mutex> lk{mut};
+
+        while (vec.size() < 7) {
+            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
+            const int n = vec.back();
+            vec.push_back(n * 10 + 2);
+            cv.notify_one();
+        }
+    };
+
+    task_manager.execute_tasks<false>(odd, even);
+
+    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
+    ASSERT_TRUE(vec == expected_val);
+}
+
+TEST(STL_Shared_mutex, mutex_test_fixture)
+{
+    if (cpus.workers_count() < 3)
+        GTEST_SKIP() << "At least 3 workers needed for this test.";
+
+    task_manager.execute_task<false>([] {
+        mutex_test_fixture<Shared_mutex> fixture;
+        fixture.test_lockable();
+    });
+}
+
+template<typename _Mutex>
+void test_one_writer()
+{
+    if (cpus.workers_count() < 4)
+        GTEST_SKIP() << "At least 4 workers needed for this test.";
+
+    // One simultaneous writer.
+    std::atomic<int> atom(-1);
+    _Mutex mut;
+
+    auto f = [&] {
+        while (atom == -1) {
+        }
+
+        std::lock_guard<_Mutex> ExclusiveLock(mut);
+        const int val = ++atom;
+        tls_worker->sleep_for(25ms); // Not a timing assumption.
+        ASSERT_TRUE(atom == val);
+    };
+
+    ASSERT_TRUE(atom.exchange(0) == -1);
+    task_manager.execute_tasks<false>(f, f, f, f);
+    ASSERT_TRUE(atom == 4);
+}
+
+template<typename _Mutex>
+void test_multiple_readers()
+{
+    if (cpus.workers_count() < 4)
+        GTEST_SKIP() << "At least 4 workers needed for this test.";
+
+    // Many simultaneous readers.
+    std::atomic<int> atom(-1);
+    _Mutex mut;
+
+    auto f = [&] {
+        while (atom == -1) {
+        }
+        std::shared_lock<_Mutex> SharedLock(mut);
+        ++atom;
+        while (atom < 4) {
+        }
+    };
+
+    ASSERT_TRUE(atom.exchange(0) == -1);
+    task_manager.execute_tasks<false>(f, f, f, f);
+    ASSERT_TRUE(atom == 4);
+}
+
+template<typename _Mutex>
+void test_writer_blocking_readers()
+{
+    if (cpus.workers_count() < 5 || cpus.count() < 5)
+        GTEST_SKIP() << "At least 5 workers and 5 CPUs needed for this test.";
+
+    // One writer blocking many readers.
+    std::atomic<int> atom(-4);
+    _Mutex mut;
+
+    auto f1 = [&] {
+        while (atom < 0) {
+        }
+        std::lock_guard<_Mutex> ExclusiveLock(mut);
+        ASSERT_TRUE(atom.exchange(1000) == 0);
+        tls_worker->sleep_for(50ms); // Not a timing assumption.
+        ASSERT_TRUE(atom.exchange(1729) == 1000);
+    };
+
+    auto f2 = [&] {
+        ++atom;
+        while (atom < 1000) {
+        }
+        std::shared_lock<_Mutex> SharedLock(mut);
+        ASSERT_TRUE(atom == 1729);
+    };
+
+    task_manager.execute_tasks<false>(f1, f2, f2, f2, f2);
+    ASSERT_TRUE(atom == 1729);
+}
+
+template<typename _Mutex>
+void test_readers_blocking_writer()
+{
+    if (cpus.workers_count() < 5 || cpus.count() < 5)
+        GTEST_SKIP() << "At least 5 workers and 5 CPUs needed for this test.";
+    // Many readers blocking one writer.
+    std::atomic<int> atom(-5);
+    _Mutex mut;
+
+    auto f1 = [&] {
+        std::shared_lock<_Mutex> SharedLock(mut);
+        ++atom;
+        while (atom < 0) {
+        }
+        std::this_thread::sleep_for(50ms); // Not a timing assumption.
+        atom += 10;
+    };
+
+    auto f2 = [&] {
+        ++atom;
+        while (atom < 0) {
+        }
+        std::lock_guard<_Mutex> ExclusiveLock(mut);
+        ASSERT_TRUE(atom == 40);
+    };
+
+    // join_and_clear(threads);
+    task_manager.execute_tasks<false>(f1, f1, f1, f1, f2);
+    ASSERT_TRUE(atom == 40);
+}
+
+template<typename _Mutex>
+void test_try_lock_and_try_lock_shared()
+{
+    // Test try_lock() and try_lock_shared().
+    _Mutex mut;
+
+    {
+        std::unique_lock<_Mutex> MainExclusive(mut, std::try_to_lock);
+        ASSERT_TRUE(MainExclusive.owns_lock());
+
+        task_manager.execute_task<false>([&] {
+            {
+                std::unique_lock<_Mutex> ExclusiveLock(mut, std::try_to_lock);
+                ASSERT_TRUE(!ExclusiveLock.owns_lock());
+            }
+
+            {
+                std::shared_lock<_Mutex> SharedLock(mut, std::try_to_lock);
+                ASSERT_TRUE(!SharedLock.owns_lock());
+            }
+        });
+    }
+
+    {
+        std::shared_lock<_Mutex> MainShared(mut, std::try_to_lock);
+        ASSERT_TRUE(MainShared.owns_lock());
+
+        task_manager.execute_task<false>([&] {
+            {
+                std::unique_lock<_Mutex> ExclusiveLock(mut, std::try_to_lock);
+                ASSERT_TRUE(!ExclusiveLock.owns_lock());
+            }
+
+            {
+                std::shared_lock<_Mutex> SharedLock(mut, std::try_to_lock);
+                ASSERT_TRUE(SharedLock.owns_lock());
+            }
+        });
+    }
+}
+
+// void test_timed_behavior() {
+//     { // Test try_lock_for() and try_lock_shared_for(). No timing assumptions.
+//         std::shared_timed_mutex stm;
+
+//         {
+//             std::unique_lock<std::shared_timed_mutex> MainExclusive(stm, 25ms);
+//             ASSERT_TRUE(MainExclusive.owns_lock());
+
+//             std::thread t([&stm] {
+//                 {
+//                     std::unique_lock<std::shared_timed_mutex> ExclusiveLock(stm, 25ms);
+//                     ASSERT_TRUE(!ExclusiveLock.owns_lock());
+//                 }
+
+//                 {
+//                     std::shared_lock<std::shared_timed_mutex> SharedLock(stm, 25ms);
+//                     ASSERT_TRUE(!SharedLock.owns_lock());
+//                 }
+//             });
+
+//             t.join();
+//         }
+
+//         {
+//             std::shared_lock<std::shared_timed_mutex> MainShared(stm, 25ms);
+//             ASSERT_TRUE(MainShared.owns_lock());
+
+//             std::thread t([&stm] {
+//                 {
+//                     std::unique_lock<std::shared_timed_mutex> ExclusiveLock(stm, 25ms);
+//                     ASSERT_TRUE(!ExclusiveLock.owns_lock());
+//                 }
+
+//                 {
+//                     std::shared_lock<std::shared_timed_mutex> SharedLock(stm, 25ms);
+//                     ASSERT_TRUE(SharedLock.owns_lock());
+//                 }
+//             });
+
+//             t.join();
+//         }
+//     }
+
+//     { // Test delayed try_lock_for() success. GENEROUS timing assumptions.
+//         std::atomic<int> atom(-5);
+//         std::shared_timed_mutex stm;
+//         std::vector<std::thread> threads;
+
+//         std::shared_lock<std::shared_timed_mutex> MainShared(stm);
+
+//         for (int i = 0; i < 4; ++i) {
+//             threads.emplace_back([&atom, &stm] {
+//                 ++atom;
+//                 while (atom < 0) {
+//                 }
+//                 std::unique_lock<std::shared_timed_mutex> ExclusiveLock(stm, 1min);
+//                 ASSERT_TRUE(ExclusiveLock.owns_lock());
+//                 const int val = (atom += 100);
+//                 std::this_thread::sleep_for(25ms);
+//                 ASSERT_TRUE(atom == val);
+//             });
+//         }
+
+//         ++atom;
+//         while (atom < 0) {
+//         }
+//         std::this_thread::sleep_for(50ms);
+//         MainShared.unlock();
+//         join_and_clear(threads);
+//         ASSERT_TRUE(atom == 400);
+//     }
+
+//     { // Test delayed try_lock_shared_for() success. GENEROUS timing assumptions.
+//         std::atomic<int> atom(-5);
+//         std::shared_timed_mutex stm;
+//         std::vector<std::thread> threads;
+
+//         std::unique_lock<std::shared_timed_mutex> MainExclusive(stm);
+
+//         for (int i = 0; i < 4; ++i) {
+//             threads.emplace_back([&atom, &stm] {
+//                 ++atom;
+//                 while (atom < 0) {
+//                 }
+//                 std::shared_lock<std::shared_timed_mutex> SharedLock(stm, 1min);
+//                 ASSERT_TRUE(SharedLock.owns_lock());
+//                 atom += 11;
+//                 while (atom < 44) {
+//                 }
+//             });
+//         }
+
+//         ++atom;
+//         while (atom < 0) {
+//         }
+//         std::this_thread::sleep_for(50ms);
+//         MainExclusive.unlock();
+//         join_and_clear(threads);
+//         ASSERT_TRUE(atom == 44);
+//     }
+
+//     { // THE GRAND FINALE: If try_lock_for() gives up due to stubborn readers,
+//       // it needs to deliver notifications. No timing assumptions.
+//         std::atomic<bool> launch_readers(false);
+//         std::shared_timed_mutex stm;
+//         std::vector<std::thread> threads;
+
+//         std::shared_lock<std::shared_timed_mutex> MainShared(stm);
+
+//         threads.emplace_back([&launch_readers, &stm] {
+//             std::unique_lock<std::shared_timed_mutex> ExclusiveLock(stm, 100ms);
+//             ASSERT_TRUE(!ExclusiveLock.owns_lock());
+//             launch_readers = true;
+//         });
+
+//         threads.emplace_back([&launch_readers, &stm] {
+//             while (!launch_readers) {
+//                 std::shared_lock<std::shared_timed_mutex> SharedLock(stm, std::try_to_lock);
+
+//                 if (!SharedLock.owns_lock()) {
+//                     launch_readers = true;
+//                 }
+//             }
+//         });
+
+//         while (!launch_readers) {
+//         }
+
+//         std::atomic<int> readers(0);
+
+//         for (int i = 0; i < 4; ++i) {
+//             threads.emplace_back([&stm, &readers] {
+//                 std::shared_lock<std::shared_timed_mutex> SharedLock(stm);
+//                 ++readers;
+//                 while (readers < 4) {
+//                 }
+//             });
+//         }
+
+//         join_and_clear(threads);
+//         ASSERT_TRUE(readers == 4);
+//     }
+// }
+
+TEST(STL_Shared_mutex, complex_tests)
+{
+    test_one_writer<Shared_mutex>();
+    test_multiple_readers<Shared_mutex>();
+    test_writer_blocking_readers<Shared_mutex>();
+    test_readers_blocking_writer<Shared_mutex>();
+    test_try_lock_and_try_lock_shared<Shared_mutex>();
+}
+
+// int main() {
+//     test_one_writer<shared_mutex>();
+//     test_multiple_readers<shared_mutex>();
+//     test_writer_blocking_readers<shared_mutex>();
+//     test_readers_blocking_writer<shared_mutex>();
+//     test_try_lock_and_try_lock_shared<shared_mutex>();
+
+//     test_one_writer<shared_timed_mutex>();
+//     test_multiple_readers<shared_timed_mutex>();
+//     test_writer_blocking_readers<shared_timed_mutex>();
+//     test_readers_blocking_writer<shared_timed_mutex>();
+//     test_try_lock_and_try_lock_shared<shared_timed_mutex>();
+
+//     test_timed_behavior();
+// }
+
 // Next section contains things that needs to be tested too. We only implemented regular mutex.
 // Remove below when implemented.
 //
 // int main()
 // {
-//     {
-//         mutex_test_fixture<Mutex> fixture;
-//         fixture.test_lockable();
-//     }
-
 //     {
 //         mutex_test_fixture<std::timed_mutex> fixture;
 //         fixture.test_lockable();
@@ -1021,12 +1397,6 @@ TEST(STL_Mutex, nonmember_try_lock_test)
 //         fixture.test_lockable();
 //         fixture.test_timed_lockable();
 //         fixture.test_recursive_lockable();
-//     }
-
-//     {
-//         mutex_test_fixture<std::shared_mutex> fixture;
-//         fixture.test_lockable();
-//         // shared-ownership locking behavior tested in Dev11_1150223_shared_mutex
 //     }
 
 //     {

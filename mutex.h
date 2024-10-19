@@ -3,7 +3,6 @@
 #ifndef COS_MUTEX_H
 #define COS_MUTEX_H
 
-#include <atomic>
 #include <mutex>
 #include <new>
 
@@ -15,10 +14,34 @@ constexpr std::size_t cache_line_size = std::hardware_destructive_interference_s
 constexpr std::size_t cache_line_size = 64;
 #endif
 
-// TODO: Make distinct (spin)lock for mutex with CAS and instead of single atomic flag, plece all
-// lock info into the lock variable, since we are aligning it on 64 bytes. We can put there owner
-// id, type of mutex etc.
-//
+class Mutex;
+class Recursive_mutex;
+
+class Mutex_internal {
+    friend class Mutex;
+    friend class Recursive_mutex;
+
+private:
+    Mutex_internal() noexcept = default;
+
+    template<lock_type lt>
+    inline lock_error spin_lock() noexcept;
+
+    template<class Mutex_class, bool throws = false>
+    [[nodiscard]] inline bool
+    check_lock(lock_error err) noexcept(std::is_same_v<Mutex_class, Recursive_mutex> || !throws);
+
+    template<class Mutex_class>
+    void lock();
+
+    template<class Mutex_class>
+    bool try_lock() noexcept;
+
+    void unlock() noexcept;
+
+    Spinlock m_spinlock;
+};
+
 class Mutex {
 public:
     Mutex() noexcept = default;
@@ -35,7 +58,34 @@ public:
     void unlock() noexcept;
 
 private:
-    Spinlock m_lock;
+    Mutex_internal m_mtx;
+};
+
+constexpr uint32_t max_rec_locks = uint32_t(-1);
+
+class Recursive_mutex {
+public:
+    Recursive_mutex() noexcept = default;
+    ~Recursive_mutex() noexcept = default;
+
+    Recursive_mutex(const Recursive_mutex&) = delete;
+    Recursive_mutex& operator=(const Recursive_mutex&) = delete;
+
+    Recursive_mutex(Recursive_mutex&&) noexcept = delete;
+    Recursive_mutex& operator=(Recursive_mutex&&) = delete;
+
+    void lock();
+    bool try_lock() noexcept;
+    void unlock() noexcept;
+
+private:
+    template<bool throws>
+    bool inc_locks_count();
+
+    [[nodiscard]] uint32_t dec_locks_count() noexcept;
+
+    Mutex_internal m_mtx;
+    uint32_t m_locks_count{0};
 };
 
 // **** This is the initial mutex implementation which works much slower then current one.

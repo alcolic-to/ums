@@ -58,7 +58,7 @@ lock_error Spinlock::lock() noexcept
     if (CAS(m_tid, expected_tid, tid))
         return lock_error::success;
 
-    if (expected_tid == tid) [[unlikely]]
+    if (expected_tid == tid)
         return lock_error::deadlock;
 
     if constexpr (type == lock_type::single_try_lock)

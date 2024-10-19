@@ -10,6 +10,7 @@
 #include "io_api.h"
 #include "os_specific.h"
 #include "scheduler.h"
+#include "util.h"
 
 // Creates worker object and starts worker thread on a provided CPU.
 // We will wait for a signal from created thread, so we can continue when it is ready.
@@ -51,6 +52,12 @@ void Worker::wait_cond_or_sleep()
 {
     if (!check_wait_info())
         m_scheduler.sync<SyncCtx::wait_cond_or_sleep>(this);
+}
+
+void Worker::sleep_until_internal(const Time_point& time_point)
+{
+    set_wait_info(false, time_point);
+    wait_cond_or_sleep();
 }
 
 void Worker::read_file(void* file_handle, IO_Buffer buffer, uint64_t offset)

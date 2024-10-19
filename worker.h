@@ -40,11 +40,18 @@ public:
     void write_file(void* file_handle, IO_Buffer buffer, uint64_t offset);
     void wait_cond_or_sleep();
 
+    void sleep_until_internal(const Time_point& time_point);
+
+    template<class Clock, class Duration>
+    void sleep_until(const std::chrono::time_point<Clock, Duration>& time_point)
+    {
+        sleep_until_internal(time_point);
+    }
+
     template<class Rep, class Period>
     void sleep_for(const std::chrono::duration<Rep, Period>& time_to_sleep)
     {
-        set_wait_info(false, now() + time_to_sleep);
-        wait_cond_or_sleep();
+        sleep_until(now() + time_to_sleep);
     }
 
     void set_state(State state) noexcept;

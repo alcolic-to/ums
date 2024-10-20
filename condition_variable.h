@@ -7,9 +7,11 @@
 #include <mutex>
 #include <vector>
 
-#include "mutex.h"
+#include "spinlock.h"
 #include "util.h"
 #include "worker.h"
+
+class Mutex;
 
 class Condition_variable {
 public:

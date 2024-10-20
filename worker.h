@@ -40,8 +40,6 @@ public:
     void write_file(void* file_handle, IO_Buffer buffer, uint64_t offset);
     void wait_cond_or_sleep();
 
-    void sleep_until_internal(const Time_point& time_point);
-
     template<class Clock, class Duration>
     void sleep_until(const std::chrono::time_point<Clock, Duration>& time_point)
     {
@@ -122,6 +120,8 @@ public:
     [[nodiscard]] bool check_wait_info() const noexcept { return check_cond() || check_sleep(); }
 
     void notify_waiter() noexcept;
+
+    void sleep_until_internal(const Time_point& time_point);
 
     // TODO: reorganize data members for quick access.
     //

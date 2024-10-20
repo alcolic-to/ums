@@ -1,9 +1,11 @@
 #include "mutex.h"
 
 #include <cstdint>
+#include <mutex>
 #include <system_error>
 
 #include "spinlock.h"
+#include "util.h"
 #include "worker.h"
 
 template<lock_type type>
@@ -126,3 +128,45 @@ void Recursive_mutex::unlock() noexcept
     if (dec_locks_count() == 0)
         m_mtx.unlock();
 };
+
+// I am too lazy to implement deadlock detection here.
+// To implement it just save thread id of the thread holding mutex,
+// and check it every time lock is called.
+// Another approach would be to implement it within mutex itself.
+//
+void Timed_mutex::lock()
+{
+    std::unique_lock<Mutex> lock{m_mtx};
+    m_cv.wait(lock, [&] { return !m_locked; });
+    m_locked = true;
+}
+
+bool Timed_mutex::try_lock() noexcept
+{
+    const std::unique_lock<Mutex> lk{m_mtx, std::try_to_lock};
+    if (lk.owns_lock() && !m_locked)
+        return m_locked = true;
+    else
+        return false;
+}
+
+void Timed_mutex::unlock()
+{
+    {
+        const std::lock_guard<Mutex> lock{m_mtx};
+        m_locked = false;
+    }
+
+    m_cv.notify_one();
+}
+
+bool Timed_mutex::try_lock_until_internal(const Time_point& time_point)
+{
+    std::unique_lock<Mutex> lock{m_mtx};
+    m_cv.wait_until(lock, time_point, [&] { return !m_locked; });
+
+    if (!m_locked)
+        return m_locked = true;
+    else
+        return false;
+}

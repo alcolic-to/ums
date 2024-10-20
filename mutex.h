@@ -6,7 +6,9 @@
 #include <mutex>
 #include <new>
 
+#include "condition_variable.h"
 #include "spinlock.h"
+#include "util.h"
 
 #ifdef __cpp_lib_hardware_interference_size
 constexpr std::size_t cache_line_size = std::hardware_destructive_interference_size;
@@ -86,6 +88,42 @@ private:
 
     Mutex_internal m_mtx;
     uint32_t m_locks_count{0};
+};
+
+class Timed_mutex {
+public:
+    Timed_mutex() noexcept = default;
+    ~Timed_mutex() noexcept = default;
+
+    Timed_mutex(const Timed_mutex&) = delete;
+    Timed_mutex& operator=(const Timed_mutex&) = delete;
+
+    Timed_mutex(Timed_mutex&&) noexcept = delete;
+    Timed_mutex& operator=(Timed_mutex&&) = delete;
+
+    void lock();
+    bool try_lock() noexcept;
+
+    template<class Rep, class Period>
+    bool try_lock_for(const std::chrono::duration<Rep, Period>& rel_time)
+    {
+        return try_lock_until(now() + rel_time);
+    }
+
+    template<class Clock, class Duration>
+    bool try_lock_until(const std::chrono::time_point<Clock, Duration>& abs_time)
+    {
+        return try_lock_until_internal(abs_time);
+    }
+
+    void unlock();
+
+private:
+    bool try_lock_until_internal(const Time_point& time_point);
+
+    Mutex m_mtx;
+    Condition_variable m_cv;
+    bool m_locked{false};
 };
 
 // **** This is the initial mutex implementation which works much slower then current one.

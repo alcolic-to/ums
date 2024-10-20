@@ -18,15 +18,15 @@
 
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 
-// Condition_variable and shared mutex does not have standard layout because
-// they have std::vector inside.
+// Condition_variable, shared mutex and timed mutex does not have standard layout because
+// they all have (explicitly or implicitly) std::vector inside.
 
 // clang-format off
 
 STATIC_ASSERT(std::is_standard_layout_v<Spinlock>);
 STATIC_ASSERT(std::is_standard_layout_v<Mutex>); // N4928 [thread.mutex.class]/3
 STATIC_ASSERT(std::is_standard_layout_v<Recursive_mutex>); // N4928 [thread.mutex.recursive]/2
-// STATIC_ASSERT(std::is_standard_layout_v<timed_mutex>); // N4928 [thread.timedmutex.class]/2
+// STATIC_ASSERT(std::is_standard_layout_v<Timed_mutex>); // N4928 [thread.timedmutex.class]/2
 // STATIC_ASSERT(std::is_standard_layout_v<recursive_timed_mutex>); // N4928 [thread.timedmutex.recursive]/2
 // STATIC_ASSERT(std::is_standard_layout_v<Shared_mutex>); // N4928 [thread.sharedmutex.class]/2
 // STATIC_ASSERT(std::is_standard_layout_v<std::shared_timed_mutex>); // N4928 [thread.sharedtimedmutex.class]/2
@@ -35,7 +35,7 @@ STATIC_ASSERT(std::is_standard_layout_v<Recursive_mutex>); // N4928 [thread.mute
 // nothrow-destructibility required by N4928 [res.on.exception.handling]/3
 STATIC_ASSERT(std::is_nothrow_destructible_v<Mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Recursive_mutex>);
-// STATIC_ASSERT(std::is_nothrow_destructible_v<timed_mutex>);
+STATIC_ASSERT(std::is_nothrow_destructible_v<Timed_mutex>);
 // STATIC_ASSERT(std::is_nothrow_destructible_v<recursive_timed_mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Shared_mutex>);
 // STATIC_ASSERT(std::is_nothrow_destructible_v<shared_timed_mutex>);
@@ -45,7 +45,7 @@ STATIC_ASSERT(std::is_nothrow_destructible_v<Condition_variable>);
 
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Mutex>); // N4928 [thread.mutex.class]
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Recursive_mutex>); // strengthened
-// STATIC_ASSERT(std::is_nothrow_default_constructible_v<timed_mutex>); // strengthened
+STATIC_ASSERT(std::is_nothrow_default_constructible_v<Timed_mutex>); // strengthened
 // STATIC_ASSERT(std::is_nothrow_default_constructible_v<recursive_timed_mutex>); // strengthened
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Shared_mutex>); // strengthened
 // STATIC_ASSERT(std::is_nothrow_default_constructible_v<shared_timed_mutex>); // strengthened
@@ -61,7 +61,7 @@ STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Sh
 // Also test mandatory and strengthened exception specification for try_lock().
 STATIC_ASSERT(noexcept(std::declval<Mutex&>().try_lock())); // strengthened
 STATIC_ASSERT(noexcept(std::declval<Recursive_mutex&>().try_lock())); // N4928 [thread.mutex.recursive]
-// STATIC_ASSERT(noexcept(std::declval<timed_mutex&>().try_lock())); // strengthened
+STATIC_ASSERT(noexcept(std::declval<Timed_mutex&>().try_lock())); // strengthened
 // STATIC_ASSERT(noexcept(std::declval<recursive_timed_mutex&>().try_lock())); // N4928 [thread.timedmutex.recursive]
 STATIC_ASSERT(noexcept(std::declval<Shared_mutex&>().try_lock())); // strengthened
 
@@ -797,7 +797,7 @@ struct mutex_test_fixture {
                     }) < std::chrono::hours(1));
         mtx.unlock();
         ASSERT_TRUE(time_execution([this] {
-                        ASSERT_TRUE(mtx.try_lock_until(std::chrono::system_clock::now() +
+                        ASSERT_TRUE(mtx.try_lock_until(std::chrono::steady_clock::now() +
                                                        std::chrono::hours(24)));
                     }) < std::chrono::hours(1));
         mtx.unlock();
@@ -811,11 +811,11 @@ struct mutex_test_fixture {
                     }) < std::chrono::hours(1));
         ASSERT_TRUE(time_execution([this] {
                         std::unique_lock<_Mutex> ul(mtx, std::defer_lock);
-                        ASSERT_TRUE(ul.try_lock_until(std::chrono::system_clock::now() +
+                        ASSERT_TRUE(ul.try_lock_until(std::chrono::steady_clock::now() +
                                                       std::chrono::hours(24)));
                     }) < std::chrono::hours(1));
         ASSERT_TRUE(time_execution([this] {
-                        std::unique_lock<_Mutex> ul(mtx, std::chrono::system_clock::now() +
+                        std::unique_lock<_Mutex> ul(mtx, std::chrono::steady_clock::now() +
                                                              std::chrono::hours(24));
                         ASSERT_TRUE(ul.owns_lock());
                     }) < std::chrono::hours(1));
@@ -856,8 +856,7 @@ struct mutex_test_fixture {
     other_mutex_thread<_Mutex> ot;
 };
 
-// TODO: Replace std::recursive_mutex, std::timed_mutex, std::recursive_timed_mutex
-// as we implement these.
+// TODO: Replace std::recursive_timed_mutex as we implement these.
 //
 void test_nonmember_lock()
 {
@@ -865,7 +864,7 @@ void test_nonmember_lock()
     other_mutex_thread<Mutex> ot(mtx);
 
     Recursive_mutex rMtx;
-    std::timed_mutex tMtx;
+    Timed_mutex tMtx;
 
     std::recursive_timed_mutex rtMtx;
     other_mutex_thread<std::recursive_timed_mutex> rtOt(rtMtx);
@@ -904,8 +903,7 @@ void test_nonmember_lock()
     rtOt.join();
 }
 
-// TODO: Replace std::recursive_mutex, std::timed_mutex, std::recursive_timed_mutex
-// as we implement these.
+// TODO: Replace std::recursive_timed_mutex as we implement these.
 //
 void test_nonmember_try_lock()
 {
@@ -913,7 +911,7 @@ void test_nonmember_try_lock()
     other_mutex_thread<Mutex> ot(mtx);
 
     Recursive_mutex rMtx;
-    std::timed_mutex tMtx;
+    Timed_mutex tMtx;
 
     std::recursive_timed_mutex rtMtx;
     other_mutex_thread<std::recursive_timed_mutex> rtOt(rtMtx);
@@ -1376,7 +1374,8 @@ void test_try_lock_and_try_lock_shared()
 
 //         threads.emplace_back([&launch_readers, &stm] {
 //             while (!launch_readers) {
-//                 std::shared_lock<std::shared_timed_mutex> SharedLock(stm, std::try_to_lock);
+//                 std::shared_lock<std::shared_timed_mutex> SharedLock(stm,
+//                 std::try_to_lock);
 
 //                 if (!SharedLock.owns_lock()) {
 //                     launch_readers = true;
@@ -1490,6 +1489,125 @@ TEST(STL_Recursive_mutex, recursive_mutex_test_fixture)
     });
 }
 
+TEST(Timed_mutex, mutex_sanity_test_1)
+{
+    Timed_mutex mutex;
+    int counter = 0;
+
+    auto f = [&] {
+        mutex.lock();
+        ++counter;
+        mutex.unlock();
+    };
+
+    task_manager.execute_tasks<false>(f, f);
+    ASSERT_TRUE(counter == 2);
+}
+
+TEST(Timed_mutex, mutex_sanity_test_2)
+{
+    Timed_mutex mutex;
+    int counter = 0;
+    int iterations = 100000;
+
+    // Test 2: Mutex Contention Test
+    auto f = [&] {
+        for (int i = 0; i < iterations; ++i) {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        }
+    };
+
+    task_manager.execute_tasks<false>(f, f, f, f);
+    ASSERT_TRUE(counter == 4 * iterations);
+}
+
+TEST(Timed_mutex, sanity_test_3)
+{
+    GTEST_SKIP() << "Deadlock detection not implemented.";
+
+    task_manager.execute_task<false>([] {
+        try {
+            Timed_mutex mutex;
+
+            mutex.lock();
+            mutex.lock();
+        }
+        catch (std::system_error& ex) {
+            ASSERT_TRUE(ex.code() ==
+                        std::make_error_code(std::errc::resource_deadlock_would_occur));
+        }
+    });
+}
+
+TEST(Timed_mutex, timed_mutex_test_fixture)
+{
+    if (cpus.workers_count() < 3)
+        GTEST_SKIP() << "At least 3 workers needed for this test.";
+
+    task_manager.execute_task<false>([] {
+        mutex_test_fixture<Timed_mutex> fixture;
+        fixture.test_lockable();
+        fixture.test_timed_lockable();
+    });
+}
+
+TEST(Timed_mutex, timed_mutex_complex_test)
+{
+    // Test try_lock_for() and try_lock_shared_for(). No timing assumptions.
+    //
+    {
+        Timed_mutex timed_mutex;
+
+        std::unique_lock<Timed_mutex> MainExclusive(timed_mutex, 25ms);
+        ASSERT_TRUE(MainExclusive.owns_lock());
+
+        task_manager.execute_task<false>([&] {
+            std::unique_lock<Timed_mutex> ExclusiveLock(timed_mutex, 25ms);
+            ASSERT_TRUE(!ExclusiveLock.owns_lock());
+        });
+    }
+
+    // Test delayed try_lock_for() success. GENEROUS timing assumptions.
+    //
+    if (cpus.count() >= 4 && cpus.workers_count() >= 4) {
+        std::atomic<int> atom(-4);
+        Timed_mutex timed_mutex;
+
+        std::unique_lock<Timed_mutex> MainUnique(timed_mutex);
+
+        auto f = [&] {
+            ++atom;
+            while (atom < 0) {
+            }
+            std::unique_lock<Timed_mutex> TryExclusiveLock(timed_mutex, std::try_to_lock);
+            ASSERT_TRUE(!TryExclusiveLock.owns_lock());
+
+            std::unique_lock<Timed_mutex> TryTimedExclusiveLock(timed_mutex, 5ms);
+            ASSERT_TRUE(!TryExclusiveLock.owns_lock());
+
+            std::unique_lock<Timed_mutex> ExclusiveLock(timed_mutex, 1min);
+            ASSERT_TRUE(ExclusiveLock.owns_lock());
+            const int val = (atom += 100);
+            tls_worker->sleep_for(25ms);
+            ASSERT_TRUE(atom == val);
+        };
+
+        auto f2 = [&] {
+            ++atom;
+            while (atom < 0) {
+            }
+
+            tls_worker->sleep_for(50ms);
+            MainUnique.unlock();
+        };
+
+        task_manager.execute_tasks<false>(f, f, f, f2);
+        ASSERT_TRUE(atom == 300);
+    }
+}
+
 // int main() {
 //     test_one_writer<shared_mutex>();
 //     test_multiple_readers<shared_mutex>();
@@ -1511,12 +1629,6 @@ TEST(STL_Recursive_mutex, recursive_mutex_test_fixture)
 //
 // int main()
 // {
-//     {
-//         mutex_test_fixture<std::timed_mutex> fixture;
-//         fixture.test_lockable();
-//         fixture.test_timed_lockable();
-//     }
-
 //     {
 //         mutex_test_fixture<std::recursive_timed_mutex> fixture;
 //         fixture.test_lockable();

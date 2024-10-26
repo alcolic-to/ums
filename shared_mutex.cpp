@@ -13,7 +13,7 @@ Shared_mutex::~Shared_mutex() noexcept
 }
 
 // TODO: Check whether exception should be thrown in case of a deadlock.
-// STL implementation does nothing in case of a deadlock.
+// STL implementation does nothing in that case.
 //
 void Shared_mutex::lock()
 {

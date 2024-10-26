@@ -2,7 +2,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <thread>
 
 // Pause intrinsic used for spinlock optimization.
 // From intel documentation on void _mm_pause(void):
@@ -34,65 +33,64 @@ void cpu_pause() noexcept
 }
 
 using mo = std::memory_order;
-const std::thread::id empty_tid{};
 
-inline bool CAS(std::atomic<std::thread::id>& tid, std::thread::id& expected,
-                const std::thread::id desired) noexcept
+// Plain spinlock implementation.
+// It loads lock flag until it becames free (without acquiring hardware cache line lock),
+// after which tries to atomically set flag to 1. If someone else has already
+// set value to 1 (took lock), exchange returns 1 and we continue spinning.
+// Instead of using CAS for setting flag, simple exchange is used which is ~30% faster.
+// Also, for performance improvement, Intel optimization manual is followed: we use exponential
+// backoff with pause instruction. Maximum backoff is taken based on microsoft STL spinlock
+// implementation, and after testing it turs out that we are not getting better results with any
+// other number. Memory bariers are standard acquire/release for lock/unlock pairs, but spinning on
+// flag is done with relaxed atomic, because memory order is not important until lock is taken.
+//
+// TODO: We can add in debug builds all sorts of features (deadlock detection, time measurements,
+// asserting on long lock held etc). We should also prevent yielding while lock is held. In that
+// case there is no point in adding optimizations by checking which CPU holds the lock.
+//
+void Spinlock::lock() noexcept
 {
-    return tid.compare_exchange_weak(expected, desired, mo::acquire, mo::relaxed);
+    constexpr uint32_t max_backoff = 64;
+    uint32_t backoff = 1;
+
+    while (m_flag.load(mo::relaxed) != 0 || m_flag.exchange(1, mo::acquire) != 0) {
+        for (uint32_t i = 0; i < backoff; ++i)
+            cpu_pause();
+
+        backoff = backoff < max_backoff ? backoff << 1U : max_backoff;
+    }
 }
 
-Spinlock::Spinlock() noexcept : m_tid{empty_tid} {}
-
-// Acquires lock by setting current thread id to m_tid.
-// In case of a deadlock returns lock_error::deadlock.
-// NOTE: We can use Worker::id() instead of std::thread::id, but we won't be able to use
-// spinlock in userspace where worker is not initialized (perf tests for example).
-//
-template<lock_type type>
-lock_error Spinlock::lock() noexcept
+bool Spinlock::try_lock() noexcept
 {
-    const std::thread::id tid{std::this_thread::get_id()};
-    std::thread::id expected_tid{empty_tid};
+    return m_flag.load(mo::relaxed) == 0 && m_flag.exchange(1, mo::acquire) == 0;
+}
 
-    if (CAS(m_tid, expected_tid, tid))
-        return lock_error::success;
-
-    if (expected_tid == tid)
-        return lock_error::deadlock;
-
-    if constexpr (type == lock_type::single_try_lock)
-        return lock_error::timeout;
-
+// Tries to acquire lock max_try number of times and returns whether it succeeded.
+//
+bool Spinlock::lock_with_timeout() noexcept
+{
     constexpr uint32_t max_try = 256;
     uint32_t try_count = 0; // NOLINT
 
     constexpr uint32_t max_backoff = 64;
     uint32_t backoff = 1;
 
-    expected_tid = empty_tid;
-
-    while (m_tid.load(mo::relaxed) != empty_tid || !CAS(m_tid, expected_tid, tid)) {
-        if constexpr (type == lock_type::try_lock) {
-            if (++try_count == max_try) [[unlikely]]
-                return lock_error::timeout;
-        }
+    while (m_flag.load(mo::relaxed) != 0 || m_flag.exchange(1, mo::acquire) != 0) {
+        if (++try_count == max_try) [[unlikely]]
+            return false;
 
         for (uint32_t i = 0; i < backoff; ++i)
             cpu_pause();
 
         backoff = backoff < max_backoff ? backoff << 1U : max_backoff;
-        expected_tid = empty_tid;
     }
 
-    return lock_error::success;
+    return true;
 }
 
 void Spinlock::unlock() noexcept
 {
-    m_tid.store(empty_tid, mo::release);
+    m_flag.store(0, mo::release);
 }
-
-template lock_error Spinlock::lock<lock_type::lock>();
-template lock_error Spinlock::lock<lock_type::try_lock>();
-template lock_error Spinlock::lock<lock_type::single_try_lock>();

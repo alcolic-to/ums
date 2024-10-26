@@ -1523,7 +1523,7 @@ TEST(Timed_mutex, mutex_sanity_test_2)
     ASSERT_TRUE(counter == 4 * iterations);
 }
 
-TEST(Timed_mutex, sanity_test_3)
+TEST(Timed_mutex, mutex_sanity_test_3)
 {
     GTEST_SKIP() << "Deadlock detection not implemented.";
 

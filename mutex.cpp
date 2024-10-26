@@ -1,86 +1,55 @@
 #include "mutex.h"
 
+#include <atomic>
 #include <cstdint>
 #include <mutex>
 #include <system_error>
+#include <thread>
 
 #include "spinlock.h"
 #include "util.h"
 #include "worker.h"
 
-template<lock_type type>
-inline lock_error Mutex_internal::spin_lock() noexcept
-{
-    return m_spinlock.lock<type>();
-}
-
-// Helper function that checks spinlock error and converts it to bool value.
-// For non-recursive mutex, returns true for success. If throws is set to
-// true and deadlock occurs, throws resource_deadlock_would_occur, otherwise
-// returns false.
-// For recursive mutex, we will return true for success and deadlock, false otherwise.
-//
-template<class Mutex_class, bool throws>
-[[nodiscard]] inline bool Mutex_internal::check_lock(const lock_error err) noexcept(
-    std::is_same_v<Mutex_class, Recursive_mutex> || !throws)
-{
-    if (err == lock_error::success)
-        return true;
-
-    if (err == lock_error::deadlock) {
-        if constexpr (std::is_same_v<Mutex_class, Recursive_mutex>)
-            return true;
-        else if constexpr (throws)
-            throw std::system_error(std::make_error_code(std::errc::resource_deadlock_would_occur));
-    }
-
-    return false;
-}
-
-template<class Mutex_class>
 void Mutex_internal::lock()
 {
-    constexpr auto try_lock = lock_type::try_lock;
-    constexpr auto single_try_lock = lock_type::single_try_lock;
-
-    if (check_lock<Mutex_class, true>(spin_lock<try_lock>()))
-        return;
-
-    while (!check_lock<Mutex_class>(spin_lock<single_try_lock>()))
-        tls_worker->yield();
+    if (!m_spinlock.lock_with_timeout())
+        while (!m_spinlock.try_lock())
+            tls_worker->yield();
 }
 
-// TODO: Check whether we should just single try lock.
-//
-template<class Mutex_class>
 bool Mutex_internal::try_lock() noexcept
 {
-    constexpr auto try_lock = lock_type::try_lock;
-
-    return check_lock<Mutex_class, false>(spin_lock<try_lock>());
+    return m_spinlock.try_lock();
 }
 
-// Since standard requires that unlock does not throw (it is UB), we can not throw
-// operation_not_permitted if thread does not own the mutex.
-//
 void Mutex_internal::unlock() noexcept
 {
     m_spinlock.unlock();
 }
 
+const std::thread::id empty_tid{};
+
 void Mutex::lock()
 {
-    m_mtx.lock<Mutex>();
+    const auto this_tid = std::this_thread::get_id();
+
+    if (m_tid.load(std::memory_order_relaxed) == this_tid)
+        throw std::system_error(std::make_error_code(std::errc::resource_deadlock_would_occur));
+
+    m_mtx.lock();
+
+    m_tid.store(this_tid, std::memory_order_relaxed);
 }
 
 bool Mutex::try_lock() noexcept
 {
-    return m_mtx.try_lock<Mutex>();
+    return m_mtx.try_lock();
 }
 
 void Mutex::unlock() noexcept
 {
     m_mtx.unlock();
+    m_tid.store(empty_tid, std::memory_order_relaxed);
 }
 
 // Increments locks count and returns if it succeded.
@@ -111,8 +80,17 @@ bool Recursive_mutex::inc_locks_count()
 
 void Recursive_mutex::lock()
 {
-    m_mtx.lock<Recursive_mutex>();
-    inc_locks_count<true>();
+    const auto this_tid = std::this_thread::get_id();
+
+    if (m_tid.load(std::memory_order_relaxed) == this_tid) {
+        inc_locks_count<true>();
+        return;
+    }
+
+    m_mtx.lock();
+
+    m_tid.store(this_tid, std::memory_order_relaxed);
+    inc_locks_count<false>(); // Never throws since counter is 0 if we locked mutex.
 };
 
 // Tries to lock mutex. It returns true if lock is acquired and lock count is incremented
@@ -120,19 +98,31 @@ void Recursive_mutex::lock()
 //
 bool Recursive_mutex::try_lock() noexcept
 {
-    return m_mtx.try_lock<Recursive_mutex>() && inc_locks_count<false>();
+    const auto this_tid = std::this_thread::get_id();
+
+    if (m_tid.load(std::memory_order_relaxed) == this_tid)
+        return inc_locks_count<false>();
+
+    if (m_mtx.try_lock()) {
+        inc_locks_count<false>();
+        m_tid.store(this_tid, std::memory_order_relaxed);
+        return true;
+    }
+
+    return false;
 };
 
 void Recursive_mutex::unlock() noexcept
 {
-    if (dec_locks_count() == 0)
+    if (dec_locks_count() == 0) {
         m_mtx.unlock();
+        m_tid.store(empty_tid, std::memory_order_relaxed);
+    }
 };
 
 // I am too lazy to implement deadlock detection here.
 // To implement it just save thread id of the thread holding mutex,
 // and check it every time lock is called.
-// Another approach would be to implement it within mutex itself.
 //
 void Timed_mutex::lock()
 {

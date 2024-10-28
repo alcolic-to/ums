@@ -49,6 +49,11 @@ using mo = std::memory_order;
 // asserting on long lock held etc). We should also prevent yielding while lock is held. In that
 // case there is no point in adding optimizations by checking which CPU holds the lock.
 //
+// TODO: I read in glibc that exchange on some architectures can use strong CAS,
+// and if that is true, we should replace exchange with compare_exchange_weak.
+// https://github.com/lattera/glibc/blame/master/nptl/pthread_spin_lock.c
+// I checked ARM and it is fine. On power64, I am not sure what happens...
+//
 void Spinlock::lock() noexcept
 {
     constexpr uint32_t max_backoff = 64;
@@ -72,7 +77,7 @@ bool Spinlock::try_lock() noexcept
 bool Spinlock::lock_with_timeout() noexcept
 {
     constexpr uint32_t max_try = 256;
-    uint32_t try_count = 0; // NOLINT
+    uint32_t try_count = 0;
 
     constexpr uint32_t max_backoff = 64;
     uint32_t backoff = 1;

@@ -10,19 +10,19 @@
 #include "util.h"
 #include "worker.h"
 
-void Mutex_internal::lock()
+void Plain_mutex::lock()
 {
     if (!m_spinlock.lock_with_timeout())
         while (!m_spinlock.try_lock())
             tls_worker->yield();
 }
 
-bool Mutex_internal::try_lock() noexcept
+bool Plain_mutex::try_lock() noexcept
 {
     return m_spinlock.try_lock();
 }
 
-void Mutex_internal::unlock() noexcept
+void Plain_mutex::unlock() noexcept
 {
     m_spinlock.unlock();
 }
@@ -52,16 +52,17 @@ void Mutex::unlock() noexcept
     m_tid.store(empty_tid, std::memory_order_relaxed);
 }
 
-// Increments locks count and returns if it succeded.
-// If throws is specified, throws if maximum recursive locks are reached.
+// Helper function that increases locks count for recursive mutexes.
+// If max_rec_locks is reched and throws is provided, throws resource_unavailable_try_again.
+// Otherwise, returns whether number is incresed successfully.
 //
 template<bool throws>
-bool Recursive_mutex::inc_locks_count()
+bool rmtx_inc_lc(uint32_t& locks_count)
 {
-    ++m_locks_count;
+    ++locks_count;
 
-    if (m_locks_count == max_rec_locks) [[unlikely]] {
-        --m_locks_count;
+    if (locks_count == max_rec_locks) [[unlikely]] {
+        --locks_count;
 
         if constexpr (throws)
             throw std::system_error(
@@ -73,9 +74,11 @@ bool Recursive_mutex::inc_locks_count()
         return true;
 }
 
-[[nodiscard]] uint32_t Recursive_mutex::dec_locks_count() noexcept
+// Helper function that decreases locks count for recursive mutexes.
+//
+[[nodiscard]] uint32_t rmtx_dec_lc(uint32_t& locks_count) noexcept
 {
-    return --m_locks_count;
+    return --locks_count;
 }
 
 void Recursive_mutex::lock()
@@ -83,14 +86,14 @@ void Recursive_mutex::lock()
     const auto this_tid = std::this_thread::get_id();
 
     if (m_tid.load(std::memory_order_relaxed) == this_tid) {
-        inc_locks_count<true>();
+        rmtx_inc_lc<true>(m_locks_count);
         return;
     }
 
     m_mtx.lock();
 
     m_tid.store(this_tid, std::memory_order_relaxed);
-    inc_locks_count<false>(); // Never throws since counter is 0 if we locked mutex.
+    rmtx_inc_lc<false>(m_locks_count);
 };
 
 // Tries to lock mutex. It returns true if lock is acquired and lock count is incremented
@@ -101,10 +104,10 @@ bool Recursive_mutex::try_lock() noexcept
     const auto this_tid = std::this_thread::get_id();
 
     if (m_tid.load(std::memory_order_relaxed) == this_tid)
-        return inc_locks_count<false>();
+        return rmtx_inc_lc<false>(m_locks_count);
 
     if (m_mtx.try_lock()) {
-        inc_locks_count<false>();
+        rmtx_inc_lc<false>(m_locks_count);
         m_tid.store(this_tid, std::memory_order_relaxed);
         return true;
     }
@@ -114,7 +117,7 @@ bool Recursive_mutex::try_lock() noexcept
 
 void Recursive_mutex::unlock() noexcept
 {
-    if (dec_locks_count() == 0) {
+    if (rmtx_dec_lc(m_locks_count) == 0) {
         m_mtx.unlock();
         m_tid.store(empty_tid, std::memory_order_relaxed);
     }
@@ -133,8 +136,19 @@ void Timed_mutex::lock()
 
 bool Timed_mutex::try_lock() noexcept
 {
-    const std::unique_lock<Mutex> lk{m_mtx, std::try_to_lock};
-    if (lk.owns_lock() && !m_locked)
+    const std::unique_lock<Mutex> lock{m_mtx, std::try_to_lock};
+    if (lock.owns_lock() && !m_locked)
+        return m_locked = true;
+    else
+        return false;
+}
+
+bool Timed_mutex::try_lock_until_internal(const Time_point& time_point)
+{
+    std::unique_lock<Mutex> lock{m_mtx};
+    m_cv.wait_until(lock, time_point, [&] { return !m_locked; });
+
+    if (!m_locked)
         return m_locked = true;
     else
         return false;
@@ -150,13 +164,59 @@ void Timed_mutex::unlock()
     m_cv.notify_one();
 }
 
-bool Timed_mutex::try_lock_until_internal(const Time_point& time_point)
+void Recursive_timed_mutex::lock()
 {
-    std::unique_lock<Mutex> lock{m_mtx};
-    m_cv.wait_until(lock, time_point, [&] { return !m_locked; });
+    const std::thread::id this_tid = std::this_thread::get_id();
+    std::unique_lock<Mutex> lock(m_mtx);
 
-    if (!m_locked)
-        return m_locked = true;
-    else
-        return false;
+    if (m_tid != this_tid) {
+        m_cv.wait(lock, [&] { return m_locks_count == 0; });
+        m_tid = this_tid;
+    }
+
+    rmtx_inc_lc<true>(m_locks_count);
+}
+
+bool Recursive_timed_mutex::try_lock() noexcept
+{
+    const std::thread::id this_tid = std::this_thread::get_id();
+    const std::unique_lock<Mutex> lock(m_mtx, std::try_to_lock);
+
+    if (lock.owns_lock() && (m_locks_count == 0 || m_tid == this_tid)) {
+        if (rmtx_inc_lc<false>(m_locks_count)) {
+            m_tid = this_tid;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Recursive_timed_mutex::try_lock_until_internal(const Time_point& time_point)
+{
+    const std::thread::id this_tid{std::this_thread::get_id()};
+    std::unique_lock<Mutex> lock(m_mtx);
+
+    if (m_tid == this_tid)
+        return rmtx_inc_lc<false>(m_locks_count);
+
+    m_cv.wait_until(lock, time_point, [&] { return m_locks_count == 0; });
+
+    if (m_locks_count == 0) {
+        rmtx_inc_lc<false>(m_locks_count);
+        m_tid = this_tid;
+        return true;
+    }
+
+    return false;
+}
+
+void Recursive_timed_mutex::unlock()
+{
+    std::unique_lock<Mutex> lock(m_mtx);
+    if (rmtx_dec_lc(m_locks_count) == 0) {
+        m_tid = empty_tid;
+        lock.unlock();
+        m_cv.notify_one();
+    }
 }

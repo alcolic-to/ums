@@ -5,6 +5,7 @@
 
 #include <mutex>
 #include <new>
+#include <thread>
 
 #include "condition_variable.h"
 #include "spinlock.h"
@@ -19,12 +20,12 @@ constexpr std::size_t cache_line_size = 64;
 class Mutex;
 class Recursive_mutex;
 
-class Mutex_internal {
+class Plain_mutex {
     friend class Mutex;
     friend class Recursive_mutex;
 
 private:
-    Mutex_internal() noexcept = default;
+    Plain_mutex() noexcept = default;
 
     void lock();
     bool try_lock() noexcept;
@@ -49,7 +50,7 @@ public:
     void unlock() noexcept;
 
 private:
-    Mutex_internal m_mtx;
+    Plain_mutex m_mtx;
     std::atomic<std::thread::id> m_tid;
 };
 
@@ -71,12 +72,7 @@ public:
     void unlock() noexcept;
 
 private:
-    template<bool throws>
-    bool inc_locks_count();
-
-    [[nodiscard]] uint32_t dec_locks_count() noexcept;
-
-    Mutex_internal m_mtx;
+    Plain_mutex m_mtx;
     std::atomic<std::thread::id> m_tid;
     uint32_t m_locks_count{0};
 };
@@ -115,6 +111,43 @@ private:
     Mutex m_mtx;
     Condition_variable m_cv;
     bool m_locked{false};
+};
+
+class Recursive_timed_mutex {
+public:
+    Recursive_timed_mutex() noexcept = default;
+    ~Recursive_timed_mutex() noexcept = default;
+
+    Recursive_timed_mutex(const Recursive_timed_mutex&) = delete;
+    Recursive_timed_mutex& operator=(const Recursive_timed_mutex&) = delete;
+
+    Recursive_timed_mutex(Recursive_timed_mutex&&) noexcept = delete;
+    Recursive_timed_mutex& operator=(Recursive_timed_mutex&&) = delete;
+
+    void lock();
+    bool try_lock() noexcept;
+
+    template<class Rep, class Period>
+    bool try_lock_for(const std::chrono::duration<Rep, Period>& rel_time)
+    {
+        return try_lock_until(std::chrono::steady_clock::now() + rel_time);
+    }
+
+    template<class Clock, class Duration>
+    bool try_lock_until(const std::chrono::time_point<Clock, Duration>& abs_time)
+    {
+        return try_lock_until_internal(abs_time);
+    }
+
+    void unlock();
+
+private:
+    bool try_lock_until_internal(const Time_point& time_point);
+
+    Mutex m_mtx;
+    Condition_variable m_cv;
+    std::thread::id m_tid;
+    uint32_t m_locks_count{0};
 };
 
 // **** This is the initial mutex implementation which works much slower then current one.

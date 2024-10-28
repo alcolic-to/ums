@@ -36,7 +36,7 @@ STATIC_ASSERT(std::is_standard_layout_v<Recursive_mutex>); // N4928 [thread.mute
 STATIC_ASSERT(std::is_nothrow_destructible_v<Mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Recursive_mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Timed_mutex>);
-// STATIC_ASSERT(std::is_nothrow_destructible_v<recursive_timed_mutex>);
+STATIC_ASSERT(std::is_nothrow_destructible_v<Recursive_timed_mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Shared_mutex>);
 // STATIC_ASSERT(std::is_nothrow_destructible_v<shared_timed_mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<std::shared_lock<Shared_mutex>>);
@@ -46,7 +46,7 @@ STATIC_ASSERT(std::is_nothrow_destructible_v<Condition_variable>);
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Mutex>); // N4928 [thread.mutex.class]
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Recursive_mutex>); // strengthened
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Timed_mutex>); // strengthened
-// STATIC_ASSERT(std::is_nothrow_default_constructible_v<recursive_timed_mutex>); // strengthened
+STATIC_ASSERT(std::is_nothrow_default_constructible_v<Recursive_timed_mutex>); // strengthened
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Shared_mutex>); // strengthened
 // STATIC_ASSERT(std::is_nothrow_default_constructible_v<shared_timed_mutex>); // strengthened
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<std::shared_lock<Shared_mutex>>); // N4928 [thread.lock.shared.cons]/1
@@ -62,249 +62,10 @@ STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Sh
 STATIC_ASSERT(noexcept(std::declval<Mutex&>().try_lock())); // strengthened
 STATIC_ASSERT(noexcept(std::declval<Recursive_mutex&>().try_lock())); // N4928 [thread.mutex.recursive]
 STATIC_ASSERT(noexcept(std::declval<Timed_mutex&>().try_lock())); // strengthened
-// STATIC_ASSERT(noexcept(std::declval<recursive_timed_mutex&>().try_lock())); // N4928 [thread.timedmutex.recursive]
+STATIC_ASSERT(noexcept(std::declval<Recursive_timed_mutex&>().try_lock())); // N4928 [thread.timedmutex.recursive]
 STATIC_ASSERT(noexcept(std::declval<Shared_mutex&>().try_lock())); // strengthened
 
 // clang-format on
-
-template<class Lockable>
-void run_lock_perf_test(const std::string& test_name, int num_threads)
-{
-    static Lockable lockable;
-    constexpr uint64_t iter_count = 100000;
-    uint64_t counter = 0;
-
-    auto lock_fn = [&] {
-        for (uint64_t i = 0; i < iter_count; ++i) {
-            std::scoped_lock<Lockable> lock{lockable};
-            ++counter;
-        }
-    };
-
-    std::vector<std::thread> threads;
-    threads.reserve(num_threads);
-
-    // Disabling next line since it causes clang-tidy dump with AV.
-    // Stopwatch<std::chrono::microseconds> sw{
-    //     std::format("{:8} with {:4} threads", test_name, num_threads)};
-
-    std::stringstream ss;
-    ss << std::setw(10) << std::left << test_name << " with " << std::setw(4) << std::right
-       << num_threads << " thread(s)";
-
-    Stopwatch<std::chrono::microseconds> sw{ss.str()};
-
-    for (int i = 0; i < num_threads; ++i)
-        threads.emplace_back(lock_fn);
-
-    for (auto&& t : threads)
-        t.join();
-
-    ASSERT_TRUE(counter == num_threads * iter_count);
-}
-
-// #define RUN_PERF_TESTS
-
-TEST(Mutex, mutex_vs_spinlock_perf_test_1)
-{
-#ifndef RUN_PERF_TESTS
-    GTEST_SKIP() << "Skipping perf test, since it last long.";
-#endif
-
-    std::cout << "---------------------------------------------------------------\n";
-    for (int threads_count = 1; threads_count <= 128; threads_count *= 2) {
-        run_lock_perf_test<Spinlock>("Spinlock", threads_count);
-        run_lock_perf_test<std::mutex>("std::mutex", threads_count);
-        std::cout << "---------------------------------------------------------------\n";
-    }
-}
-
-TEST(Mutex, mutex_sanity_test_1)
-{
-    Mutex mutex;
-    int counter = 0;
-
-    auto f = [&] {
-        mutex.lock();
-        ++counter;
-        mutex.unlock();
-    };
-
-    task_manager.execute_tasks<false>(f, f);
-    ASSERT_TRUE(counter == 2);
-}
-
-TEST(Mutex, mutex_sanity_test_2)
-{
-    Mutex mutex;
-    int counter = 0;
-    int iterations = 100000;
-
-    // Test 2: Mutex Contention Test
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            mutex.lock();
-            ++counter;
-            mutex.unlock();
-        }
-    };
-
-    task_manager.execute_tasks<false>(f, f, f, f);
-    ASSERT_TRUE(counter == 4 * iterations);
-}
-
-TEST(Mutex, mutex_sanity_test_3)
-{
-    task_manager.execute_task<false>([] {
-        try {
-            Mutex mutex;
-
-            mutex.lock();
-            mutex.lock();
-        }
-        catch (std::system_error& ex) {
-            ASSERT_TRUE(ex.code() ==
-                        std::make_error_code(std::errc::resource_deadlock_would_occur));
-        }
-    });
-}
-
-TEST(Mutex, mutex_peft_test_1)
-{
-#ifndef RUN_PERF_TESTS
-    GTEST_SKIP() << "Skipping perf test, since it last long.";
-#endif
-
-    Mutex mutex;
-    int counter = 0;
-    int iterations = 100000000;
-
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            std::scoped_lock<Mutex> lock{mutex};
-            ++counter;
-        }
-    };
-
-    task_manager.execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
-    ASSERT_TRUE(counter == 16 * iterations);
-}
-
-TEST(Mutex, spinlock_peft_test_1)
-{
-#ifndef RUN_PERF_TESTS
-    GTEST_SKIP() << "Skipping perf test, since it last long.";
-#endif
-
-    Spinlock mutex;
-    int counter = 0;
-    int iterations = 100000000;
-
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            std::scoped_lock<Spinlock> lock{mutex};
-            ++counter;
-        }
-    };
-
-    task_manager.execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
-    ASSERT_TRUE(counter == 16 * iterations);
-}
-
-TEST(Mutex, std_mutex_peft_test_1)
-{
-#ifndef RUN_PERF_TESTS
-    GTEST_SKIP() << "Skipping perf test, since it last long.";
-#endif
-
-    std::mutex mutex;
-    int counter = 0;
-    int iterations = 100000000;
-
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            std::scoped_lock<std::mutex> lock{mutex};
-            ++counter;
-        }
-    };
-
-    std::vector<std::thread> v;
-    v.reserve(16);
-    for (int i = 0; i < 16; ++i)
-        v.emplace_back(std::thread{f});
-
-    for (auto&& thread : v)
-        thread.join();
-
-    ASSERT_TRUE(counter == 16 * iterations);
-}
-
-TEST(Mutex, mutex_peft_test_2)
-{
-#ifndef RUN_PERF_TESTS
-    GTEST_SKIP() << "Skipping perf test, since it last long.";
-#endif
-
-    Mutex mutex;
-    int counter = 0;
-    int iterations = 100000000;
-
-    auto f = [&] {
-        std::scoped_lock<Mutex> lock{mutex};
-        for (int i = 0; i < iterations; ++i)
-            ++counter;
-    };
-
-    task_manager.execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
-    ASSERT_TRUE(counter == 16 * iterations);
-}
-
-TEST(Mutex, spinlock_peft_test_2)
-{
-#ifndef RUN_PERF_TESTS
-    GTEST_SKIP() << "Skipping perf test, since it last long.";
-#endif
-
-    Spinlock mutex;
-    int counter = 0;
-    int iterations = 100000000;
-
-    auto f = [&] {
-        std::scoped_lock<Spinlock> lock{mutex};
-        for (int i = 0; i < iterations; ++i)
-            ++counter;
-    };
-
-    task_manager.execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
-    ASSERT_TRUE(counter == 16 * iterations);
-}
-
-TEST(Mutex, std_mutex_peft_test_2)
-{
-#ifndef RUN_PERF_TESTS
-    GTEST_SKIP() << "Skipping perf test, since it last long.";
-#endif
-
-    std::mutex mutex;
-    int counter = 0;
-    int iterations = 100000000;
-
-    auto f = [&] {
-        std::scoped_lock<std::mutex> lock{mutex};
-        for (int i = 0; i < iterations; ++i)
-            ++counter;
-    };
-
-    std::vector<std::thread> v;
-    v.reserve(16);
-    for (int i = 0; i < 16; ++i)
-        v.emplace_back(std::thread{f});
-
-    for (auto&& thread : v)
-        thread.join();
-
-    ASSERT_TRUE(counter == 16 * iterations);
-}
 
 TEST(Condition_variable, cv_sanity_test_1)
 {
@@ -437,7 +198,7 @@ TEST(Condition_variable, cv_spurious_wakeup_test)
 }
 
 // https://github.com/microsoft/STL/blob/1e312b38db8df1dfbea17adc344454feb8d00dd9/tests/std/include/test_header_units_and_modules.hpp#L150
-TEST(Condition_variable, condition_variable_complex_test_1)
+TEST(Condition_variable, cv_complex_test_1)
 {
     if (cpus.workers_count() < 2)
         GTEST_SKIP() << "At least 2 workers needed for this test.";
@@ -477,7 +238,7 @@ TEST(Condition_variable, condition_variable_complex_test_1)
     static_assert(static_cast<int>(std::cv_status::timeout) == 1);
 }
 
-TEST(Condition_variable, condition_variable_complex_test_2)
+TEST(Condition_variable, cv_complex_test_2)
 {
     if (cpus.workers_count() < 9)
         GTEST_SKIP() << "At least 9 workers needed for this test.";
@@ -637,9 +398,9 @@ private:
 template<typename Func>
 std::chrono::nanoseconds time_execution(Func&& f)
 {
-    const auto startTime = std::chrono::system_clock::now();
+    const auto startTime = std::chrono::steady_clock::now();
     std::forward<Func>(f)();
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now() -
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() -
                                                                 startTime);
 }
 
@@ -856,8 +617,6 @@ struct mutex_test_fixture {
     other_mutex_thread<_Mutex> ot;
 };
 
-// TODO: Replace std::recursive_timed_mutex as we implement these.
-//
 void test_nonmember_lock()
 {
     Mutex mtx;
@@ -866,10 +625,10 @@ void test_nonmember_lock()
     Recursive_mutex rMtx;
     Timed_mutex tMtx;
 
-    std::recursive_timed_mutex rtMtx;
-    other_mutex_thread<std::recursive_timed_mutex> rtOt(rtMtx);
+    Recursive_timed_mutex rtMtx;
+    other_mutex_thread<Recursive_timed_mutex> rtOt(rtMtx);
 
-    lock(mtx, rMtx, tMtx, rtMtx);
+    std::lock(mtx, rMtx, tMtx, rtMtx);
     mtx.unlock();
     rMtx.unlock();
     tMtx.unlock();
@@ -879,7 +638,7 @@ void test_nonmember_lock()
     rtOt.lock();
     ot.unlock_delayed();   // no timing assumptions: lock() retries until it
     rtOt.unlock_delayed(); // can lock all input mutexes
-    lock(rtMtx, tMtx, mtx, rMtx);
+    std::lock(rtMtx, tMtx, mtx, rMtx);
     mtx.unlock();
     rMtx.unlock();
     tMtx.unlock();
@@ -889,7 +648,7 @@ void test_nonmember_lock()
 
     throwing_mutex throwing;
     try {
-        lock(rtMtx, mtx, throwing); // throws
+        std::lock(rtMtx, mtx, throwing); // throws
         abort();
     }
     catch (const throwing_mutex_threw&) {
@@ -903,8 +662,6 @@ void test_nonmember_lock()
     rtOt.join();
 }
 
-// TODO: Replace std::recursive_timed_mutex as we implement these.
-//
 void test_nonmember_try_lock()
 {
     Mutex mtx;
@@ -913,11 +670,11 @@ void test_nonmember_try_lock()
     Recursive_mutex rMtx;
     Timed_mutex tMtx;
 
-    std::recursive_timed_mutex rtMtx;
-    other_mutex_thread<std::recursive_timed_mutex> rtOt(rtMtx);
+    Recursive_timed_mutex rtMtx;
+    other_mutex_thread<Recursive_timed_mutex> rtOt(rtMtx);
 
     // try_lock with all mutexes unlocked
-    ASSERT_TRUE(try_lock(mtx, rMtx, tMtx, rtMtx) == -1);
+    ASSERT_TRUE(std::try_lock(mtx, rMtx, tMtx, rtMtx) == -1);
     mtx.unlock();
     rMtx.unlock();
     tMtx.unlock();
@@ -925,7 +682,7 @@ void test_nonmember_try_lock()
 
     // try_lock with some mutexes locked
     rtOt.lock();
-    ASSERT_TRUE(try_lock(mtx, rMtx, tMtx, rtMtx) == 3);
+    ASSERT_TRUE(std::try_lock(mtx, rMtx, tMtx, rtMtx) == 3);
     ASSERT_TRUE(ot.try_lock());
     ot.unlock();
     rtOt.unlock();
@@ -933,7 +690,7 @@ void test_nonmember_try_lock()
     // try_lock with throw
     throwing_mutex throwing;
     try {
-        (void)try_lock(mtx, rtMtx, throwing);
+        (void)std::try_lock(mtx, rtMtx, throwing);
         abort();
     }
     catch (const throwing_mutex_threw&) {
@@ -964,145 +721,6 @@ void test_vso_1253916()
     std::shared_mutex mtx;
     do_locked_things(std::unique_lock<std::shared_mutex>{mtx});
     do_shared_locked_things(std::shared_lock<std::shared_mutex>{mtx});
-}
-
-TEST(STL_Mutex, mutex_test_fixture)
-{
-    if (cpus.workers_count() < 3)
-        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
-
-    task_manager.execute_task<false>([] {
-        mutex_test_fixture<Mutex> fixture;
-        fixture.test_lockable();
-    });
-}
-
-TEST(STL_Mutex, nonmember_lock_test)
-{
-    GTEST_SKIP() << "Skipping test since we did not implement other mutex types. "
-                 << "Some system mutexes (like std::recursive_timed_mutex) "
-                 << "might wait on a condition variable, which will block our scheduler, "
-                 << "hence we must skip this test.";
-
-    // if (cpus.workers_count() < 3)
-    //     GTEST_SKIP() << "At least 3 CPUs needed for this test.";
-
-    task_manager.execute_task<false>([] { test_nonmember_lock(); });
-}
-
-TEST(STL_Mutex, nonmember_try_lock_test)
-{
-    GTEST_SKIP() << "Skipping test since we did not implement other mutex types. "
-                 << "Some system mutexes (like std::recursive_timed_mutex) "
-                 << "might wait on a condition variable, which will block our scheduler, "
-                 << "hence we must skip this test.";
-
-    // if (cpus.workers_count() < 3)
-    //     GTEST_SKIP() << "At least 3 CPUs needed for this test.";
-
-    task_manager.execute_task<false>([] { test_nonmember_try_lock(); });
-}
-
-// *******************
-// Shared mutex tests.
-// *******************
-
-TEST(Shared_mutex, mutex_sanity_test_1)
-{
-    Shared_mutex mutex;
-    int counter = 0;
-
-    auto f = [&] {
-        mutex.lock();
-        ++counter;
-        mutex.unlock();
-    };
-
-    task_manager.execute_tasks<false>(f, f);
-    ASSERT_TRUE(counter == 2);
-}
-
-TEST(Shared_mutex, mutex_sanity_test_2)
-{
-    Shared_mutex mutex;
-    int counter = 0;
-    int iterations = 100000;
-
-    // Test 2: Mutex Contention Test
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            mutex.lock();
-            ++counter;
-            mutex.unlock();
-        }
-    };
-
-    task_manager.execute_tasks<false>(f, f, f, f);
-    ASSERT_TRUE(counter == 4 * iterations);
-}
-
-TEST(Shared_mutex, mutex_sanity_test_3)
-{
-    GTEST_SKIP() << "Skipping test. Not implement throwing for deadlock on shared mutex.";
-
-    task_manager.execute_task<false>([] {
-        try {
-            Shared_mutex mutex;
-
-            mutex.lock();
-            mutex.lock();
-            ASSERT_TRUE(false);
-        }
-        catch (std::system_error& ex) {
-            ASSERT_TRUE(ex.code() ==
-                        std::make_error_code(std::errc::resource_deadlock_would_occur));
-        }
-    });
-}
-
-TEST(Shared_mutex, sanity_test_4)
-{
-    std::condition_variable_any cv;
-    Shared_mutex mut;
-    std::vector<int> vec = {5};
-
-    auto odd = [&] {
-        std::unique_lock<Shared_mutex> lk{mut};
-
-        while (vec.size() < 6) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 1);
-            cv.notify_one();
-        }
-    };
-
-    auto even = [&] {
-        std::unique_lock<Shared_mutex> lk{mut};
-
-        while (vec.size() < 7) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 2);
-            cv.notify_one();
-        }
-    };
-
-    task_manager.execute_tasks<false>(odd, even);
-
-    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
-    ASSERT_TRUE(vec == expected_val);
-}
-
-TEST(STL_Shared_mutex, mutex_test_fixture)
-{
-    if (cpus.workers_count() < 3)
-        GTEST_SKIP() << "At least 3 workers needed for this test.";
-
-    task_manager.execute_task<false>([] {
-        mutex_test_fixture<Shared_mutex> fixture;
-        fixture.test_lockable();
-    });
 }
 
 template<typename _Mutex>
@@ -1402,7 +1020,166 @@ void test_try_lock_and_try_lock_shared()
 //     }
 // }
 
-TEST(STL_Shared_mutex, complex_tests)
+TEST(Mutex, mutex_sanity_test_1)
+{
+    Mutex mutex;
+    int counter = 0;
+
+    auto f = [&] {
+        mutex.lock();
+        ++counter;
+        mutex.unlock();
+    };
+
+    task_manager.execute_tasks<false>(f, f);
+    ASSERT_TRUE(counter == 2);
+}
+
+TEST(Mutex, mutex_sanity_test_2)
+{
+    Mutex mutex;
+    int counter = 0;
+    int iterations = 100000;
+
+    // Test 2: Mutex Contention Test
+    auto f = [&] {
+        for (int i = 0; i < iterations; ++i) {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        }
+    };
+
+    task_manager.execute_tasks<false>(f, f, f, f);
+    ASSERT_TRUE(counter == 4 * iterations);
+}
+
+TEST(Mutex, mutex_sanity_test_3)
+{
+    task_manager.execute_task<false>([] {
+        try {
+            Mutex mutex;
+
+            mutex.lock();
+            mutex.lock();
+        }
+        catch (std::system_error& ex) {
+            ASSERT_TRUE(ex.code() ==
+                        std::make_error_code(std::errc::resource_deadlock_would_occur));
+        }
+    });
+}
+
+TEST(Mutex, mutex_test_fixture)
+{
+    if (cpus.workers_count() < 3)
+        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+
+    task_manager.execute_task<false>([] {
+        mutex_test_fixture<Mutex> fixture;
+        fixture.test_lockable();
+    });
+}
+
+TEST(Shared_mutex, mutex_sanity_test_1)
+{
+    Shared_mutex mutex;
+    int counter = 0;
+
+    auto f = [&] {
+        mutex.lock();
+        ++counter;
+        mutex.unlock();
+    };
+
+    task_manager.execute_tasks<false>(f, f);
+    ASSERT_TRUE(counter == 2);
+}
+
+TEST(Shared_mutex, mutex_sanity_test_2)
+{
+    Shared_mutex mutex;
+    int counter = 0;
+    int iterations = 100000;
+
+    // Test 2: Mutex Contention Test
+    auto f = [&] {
+        for (int i = 0; i < iterations; ++i) {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        }
+    };
+
+    task_manager.execute_tasks<false>(f, f, f, f);
+    ASSERT_TRUE(counter == 4 * iterations);
+}
+
+TEST(Shared_mutex, mutex_sanity_test_3)
+{
+    GTEST_SKIP() << "Skipping test. Not implement throwing for deadlock on shared mutex.";
+
+    task_manager.execute_task<false>([] {
+        try {
+            Shared_mutex mutex;
+
+            mutex.lock();
+            mutex.lock();
+            ASSERT_TRUE(false);
+        }
+        catch (std::system_error& ex) {
+            ASSERT_TRUE(ex.code() ==
+                        std::make_error_code(std::errc::resource_deadlock_would_occur));
+        }
+    });
+}
+
+TEST(Shared_mutex, sanity_test_4)
+{
+    std::condition_variable_any cv;
+    Shared_mutex mut;
+    std::vector<int> vec = {5};
+
+    auto odd = [&] {
+        std::unique_lock<Shared_mutex> lk{mut};
+
+        while (vec.size() < 6) {
+            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
+            const int n = vec.back();
+            vec.push_back(n * 10 + 1);
+            cv.notify_one();
+        }
+    };
+
+    auto even = [&] {
+        std::unique_lock<Shared_mutex> lk{mut};
+
+        while (vec.size() < 7) {
+            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
+            const int n = vec.back();
+            vec.push_back(n * 10 + 2);
+            cv.notify_one();
+        }
+    };
+
+    task_manager.execute_tasks<false>(odd, even);
+
+    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
+    ASSERT_TRUE(vec == expected_val);
+}
+
+TEST(Shared_mutex, mutex_test_fixture)
+{
+    if (cpus.workers_count() < 3)
+        GTEST_SKIP() << "At least 3 workers needed for this test.";
+
+    task_manager.execute_task<false>([] {
+        mutex_test_fixture<Shared_mutex> fixture;
+        fixture.test_lockable();
+    });
+}
+
+TEST(Shared_mutex, complex_tests)
 {
     test_one_writer<Shared_mutex>();
     test_multiple_readers<Shared_mutex>();
@@ -1477,7 +1254,7 @@ TEST(Recursive_mutex, sanity_test_4)
     });
 }
 
-TEST(STL_Recursive_mutex, recursive_mutex_test_fixture)
+TEST(Recursive_mutex, recursive_mutex_test_fixture)
 {
     if (cpus.workers_count() < 3)
         GTEST_SKIP() << "At least 3 workers needed for this test.";
@@ -1608,6 +1385,106 @@ TEST(Timed_mutex, timed_mutex_complex_test)
     }
 }
 
+TEST(Recursive_timed_mutex, mutex_sanity_test_1)
+{
+    Recursive_timed_mutex mutex;
+    int counter = 0;
+
+    auto f = [&] {
+        mutex.lock();
+        ++counter;
+        mutex.unlock();
+    };
+
+    task_manager.execute_tasks<false>(f, f);
+    ASSERT_TRUE(counter == 2);
+}
+
+TEST(Recursive_timed_mutex, mutex_sanity_test_2)
+{
+    Recursive_timed_mutex mutex;
+    int counter = 0;
+    int iterations = 100000;
+
+    // Test 2: Mutex Contention Test
+    auto f = [&] {
+        for (int i = 0; i < iterations; ++i) {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        }
+    };
+
+    task_manager.execute_tasks<false>(f, f, f, f);
+    ASSERT_TRUE(counter == 4 * iterations);
+}
+
+TEST(Recursive_timed_mutex, mutex_sanity_test_3)
+{
+    task_manager.execute_task<false>([] {
+        Recursive_timed_mutex mutex;
+
+        mutex.lock();
+        mutex.lock();
+        mutex.unlock();
+        mutex.unlock();
+
+        ASSERT_TRUE(true);
+    });
+}
+
+TEST(Recursive_timed_mutex, mutex_sanity_test_4)
+{
+    GTEST_SKIP() << "Skipping test since it lasts long, especially for debug build.";
+
+    task_manager.execute_task<false>([] {
+        try {
+            Recursive_timed_mutex mutex;
+
+            while (true)
+                mutex.lock();
+        }
+        catch (std::system_error& ex) {
+            ASSERT_TRUE(ex.code() ==
+                        std::make_error_code(std::errc::resource_unavailable_try_again));
+        }
+    });
+}
+
+TEST(Recursive_timed_mutex, recursive_timed_mutex_test_fixture)
+{
+    if (cpus.workers_count() < 3)
+        GTEST_SKIP() << "At least 3 workers needed for this test.";
+
+    task_manager.execute_task<false>([] {
+        mutex_test_fixture<Recursive_timed_mutex> fixture;
+        fixture.test_lockable();
+        fixture.test_timed_lockable();
+        fixture.test_recursive_lockable();
+    });
+}
+
+TEST(STL_Mutex, nonmember_lock_test)
+{
+    if (cpus.workers_count() < 3)
+        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+
+    task_manager.execute_task<false>([] { test_nonmember_lock(); });
+}
+
+TEST(STL_Mutex, nonmember_try_lock_test)
+{
+    if (cpus.workers_count() < 3)
+        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+
+    task_manager.execute_task<false>([] { test_nonmember_try_lock(); });
+}
+
+TEST(STL_Mutex, test_vso_1253916)
+{
+    task_manager.execute_task<false>([] { test_vso_1253916(); });
+}
+
 // int main() {
 //     test_one_writer<shared_mutex>();
 //     test_multiple_readers<shared_mutex>();
@@ -1630,22 +1507,10 @@ TEST(Timed_mutex, timed_mutex_complex_test)
 // int main()
 // {
 //     {
-//         mutex_test_fixture<std::recursive_timed_mutex> fixture;
-//         fixture.test_lockable();
-//         fixture.test_timed_lockable();
-//         fixture.test_recursive_lockable();
-//     }
-
-//     {
 //         mutex_test_fixture<std::shared_timed_mutex> fixture;
 //         fixture.test_lockable();
 //         fixture.test_timed_lockable();
 //     }
-
-//     test_nonmember_lock();
-//     test_nonmember_try_lock();
-
-//     test_vso_1253916();
 // }
 
 // More mutex tests:

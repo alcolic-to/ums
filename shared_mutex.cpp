@@ -17,16 +17,16 @@ Shared_mutex::~Shared_mutex() noexcept
 //
 void Shared_mutex::lock()
 {
-    std::unique_lock<Mutex> lk{m_mutex};
-    m_gate1.wait(lk, [&] { return !m_state.has_write(); });
+    std::unique_lock<Mutex> lock{m_mutex};
+    m_gate1.wait(lock, [&] { return !m_state.has_write(); });
     m_state.set_write();
 
-    m_gate2.wait(lk, [&] { return !m_state.has_readers(); });
+    m_gate2.wait(lock, [&] { return !m_state.has_readers(); });
 }
 
 bool Shared_mutex::try_lock() noexcept
 {
-    const std::unique_lock<Mutex> lk{m_mutex};
+    const std::unique_lock<Mutex> lock{m_mutex};
     if (!m_state.has_readers() && !m_state.has_write()) {
         m_state.set_write();
         return true;
@@ -38,7 +38,7 @@ bool Shared_mutex::try_lock() noexcept
 void Shared_mutex::unlock() noexcept
 {
     {
-        const std::lock_guard<Mutex> lk{m_mutex};
+        const std::lock_guard<Mutex> lock{m_mutex};
         m_state.unset_write();
     }
 
@@ -47,14 +47,14 @@ void Shared_mutex::unlock() noexcept
 
 void Shared_mutex::lock_shared()
 {
-    std::unique_lock<Mutex> lk{m_mutex};
-    m_gate1.wait(lk, [&] { return !m_state.has_write() && !m_state.max_readers(); });
+    std::unique_lock<Mutex> lock{m_mutex};
+    m_gate1.wait(lock, [&] { return !m_state.has_write() && !m_state.max_readers(); });
     m_state.inc_readers();
 }
 
 bool Shared_mutex::try_lock_shared() noexcept
 {
-    const std::unique_lock<Mutex> lk{m_mutex};
+    const std::unique_lock<Mutex> lock{m_mutex};
     if (!m_state.has_write() && !m_state.max_readers()) {
         m_state.inc_readers();
         return true;
@@ -70,7 +70,7 @@ void Shared_mutex::unlock_shared() noexcept
     bool has_write = false;
 
     {
-        const std::lock_guard<Mutex> lk{m_mutex};
+        const std::lock_guard<Mutex> lock{m_mutex};
         max_readers = m_state.max_readers();
         m_state.dec_readers();
         has_readers = m_state.has_readers();

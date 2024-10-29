@@ -44,7 +44,7 @@ public:
     bool wait_for(std::unique_lock<Mutex>& lock, const std::chrono::duration<Rep, Period>& time,
                   Predicate pred)
     {
-        return wait_until(lock, now() + time, std::forward<Predicate>(pred));
+        return wait_until(lock, now() + time, std::forward<Predicate>(pred)); // or just std::move?
     }
 
     template<class Clock, class Duration>

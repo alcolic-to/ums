@@ -3,14 +3,7 @@
 #include <mutex>
 
 #include "mutex.h"
-
-// Shared mutex implementation from Howard Hinnant:
-// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2406.html
-
-Shared_mutex::~Shared_mutex() noexcept
-{
-    const std::lock_guard<Mutex> lock{m_mutex};
-}
+#include "util.h"
 
 // TODO: Check whether exception should be thrown in case of a deadlock.
 // STL implementation does nothing in that case.
@@ -85,4 +78,37 @@ void Shared_mutex::unlock_shared() noexcept
         if (max_readers)
             m_gate1.notify_one();
     }
+}
+
+bool Shared_timed_mutex::try_lock_until_internal(const Time_point& time_point)
+{
+    auto not_writing = [&] { return !m_state.has_write(); };
+    auto no_readers = [&] { return !m_state.has_readers(); };
+
+    std::unique_lock<Mutex> lock{m_mutex};
+    if (!m_gate1.wait_until(lock, time_point, not_writing))
+        return false;
+
+    m_state.set_write();
+
+    if (!m_gate2.wait_until(lock, time_point, no_readers)) {
+        m_state.unset_write();
+        lock.unlock();
+        m_gate1.notify_all();
+        return false;
+    }
+
+    return true;
+}
+
+bool Shared_timed_mutex::try_lock_shared_until_internal(const Time_point& time_point)
+{
+    auto cond = [&] { return !m_state.has_write() && !m_state.max_readers(); };
+
+    std::unique_lock<Mutex> lock{m_mutex};
+    if (!m_gate1.wait_until(lock, time_point, cond))
+        return false;
+
+    m_state.inc_readers();
+    return true;
 }

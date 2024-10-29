@@ -27,9 +27,9 @@ STATIC_ASSERT(std::is_standard_layout_v<Spinlock>);
 STATIC_ASSERT(std::is_standard_layout_v<Mutex>); // N4928 [thread.mutex.class]/3
 STATIC_ASSERT(std::is_standard_layout_v<Recursive_mutex>); // N4928 [thread.mutex.recursive]/2
 // STATIC_ASSERT(std::is_standard_layout_v<Timed_mutex>); // N4928 [thread.timedmutex.class]/2
-// STATIC_ASSERT(std::is_standard_layout_v<recursive_timed_mutex>); // N4928 [thread.timedmutex.recursive]/2
+// STATIC_ASSERT(std::is_standard_layout_v<Recursive_timed_mutex>); // N4928 [thread.timedmutex.recursive]/2
 // STATIC_ASSERT(std::is_standard_layout_v<Shared_mutex>); // N4928 [thread.sharedmutex.class]/2
-// STATIC_ASSERT(std::is_standard_layout_v<std::shared_timed_mutex>); // N4928 [thread.sharedtimedmutex.class]/2
+// STATIC_ASSERT(std::is_standard_layout_v<Shared_timed_mutex>); // N4928 [thread.sharedtimedmutex.class]/2
 // STATIC_ASSERT(std::is_standard_layout_v<Condition_variable>); // N4928 [thread.condition.condvar]/1
 
 // nothrow-destructibility required by N4928 [res.on.exception.handling]/3
@@ -38,9 +38,9 @@ STATIC_ASSERT(std::is_nothrow_destructible_v<Recursive_mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Timed_mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Recursive_timed_mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Shared_mutex>);
-// STATIC_ASSERT(std::is_nothrow_destructible_v<shared_timed_mutex>);
+STATIC_ASSERT(std::is_nothrow_destructible_v<Shared_timed_mutex>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<std::shared_lock<Shared_mutex>>);
-// STATIC_ASSERT(std::is_nothrow_destructible_v<shared_lock<shared_timed_mutex>>);
+STATIC_ASSERT(std::is_nothrow_destructible_v<std::shared_lock<Shared_timed_mutex>>);
 STATIC_ASSERT(std::is_nothrow_destructible_v<Condition_variable>);
 
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Mutex>); // N4928 [thread.mutex.class]
@@ -48,15 +48,15 @@ STATIC_ASSERT(std::is_nothrow_default_constructible_v<Recursive_mutex>); // stre
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Timed_mutex>); // strengthened
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Recursive_timed_mutex>); // strengthened
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Shared_mutex>); // strengthened
-// STATIC_ASSERT(std::is_nothrow_default_constructible_v<shared_timed_mutex>); // strengthened
+STATIC_ASSERT(std::is_nothrow_default_constructible_v<Shared_timed_mutex>); // strengthened
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<std::shared_lock<Shared_mutex>>); // N4928 [thread.lock.shared.cons]/1
-// STATIC_ASSERT(std::is_nothrow_default_constructible_v<std::shared_lock<shared_timed_mutex>>); // N4928 [thread.lock.shared.cons]/1
+STATIC_ASSERT(std::is_nothrow_default_constructible_v<std::shared_lock<Shared_timed_mutex>>); // N4928 [thread.lock.shared.cons]/1
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Condition_variable>); // strengthened
 
 STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Shared_mutex&, std::adopt_lock_t>); // strengthened
 STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Shared_mutex&, const std::adopt_lock_t&>); // strengthened
-// STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<std::shared_timed_mutex>, std::shared_timed_mutex&, std::adopt_lock_t>); // strengthened
-// STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<shared_timed_mutex>, shared_timed_mutex&, const adopt_lock_t&>); // strengthened
+STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_timed_mutex>, Shared_timed_mutex&, std::adopt_lock_t>); // strengthened
+STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_timed_mutex>, Shared_timed_mutex&, const std::adopt_lock_t&>); // strengthened
 
 // Also test mandatory and strengthened exception specification for try_lock().
 STATIC_ASSERT(noexcept(std::declval<Mutex&>().try_lock())); // strengthened
@@ -875,150 +875,160 @@ void test_try_lock_and_try_lock_shared()
     }
 }
 
-// void test_timed_behavior() {
-//     { // Test try_lock_for() and try_lock_shared_for(). No timing assumptions.
-//         std::shared_timed_mutex stm;
+void test_timed_behavior()
+{
+    { // Test try_lock_for() and try_lock_shared_for(). No timing assumptions.
+        Shared_timed_mutex stm;
 
-//         {
-//             std::unique_lock<std::shared_timed_mutex> MainExclusive(stm, 25ms);
-//             ASSERT_TRUE(MainExclusive.owns_lock());
+        {
+            std::unique_lock<Shared_timed_mutex> MainExclusive(stm, 25ms);
+            ASSERT_TRUE(MainExclusive.owns_lock());
 
-//             std::thread t([&stm] {
-//                 {
-//                     std::unique_lock<std::shared_timed_mutex> ExclusiveLock(stm, 25ms);
-//                     ASSERT_TRUE(!ExclusiveLock.owns_lock());
-//                 }
+            task_manager.execute_task<false>([&] {
+                {
+                    std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 25ms);
+                    ASSERT_TRUE(!ExclusiveLock.owns_lock());
+                }
 
-//                 {
-//                     std::shared_lock<std::shared_timed_mutex> SharedLock(stm, 25ms);
-//                     ASSERT_TRUE(!SharedLock.owns_lock());
-//                 }
-//             });
+                {
+                    std::shared_lock<Shared_timed_mutex> SharedLock(stm, 25ms);
+                    ASSERT_TRUE(!SharedLock.owns_lock());
+                }
+            });
+        }
 
-//             t.join();
-//         }
+        {
+            std::shared_lock<Shared_timed_mutex> MainShared(stm, 25ms);
+            ASSERT_TRUE(MainShared.owns_lock());
 
-//         {
-//             std::shared_lock<std::shared_timed_mutex> MainShared(stm, 25ms);
-//             ASSERT_TRUE(MainShared.owns_lock());
+            task_manager.execute_task<false>([&] {
+                {
+                    std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 25ms);
+                    ASSERT_TRUE(!ExclusiveLock.owns_lock());
+                }
 
-//             std::thread t([&stm] {
-//                 {
-//                     std::unique_lock<std::shared_timed_mutex> ExclusiveLock(stm, 25ms);
-//                     ASSERT_TRUE(!ExclusiveLock.owns_lock());
-//                 }
+                {
+                    std::shared_lock<Shared_timed_mutex> SharedLock(stm, 25ms);
+                    ASSERT_TRUE(SharedLock.owns_lock());
+                }
+            });
+        }
+    }
 
-//                 {
-//                     std::shared_lock<std::shared_timed_mutex> SharedLock(stm, 25ms);
-//                     ASSERT_TRUE(SharedLock.owns_lock());
-//                 }
-//             });
+    // Test delayed try_lock_for() success. GENEROUS timing assumptions.
+    //
+    if (cpus.count() >= 5 && cpus.workers_count() >= 5) {
+        std::atomic<int> atom(-5);
+        Shared_timed_mutex stm;
 
-//             t.join();
-//         }
-//     }
+        auto f1 = [&] {
+            std::shared_lock<Shared_timed_mutex> MainShared(stm);
 
-//     { // Test delayed try_lock_for() success. GENEROUS timing assumptions.
-//         std::atomic<int> atom(-5);
-//         std::shared_timed_mutex stm;
-//         std::vector<std::thread> threads;
+            ++atom;
+            while (atom < 0) {
+            }
+            tls_worker->sleep_for(50ms);
+            MainShared.unlock();
+        };
 
-//         std::shared_lock<std::shared_timed_mutex> MainShared(stm);
+        auto f2 = [&] {
+            tls_worker->sleep_for(50ms);
 
-//         for (int i = 0; i < 4; ++i) {
-//             threads.emplace_back([&atom, &stm] {
-//                 ++atom;
-//                 while (atom < 0) {
-//                 }
-//                 std::unique_lock<std::shared_timed_mutex> ExclusiveLock(stm, 1min);
-//                 ASSERT_TRUE(ExclusiveLock.owns_lock());
-//                 const int val = (atom += 100);
-//                 std::this_thread::sleep_for(25ms);
-//                 ASSERT_TRUE(atom == val);
-//             });
-//         }
+            ++atom;
+            while (atom < 0) {
+            }
+            std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 1min);
+            ASSERT_TRUE(ExclusiveLock.owns_lock());
+            const int val = (atom += 100);
+            tls_worker->sleep_for(25ms);
+            ASSERT_TRUE(atom == val);
+        };
 
-//         ++atom;
-//         while (atom < 0) {
-//         }
-//         std::this_thread::sleep_for(50ms);
-//         MainShared.unlock();
-//         join_and_clear(threads);
-//         ASSERT_TRUE(atom == 400);
-//     }
+        task_manager.execute_tasks<false>(f1, f2, f2, f2, f2);
+        ASSERT_TRUE(atom == 400);
+    }
 
-//     { // Test delayed try_lock_shared_for() success. GENEROUS timing assumptions.
-//         std::atomic<int> atom(-5);
-//         std::shared_timed_mutex stm;
-//         std::vector<std::thread> threads;
+    // Test delayed try_lock_shared_for() success. GENEROUS timing assumptions.
+    //
+    if (cpus.count() >= 5 && cpus.workers_count() >= 5) {
+        std::atomic<int> atom(-5);
+        Shared_timed_mutex stm;
 
-//         std::unique_lock<std::shared_timed_mutex> MainExclusive(stm);
+        auto f1 = [&] {
+            std::unique_lock<Shared_timed_mutex> MainExclusive(stm);
 
-//         for (int i = 0; i < 4; ++i) {
-//             threads.emplace_back([&atom, &stm] {
-//                 ++atom;
-//                 while (atom < 0) {
-//                 }
-//                 std::shared_lock<std::shared_timed_mutex> SharedLock(stm, 1min);
-//                 ASSERT_TRUE(SharedLock.owns_lock());
-//                 atom += 11;
-//                 while (atom < 44) {
-//                 }
-//             });
-//         }
+            ++atom;
+            while (atom < 0) {
+            }
+            tls_worker->sleep_for(50ms);
+            MainExclusive.unlock();
+        };
 
-//         ++atom;
-//         while (atom < 0) {
-//         }
-//         std::this_thread::sleep_for(50ms);
-//         MainExclusive.unlock();
-//         join_and_clear(threads);
-//         ASSERT_TRUE(atom == 44);
-//     }
+        auto f2 = [&] {
+            tls_worker->sleep_for(50ms);
 
-//     { // THE GRAND FINALE: If try_lock_for() gives up due to stubborn readers,
-//       // it needs to deliver notifications. No timing assumptions.
-//         std::atomic<bool> launch_readers(false);
-//         std::shared_timed_mutex stm;
-//         std::vector<std::thread> threads;
+            ++atom;
+            while (atom < 0) {
+            }
+            std::shared_lock<Shared_timed_mutex> SharedLock(stm, 1min);
+            ASSERT_TRUE(SharedLock.owns_lock());
+            atom += 11;
+            while (atom < 44) {
+            }
+        };
 
-//         std::shared_lock<std::shared_timed_mutex> MainShared(stm);
+        task_manager.execute_tasks<false>(f1, f2, f2, f2, f2);
+        ASSERT_TRUE(atom == 44);
+    }
 
-//         threads.emplace_back([&launch_readers, &stm] {
-//             std::unique_lock<std::shared_timed_mutex> ExclusiveLock(stm, 100ms);
-//             ASSERT_TRUE(!ExclusiveLock.owns_lock());
-//             launch_readers = true;
-//         });
+    // THE GRAND FINALE: If try_lock_for() gives up due to stubborn readers,
+    // it needs to deliver notifications. No timing assumptions.
+    //
+    if (cpus.count() >= 3 && cpus.workers_count() >= 3) {
+        std::atomic<bool> launch_readers(false);
+        Shared_timed_mutex stm;
 
-//         threads.emplace_back([&launch_readers, &stm] {
-//             while (!launch_readers) {
-//                 std::shared_lock<std::shared_timed_mutex> SharedLock(stm,
-//                 std::try_to_lock);
+        auto f1 = [&] {
+            while (!launch_readers) {
+            }
+        };
 
-//                 if (!SharedLock.owns_lock()) {
-//                     launch_readers = true;
-//                 }
-//             }
-//         });
+        auto f2 = [&] {
+            tls_worker->sleep_for(50ms);
+            std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 100ms);
+            ASSERT_TRUE(!ExclusiveLock.owns_lock());
+            launch_readers = true;
+        };
 
-//         while (!launch_readers) {
-//         }
+        auto f3 = [&] {
+            tls_worker->sleep_for(50ms);
+            while (!launch_readers) {
+                std::shared_lock<Shared_timed_mutex> SharedLock(stm, std::try_to_lock);
 
-//         std::atomic<int> readers(0);
+                if (!SharedLock.owns_lock())
+                    launch_readers = true;
+            }
+        };
 
-//         for (int i = 0; i < 4; ++i) {
-//             threads.emplace_back([&stm, &readers] {
-//                 std::shared_lock<std::shared_timed_mutex> SharedLock(stm);
-//                 ++readers;
-//                 while (readers < 4) {
-//                 }
-//             });
-//         }
+        std::shared_lock<Shared_timed_mutex> MainShared(stm);
 
-//         join_and_clear(threads);
-//         ASSERT_TRUE(readers == 4);
-//     }
-// }
+        task_manager.execute_tasks<false>(f1, f2, f3);
+
+        std::atomic<int> readers(0);
+
+        auto f4 = [&] {
+            std::shared_lock<Shared_timed_mutex> SharedLock(stm);
+            ++readers;
+            while (readers < 4) {
+            }
+        };
+
+        task_manager.execute_tasks<false>(f4, f4, f4, f4);
+
+        // join_and_clear(threads);
+        ASSERT_TRUE(readers == 4);
+    }
+}
 
 TEST(Mutex, mutex_sanity_test_1)
 {
@@ -1068,6 +1078,40 @@ TEST(Mutex, mutex_sanity_test_3)
                         std::make_error_code(std::errc::resource_deadlock_would_occur));
         }
     });
+}
+
+TEST(Mutex, mutex_sanity_test_4)
+{
+    std::condition_variable_any cv;
+    Mutex mut;
+    std::vector<int> vec = {5};
+
+    auto odd = [&] {
+        std::unique_lock<Mutex> lk{mut};
+
+        while (vec.size() < 6) {
+            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
+            const int n = vec.back();
+            vec.push_back(n * 10 + 1);
+            cv.notify_one();
+        }
+    };
+
+    auto even = [&] {
+        std::unique_lock<Mutex> lk{mut};
+
+        while (vec.size() < 7) {
+            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
+            const int n = vec.back();
+            vec.push_back(n * 10 + 2);
+            cv.notify_one();
+        }
+    };
+
+    task_manager.execute_tasks<false>(odd, even);
+
+    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
+    ASSERT_TRUE(vec == expected_val);
 }
 
 TEST(Mutex, mutex_test_fixture)
@@ -1318,6 +1362,40 @@ TEST(Timed_mutex, mutex_sanity_test_3)
     });
 }
 
+TEST(Timed_mutex, mutex_sanity_test_4)
+{
+    std::condition_variable_any cv;
+    Timed_mutex mut;
+    std::vector<int> vec = {5};
+
+    auto odd = [&] {
+        std::unique_lock<Timed_mutex> lk{mut};
+
+        while (vec.size() < 6) {
+            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
+            const int n = vec.back();
+            vec.push_back(n * 10 + 1);
+            cv.notify_one();
+        }
+    };
+
+    auto even = [&] {
+        std::unique_lock<Timed_mutex> lk{mut};
+
+        while (vec.size() < 7) {
+            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
+            const int n = vec.back();
+            vec.push_back(n * 10 + 2);
+            cv.notify_one();
+        }
+    };
+
+    task_manager.execute_tasks<false>(odd, even);
+
+    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
+    ASSERT_TRUE(vec == expected_val);
+}
+
 TEST(Timed_mutex, timed_mutex_test_fixture)
 {
     if (cpus.workers_count() < 3)
@@ -1352,9 +1430,9 @@ TEST(Timed_mutex, timed_mutex_complex_test)
         std::atomic<int> atom(-4);
         Timed_mutex timed_mutex;
 
-        std::unique_lock<Timed_mutex> MainUnique(timed_mutex);
-
         auto f = [&] {
+            tls_worker->sleep_for(50ms);
+
             ++atom;
             while (atom < 0) {
             }
@@ -1372,6 +1450,9 @@ TEST(Timed_mutex, timed_mutex_complex_test)
         };
 
         auto f2 = [&] {
+            std::unique_lock<Timed_mutex> MainUnique(timed_mutex);
+            tls_worker->sleep_for(50ms);
+
             ++atom;
             while (atom < 0) {
             }
@@ -1464,6 +1545,119 @@ TEST(Recursive_timed_mutex, recursive_timed_mutex_test_fixture)
     });
 }
 
+TEST(Shared_timed_mutex, mutex_sanity_test_1)
+{
+    Shared_timed_mutex mutex;
+    int counter = 0;
+
+    auto f = [&] {
+        mutex.lock();
+        ++counter;
+        mutex.unlock();
+    };
+
+    task_manager.execute_tasks<false>(f, f);
+    ASSERT_TRUE(counter == 2);
+}
+
+TEST(Shared_timed_mutex, mutex_sanity_test_2)
+{
+    Shared_timed_mutex mutex;
+    int counter = 0;
+    int iterations = 100000;
+
+    // Test 2: Mutex Contention Test
+    auto f = [&] {
+        for (int i = 0; i < iterations; ++i) {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        }
+    };
+
+    task_manager.execute_tasks<false>(f, f, f, f);
+    ASSERT_TRUE(counter == 4 * iterations);
+}
+
+TEST(Shared_timed_mutex, mutex_sanity_test_3)
+{
+    GTEST_SKIP() << "Skipping test. Not implement throwing for deadlock on shared timed mutex.";
+
+    task_manager.execute_task<false>([] {
+        try {
+            Shared_timed_mutex mutex;
+
+            mutex.lock();
+            mutex.lock();
+            ASSERT_TRUE(false);
+        }
+        catch (std::system_error& ex) {
+            ASSERT_TRUE(ex.code() ==
+                        std::make_error_code(std::errc::resource_deadlock_would_occur));
+        }
+    });
+}
+
+TEST(Shared_timed_mutex, sanity_test_4)
+{
+    std::condition_variable_any cv;
+    Shared_timed_mutex mut;
+    std::vector<int> vec = {5};
+
+    auto odd = [&] {
+        std::unique_lock<Shared_timed_mutex> lk{mut};
+
+        while (vec.size() < 6) {
+            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
+            const int n = vec.back();
+            vec.push_back(n * 10 + 1);
+            cv.notify_one();
+        }
+    };
+
+    auto even = [&] {
+        std::unique_lock<Shared_timed_mutex> lk{mut};
+
+        while (vec.size() < 7) {
+            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
+            const int n = vec.back();
+            vec.push_back(n * 10 + 2);
+            cv.notify_one();
+        }
+    };
+
+    task_manager.execute_tasks<false>(odd, even);
+
+    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
+    ASSERT_TRUE(vec == expected_val);
+}
+
+TEST(Shared_timed_mutex, shared_timed_mutex_test_fixture)
+{
+    if (cpus.workers_count() < 3)
+        GTEST_SKIP() << "At least 3 workers needed for this test.";
+
+    task_manager.execute_task<false>([] {
+        mutex_test_fixture<Shared_timed_mutex> fixture;
+        fixture.test_lockable();
+        fixture.test_timed_lockable();
+    });
+}
+
+TEST(Shared_timed_mutex, complex_tests_1)
+{
+    test_one_writer<Shared_timed_mutex>();
+    test_multiple_readers<Shared_timed_mutex>();
+    test_writer_blocking_readers<Shared_timed_mutex>();
+    test_readers_blocking_writer<Shared_timed_mutex>();
+    test_try_lock_and_try_lock_shared<Shared_timed_mutex>();
+}
+
+TEST(Shared_timed_mutex, complex_tests_2)
+{
+    test_timed_behavior();
+}
+
 TEST(STL_Mutex, nonmember_lock_test)
 {
     if (cpus.workers_count() < 3)
@@ -1484,34 +1678,6 @@ TEST(STL_Mutex, test_vso_1253916)
 {
     task_manager.execute_task<false>([] { test_vso_1253916(); });
 }
-
-// int main() {
-//     test_one_writer<shared_mutex>();
-//     test_multiple_readers<shared_mutex>();
-//     test_writer_blocking_readers<shared_mutex>();
-//     test_readers_blocking_writer<shared_mutex>();
-//     test_try_lock_and_try_lock_shared<shared_mutex>();
-
-//     test_one_writer<shared_timed_mutex>();
-//     test_multiple_readers<shared_timed_mutex>();
-//     test_writer_blocking_readers<shared_timed_mutex>();
-//     test_readers_blocking_writer<shared_timed_mutex>();
-//     test_try_lock_and_try_lock_shared<shared_timed_mutex>();
-
-//     test_timed_behavior();
-// }
-
-// Next section contains things that needs to be tested too. We only implemented regular mutex.
-// Remove below when implemented.
-//
-// int main()
-// {
-//     {
-//         mutex_test_fixture<std::shared_timed_mutex> fixture;
-//         fixture.test_lockable();
-//         fixture.test_timed_lockable();
-//     }
-// }
 
 // More mutex tests:
 // https://github.com/microsoft/STL/blob/1e312b38db8df1dfbea17adc344454feb8d00dd9/tests/std/tests/Dev11_1150223_shared_mutex/test.cpp

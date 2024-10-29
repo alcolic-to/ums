@@ -130,7 +130,7 @@ public:
     template<class Rep, class Period>
     bool try_lock_for(const std::chrono::duration<Rep, Period>& rel_time)
     {
-        return try_lock_until(std::chrono::steady_clock::now() + rel_time);
+        return try_lock_until(now() + rel_time);
     }
 
     template<class Clock, class Duration>

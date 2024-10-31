@@ -5,7 +5,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <thread>
 
 class Spinlock {
 public:

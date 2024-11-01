@@ -204,7 +204,7 @@ void bind_thread(uint64_t cpu_mask) noexcept
     print_thread_affinity();
 }
 
-void print_thread_affinity()
+void print_thread_affinity() noexcept
 {
     cpu_set_t mask;
     CPU_ZERO(&mask);

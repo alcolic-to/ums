@@ -28,7 +28,7 @@ private:
     Plain_mutex() noexcept = default;
 
     void lock();
-    bool try_lock() noexcept;
+    [[nodiscard]] bool try_lock() noexcept;
     void unlock() noexcept;
 
     Spinlock m_spinlock;
@@ -46,7 +46,7 @@ public:
     Mutex& operator=(Mutex&&) = delete;
 
     void lock();
-    bool try_lock() noexcept;
+    [[nodiscard]] bool try_lock() noexcept;
     void unlock() noexcept;
 
 private:
@@ -68,7 +68,7 @@ public:
     Recursive_mutex& operator=(Recursive_mutex&&) = delete;
 
     void lock();
-    bool try_lock() noexcept;
+    [[nodiscard]] bool try_lock() noexcept;
     void unlock() noexcept;
 
 private:
@@ -89,16 +89,16 @@ public:
     Timed_mutex& operator=(Timed_mutex&&) = delete;
 
     void lock();
-    bool try_lock() noexcept;
+    [[nodiscard]] bool try_lock() noexcept;
 
     template<class Rep, class Period>
-    bool try_lock_for(const std::chrono::duration<Rep, Period>& rel_time)
+    [[nodiscard]] bool try_lock_for(const std::chrono::duration<Rep, Period>& rel_time)
     {
         return try_lock_until(now() + rel_time);
     }
 
     template<class Clock, class Duration>
-    bool try_lock_until(const std::chrono::time_point<Clock, Duration>& abs_time)
+    [[nodiscard]] bool try_lock_until(const std::chrono::time_point<Clock, Duration>& abs_time)
     {
         return try_lock_until_internal(abs_time);
     }
@@ -106,7 +106,7 @@ public:
     void unlock();
 
 private:
-    bool try_lock_until_internal(const Time_point& time_point);
+    [[nodiscard]] bool try_lock_until_internal(const Time_point& time_point);
 
     Mutex m_mtx;
     Condition_variable m_cv;
@@ -125,16 +125,16 @@ public:
     Recursive_timed_mutex& operator=(Recursive_timed_mutex&&) = delete;
 
     void lock();
-    bool try_lock() noexcept;
+    [[nodiscard]] bool try_lock() noexcept;
 
     template<class Rep, class Period>
-    bool try_lock_for(const std::chrono::duration<Rep, Period>& rel_time)
+    [[nodiscard]] bool try_lock_for(const std::chrono::duration<Rep, Period>& rel_time)
     {
         return try_lock_until(now() + rel_time);
     }
 
     template<class Clock, class Duration>
-    bool try_lock_until(const std::chrono::time_point<Clock, Duration>& abs_time)
+    [[nodiscard]] bool try_lock_until(const std::chrono::time_point<Clock, Duration>& abs_time)
     {
         return try_lock_until_internal(abs_time);
     }
@@ -142,7 +142,7 @@ public:
     void unlock();
 
 private:
-    bool try_lock_until_internal(const Time_point& time_point);
+    [[nodiscard]] bool try_lock_until_internal(const Time_point& time_point);
 
     Mutex m_mtx;
     Condition_variable m_cv;

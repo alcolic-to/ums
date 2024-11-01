@@ -10,22 +10,33 @@
 #include <mutex>
 #include <vector>
 
-#include "mutex.h"
+#include "config.h"
+#include "spinlock.h"
 #include "task_manager.h"
 #include "worker.h" // This can be moved and class Worker can be forward declared if we dispose Worker::State.
 
-class CPUs;
-class CPU;
+
+using Cpu_Mask = std::bitset<CFG_max_cpu_count>;
+
+class CPU final {
+public:
+    explicit CPU(uint64_t cpu_id) noexcept : m_id{cpu_id}, m_mask{Cpu_Mask{}.set(cpu_id)} {}
+
+    uint64_t m_id;
+    Cpu_Mask m_mask;
+};
 
 // Synchronization context for scheduler.
 //
 enum class SyncCtx : int { main, yield, wait_cond_or_sleep, io };
 
 class Scheduler final {
+    friend class Worker;
+
 public:
     enum class State : int { initializing, running, idle, exiting };
 
-    explicit Scheduler(const CPU& cpu);
+    explicit Scheduler(uint64_t cpu_id);
     ~Scheduler() noexcept;
 
     Scheduler(const Scheduler&) = delete;
@@ -95,6 +106,8 @@ public:
     void exit_workers();
     void exit();
 
+    [[nodiscard]] uint32_t workers_count() const noexcept { return m_workers.size(); }
+
     bool has_work() const noexcept;
 
     void signal_exit() noexcept { m_exit.store(true, std::memory_order_relaxed); }
@@ -145,7 +158,8 @@ public:
         std::atomic<std::size_t> m_size{0};
     };
 
-    const CPU& m_cpu;
+private:
+    CPU m_cpu;
     Worker* m_worker{nullptr};
     std::deque<Worker*> m_runnable_queue;
     std::deque<Worker*> m_idle_queue;
@@ -165,5 +179,22 @@ public:
     //
     std::vector<std::unique_ptr<Worker>> m_workers;
 };
+
+class Schedulers final {
+public:
+    Schedulers() noexcept;
+
+    [[nodiscard]] Scheduler& min_load_scheduler() const noexcept;
+    [[nodiscard]] uint32_t workers_count() const noexcept;
+    [[nodiscard]] uint32_t cpus_count() const noexcept;
+
+private:
+    uint32_t m_system_cpus_count;
+    Cpu_Mask m_avail_cpus_mask;
+    std::vector<std::unique_ptr<Scheduler>> m_schedulers;
+};
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+extern Schedulers schedulers;
 
 #endif // COS_SCHEDULER_H

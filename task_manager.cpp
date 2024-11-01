@@ -4,7 +4,6 @@
 #include <memory>
 #include <mutex>
 
-#include "cpu.h"
 #include "scheduler.h"
 
 Task::Task() noexcept : m_state{State::not_started} {}
@@ -33,11 +32,11 @@ void Task::operator()()
     m_func();
 }
 
-Task_manager::Task_manager(const CPUs& cpus) noexcept : m_cpus{cpus} {}
+Task_manager::Task_manager(const Schedulers& schedulers) noexcept : m_schedulers{schedulers} {}
 
 void Task_manager::enque_task(const std::shared_ptr<Task>& task)
 {
-    Scheduler& best_scheduler = m_cpus.min_load_scheduler();
+    Scheduler& best_scheduler = m_schedulers.min_load_scheduler();
     best_scheduler.enqueue_task(task);
 }
 

@@ -7,7 +7,7 @@
 #include <functional>
 #include <mutex>
 
-class CPUs;
+class Schedulers;
 
 class Task {
 public:
@@ -28,7 +28,7 @@ public:
 
 class Task_manager final {
 public:
-    explicit Task_manager(const CPUs& cpus) noexcept;
+    explicit Task_manager(const Schedulers& schedulers) noexcept;
     ~Task_manager() noexcept = default;
 
     Task_manager(const Task_manager& rhs) = delete;
@@ -70,7 +70,7 @@ public:
                 task->wait();
     }
 
-    const CPUs& m_cpus;
+    const Schedulers& m_schedulers;
 };
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)

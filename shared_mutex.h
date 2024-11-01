@@ -69,11 +69,11 @@ public:
     Shared_mutex& operator=(Shared_mutex&&) = delete;
 
     void lock();
-    bool try_lock() noexcept;
+    [[nodiscard]] bool try_lock() noexcept;
     void unlock() noexcept;
 
     void lock_shared();
-    bool try_lock_shared() noexcept;
+    [[nodiscard]] bool try_lock_shared() noexcept;
     void unlock_shared() noexcept;
 
 private:
@@ -86,34 +86,33 @@ private:
 class Shared_timed_mutex : public Shared_mutex {
 public:
     template<class Rep, class Period>
-    bool try_lock_for(const std::chrono::duration<Rep, Period>& rel_time)
+    [[nodiscard]] bool try_lock_for(const std::chrono::duration<Rep, Period>& rel_time)
     {
         return try_lock_until(now() + rel_time);
     }
 
     template<class Clock, class Duration>
-    _NODISCARD_TRY_CHANGE_STATE bool
-    try_lock_until(const std::chrono::time_point<Clock, Duration>& abs_time)
+    [[nodiscard]] bool try_lock_until(const std::chrono::time_point<Clock, Duration>& abs_time)
     {
         return try_lock_until_internal(abs_time);
     }
 
     template<class Rep, class Period>
-    _NODISCARD_TRY_CHANGE_STATE bool
-    try_lock_shared_for(const std::chrono::duration<Rep, Period>& rel_time)
+    [[nodiscard]] bool try_lock_shared_for(const std::chrono::duration<Rep, Period>& rel_time)
     {
         return try_lock_shared_until(now() + rel_time);
     }
 
     template<class Clock, class Duration>
-    bool try_lock_shared_until(const std::chrono::time_point<Clock, Duration>& abs_time)
+    [[nodiscard]] bool
+    try_lock_shared_until(const std::chrono::time_point<Clock, Duration>& abs_time)
     {
         return try_lock_shared_until_internal(abs_time);
     }
 
 private:
-    bool try_lock_until_internal(const Time_point& time_point);
-    bool try_lock_shared_until_internal(const Time_point& time_point);
+    [[nodiscard]] bool try_lock_until_internal(const Time_point& time_point);
+    [[nodiscard]] bool try_lock_shared_until_internal(const Time_point& time_point);
 };
 
 #endif // COS_SHARED_MUTEX_H

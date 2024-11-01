@@ -4,20 +4,62 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <mutex>
 
 #include "config.h"
-#include "cpu.h"
 #include "io_api.h"
+#include "os_specific.h"
 #include "task_manager.h"
 #include "util.h"
 #include "worker.h"
 
+// Creates new Scheduler for each bit available in available CPUs mask.
+//
+// clang-format off
+Schedulers::Schedulers() noexcept try
+    : m_system_cpus_count{cpus_count()}
+    , m_avail_cpus_mask{Cpu_Mask{cpus_avail_mask()} & CFG_allowed_cpus}
+{
+    for (uint64_t cpu_id = 0; cpu_id < m_avail_cpus_mask.size(); ++cpu_id)
+        if (m_avail_cpus_mask.test(cpu_id))
+            m_schedulers.emplace_back(std::make_unique<Scheduler>(cpu_id));
+}
+catch (...) {
+    std::terminate();
+}
+
+// clang-format on
+
+Scheduler& Schedulers::min_load_scheduler() const noexcept
+{
+    // NOLINTNEXTLINE(readability-suspicious-call-argument)
+    const auto cmp = [](const auto& left, const auto& right) {
+        return left->load() < right->load();
+    };
+
+    return **std::min_element(m_schedulers.begin(), m_schedulers.end(), cmp);
+}
+
+[[nodiscard]] uint32_t Schedulers::workers_count() const noexcept
+{
+    uint32_t c = 0;
+    for (const auto& scheduler : m_schedulers)
+        c += scheduler->workers_count();
+
+    return c;
+}
+
+[[nodiscard]] uint32_t Schedulers::cpus_count() const noexcept
+{
+    return m_schedulers.size();
+}
+
 // Creates scheduler and workers for provided CPU.
 // After workers are created, starts single worker from idle queue.
 //
-Scheduler::Scheduler(const CPU& cpu) : m_cpu{cpu}
+Scheduler::Scheduler(uint64_t cpu_id) : m_cpu{cpu_id}
 {
     for (uint32_t i = 0; i < CFG_workers_per_cpu; ++i)
         m_workers.push_back(std::make_unique<Worker>(i, *this));

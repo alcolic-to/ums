@@ -61,7 +61,7 @@ uint64_t cpus_avail_mask() noexcept
     return procCpuMask;
 }
 
-// Binds current thread to to provided CPU.
+// Binds current thread to the provided CPU.
 //
 void bind_thread(uint64_t cpu_mask) noexcept
 {

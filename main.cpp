@@ -1,10 +1,13 @@
 // NOLINTBEGIN
 
 #include <atomic>
+#include <barrier>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <future>
 #include <iostream>
+#include <latch>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -27,11 +30,6 @@
 #include "worker.h"
 
 using namespace std::chrono_literals;
-
-void f2()
-{
-    tls_worker->yield();
-}
 
 void f1()
 {
@@ -126,11 +124,6 @@ void ms3_function()
     // std::cout << r << "\n";
 }
 
-void sleep_test()
-{
-    tls_worker->sleep_for(1000ms);
-}
-
 #if defined _WIN32
 
 HANDLE file = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
@@ -181,90 +174,13 @@ void write_to_file()
                    (random() % max_file_size) * io_str.size());
 }
 
-static Spinlock sl;
-
-static uint64_t sum = 0;
-
-void testing_spinlock()
-{
-    // std::scoped_lock<Spinlockic> lock{sl};
-    for (int i = 0; i < 1000000; ++i) {
-        std::scoped_lock<Spinlock> lock{sl};
-        sum += 1;
-    }
-}
-
-static Mutex m;
-
-// static Spinlock spinlock;
-
-void testing_mutex()
-{
-    // std::scoped_lock<Mutex> lock{m};
-    for (int i = 0; i < 1000000; ++i) {
-        std::scoped_lock<Mutex> lock{m};
-        // std::scoped_lock<Spinlock> lock{spinlock};
-        sum += 1;
-    }
-}
-
-void execute_testing_mutex_tasks()
-{
-    constexpr int tasks_count = 1000;
-
-    std::vector<std::shared_ptr<Task>> tasks;
-    tasks.reserve(tasks_count);
-
-    Stopwatch sw{"Testing mutex"};
-
-    for (int i = 0; i < tasks_count; ++i) {
-        std::shared_ptr<Task> task{std::make_shared<Task>(testing_mutex)};
-        task_manager.enque_task(task);
-        tasks.push_back(std::move(task));
-    }
-
-    for (auto&& task : tasks)
-        task->wait();
-
-    std::cout << sum << "\n";
-}
-
-std::mutex mtx;
-std::condition_variable cv;
-std::atomic<bool> wake_up_signaled{false};
-
-Mutex mlock;
-
-void f()
-{
-    std::this_thread::sleep_for(1s);
-    mlock.lock();
-    mlock.lock();
-    // wake_up_signaled.store(true, std::memory_order_relaxed);
-    // cv.notify_one();
-}
-
-// Shared_mutex smutex;
+Mutex mtx;
 
 int main(int argc, char* argv[])
 {
-    // Stopwatch s{"Stopwatch"};
+    Stopwatch s{"Stopwatch"};
 
-    Shared_mutex smutex;
-
-    for (int i = 0; i < 1; ++i) {
-        task_manager.execute_task([&] {
-            smutex.lock_shared();
-            tls_worker->sleep_for(2s);
-            smutex.unlock_shared();
-        });
-    }
-
-    task_manager.execute_task([&] {
-        smutex.lock();
-        // tls_worker->sleep_for(10s);
-        smutex.unlock();
-    });
+    task_manager.execute_task<false>(ms3_function);
 }
 
 #else

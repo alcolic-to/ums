@@ -17,8 +17,9 @@
 class Scheduler;
 
 class Worker final {
-public:
     friend class Scheduler;
+
+public:
     enum class State : int { initializing, idle, waiting, pending_io, runnable, running, exiting };
 
     Worker(uint64_t id, Scheduler& scheduler);
@@ -123,6 +124,7 @@ public:
 
     void sleep_until_internal(const Time_point& time_point);
 
+private:
     // TODO: reorganize data members for quick access.
     //
     std::condition_variable m_cv;

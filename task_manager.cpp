@@ -4,6 +4,7 @@
 #include <memory>
 #include <mutex>
 
+#include "mutex.h"
 #include "scheduler.h"
 
 Task::Task() noexcept : m_state{State::not_started} {}
@@ -16,13 +17,13 @@ Task::Task(const std::function<void()>& function) noexcept
 
 void Task::wait()
 {
-    std::unique_lock<std::mutex> lock{m_mtx};
+    std::unique_lock<Mutex> lock{m_mtx};
     m_cv.wait(lock, [&] { return m_state == Task::State::done; });
 }
 
 void Task::notify() noexcept
 {
-    const std::unique_lock<std::mutex> lock{m_mtx};
+    const std::unique_lock<Mutex> lock{m_mtx};
     m_state = State::done;
     m_cv.notify_one();
 }

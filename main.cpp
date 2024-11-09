@@ -26,6 +26,7 @@
 #include "shared_mutex.h"
 #include "spinlock.h"
 #include "task_manager.h"
+#include "ums.h"
 #include "util.h"
 #include "worker.h"
 
@@ -81,7 +82,7 @@ uint64_t f3()
 void thread_function()
 {
     for (int i = 0; i < 1000; ++i)
-        task_manager.execute_task<false>(f3);
+        task_manager->execute_task<false>(f3);
 }
 
 // Duration of ~4ms when plugged in.
@@ -109,7 +110,7 @@ void ms3_function()
     auto start = now();
 
     for (int i = 0; i < 1000; ++i) {
-        task_manager.execute_task<false>(f4);
+        task_manager->execute_task<true>(f4);
         // std::cout << GetCurrentProcessorNumber() << "\n";
         // r += f4();
     }
@@ -174,13 +175,25 @@ void write_to_file()
                    (random() % max_file_size) * io_str.size());
 }
 
-Mutex mtx;
+void f122()
+{
+    std::cout << "f122\n";
+}
+
+// int ums_main(int argc, char* argv[])
+void ums_main()
+{
+    Stopwatch<std::chrono::microseconds> s{"Stopwatch"};
+
+    // task_manager->execute_task<true>(ms3_function);
+
+    for (int i = 0; i < 1000; ++i)
+        task_manager->execute_task<true>(f4);
+}
 
 int main(int argc, char* argv[])
 {
-    Stopwatch s{"Stopwatch"};
-
-    task_manager.execute_task<false>(ms3_function);
+    init_ums(ums_main);
 }
 
 #else
@@ -190,7 +203,7 @@ int main(int argc, char* argv[])
     Stopwatch sw("Sleep test");
 
     for (std::size_t i = 0; i < 10; ++i)
-        task_manager.execute_task<false>(sleep_test);
+        task_manager->execute_task<false>(sleep_test);
 }
 
 #endif

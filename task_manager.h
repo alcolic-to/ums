@@ -3,9 +3,10 @@
 #ifndef COS_TASK_MANAGER_H
 #define COS_TASK_MANAGER_H
 
-#include <condition_variable>
 #include <functional>
-#include <mutex>
+
+#include "condition_variable.h"
+#include "mutex.h"
 
 class Schedulers;
 
@@ -22,8 +23,8 @@ public:
 
     std::function<void()> m_func;
     State m_state;
-    std::mutex m_mtx;
-    std::condition_variable m_cv;
+    Mutex m_mtx;
+    Condition_variable m_cv;
 };
 
 class Task_manager final {
@@ -72,8 +73,5 @@ public:
 
     const Schedulers& m_schedulers;
 };
-
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-extern Task_manager task_manager;
 
 #endif // COS_TASK_MANAGER_H

@@ -13,14 +13,14 @@ IO_Request::IO_Request(void* file_handle, IO_Buffer buffer, uint64_t offset, Typ
     , m_state{State::init}
 {
     if (m_type == Type::read)
-        read_file(*this);
+        os::read_file(*this);
     else
-        write_file(*this);
+        os::write_file(*this);
 }
 
 void IO_Request::update() noexcept
 {
-    update_io_state(*this);
+    os::update_io_state(*this);
 }
 
 void cos_read_file(void* file_handle, IO_Buffer buffer, uint64_t offset)

@@ -12,9 +12,8 @@
 #include "mutex.h"
 #include "scheduler.h"
 #include "shared_mutex.h"
-#include "task_manager.h"
+#include "ums.h"
 #include "util.h"
-#include "worker.h"
 
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 
@@ -53,10 +52,11 @@ STATIC_ASSERT(std::is_nothrow_default_constructible_v<std::shared_lock<Shared_mu
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<std::shared_lock<Shared_timed_mutex>>); // N4928 [thread.lock.shared.cons]/1
 STATIC_ASSERT(std::is_nothrow_default_constructible_v<Condition_variable>); // strengthened
 
-STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Shared_mutex&, std::adopt_lock_t>); // strengthened
-STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Shared_mutex&, const std::adopt_lock_t&>); // strengthened
-STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_timed_mutex>, Shared_timed_mutex&, std::adopt_lock_t>); // strengthened
-STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_timed_mutex>, Shared_timed_mutex&, const std::adopt_lock_t&>); // strengthened
+// gcc's libstdc++ does not align with these.
+// STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Shared_mutex&, std::adopt_lock_t>); // strengthened
+// STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_mutex>, Shared_mutex&, const std::adopt_lock_t&>); // strengthened
+// STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_timed_mutex>, Shared_timed_mutex&, std::adopt_lock_t>); // strengthened
+// STATIC_ASSERT(std::is_nothrow_constructible_v<std::shared_lock<Shared_timed_mutex>, Shared_timed_mutex&, const std::adopt_lock_t&>); // strengthened
 
 // Also test mandatory and strengthened exception specification for try_lock().
 STATIC_ASSERT(noexcept(std::declval<Mutex&>().try_lock())); // strengthened
@@ -69,222 +69,246 @@ STATIC_ASSERT(noexcept(std::declval<Shared_mutex&>().try_lock())); // strengthen
 
 TEST(Condition_variable, cv_sanity_test_1)
 {
-    if (schedulers.workers_count() < 2)
-        GTEST_SKIP() << "At least 2 workers needed for this test.";
+    // if (schedulers->workers_count() < 2)
+    //     GTEST_SKIP() << "At least 2 workers needed for this test.";
 
-    Mutex mutex;
-    Condition_variable cv;
-    bool ready = false;
+    auto test = [] {
+        Mutex mutex;
+        Condition_variable cv;
+        bool ready = false;
 
-    auto waiter = [&] {
-        std::unique_lock<Mutex> lock(mutex);
-        while (!ready)
-            cv.wait(lock);
+        auto waiter = [&] {
+            std::unique_lock<Mutex> lock(mutex);
+            while (!ready)
+                cv.wait(lock);
 
-        ASSERT_TRUE(true);
+            ASSERT_TRUE(true);
+        };
+
+        auto notifier = [&] {
+            std::unique_lock<Mutex> lock(mutex);
+            ready = true;
+            cv.notify_one();
+        };
+
+        task_manager->execute_tasks<false>(waiter, notifier);
     };
 
-    auto notifier = [&] {
-        std::unique_lock<Mutex> lock(mutex);
-        ready = true;
-        cv.notify_one();
-    };
-
-    task_manager.execute_tasks<false>(waiter, notifier);
+    init_ums(test);
 }
 
 TEST(Condition_variable, cv_sanity_test_2)
 {
-    if (schedulers.workers_count() < 4)
-        GTEST_SKIP() << "At least 4 workers needed for this test.";
+    // if (schedulers->workers_count() < 4)
+    //     GTEST_SKIP() << "At least 4 workers needed for this test.";
 
-    Mutex mtx;
-    Condition_variable cv1, cv2, cv3;
-    std::vector<std::uint8_t> v;
+    auto test = [] {
+        Mutex mtx;
+        Condition_variable cv1, cv2, cv3;
+        std::vector<std::uint8_t> v;
 
-    auto waiter_1 = [&] {
-        std::unique_lock<Mutex> l{mtx};
-        cv1.wait(l);
-        v.push_back(1);
+        auto waiter_1 = [&] {
+            std::unique_lock<Mutex> l{mtx};
+            cv1.wait(l);
+            v.push_back(1);
+        };
+
+        auto waiter_2 = [&] {
+            std::unique_lock<Mutex> l{mtx};
+            cv2.wait(l);
+            v.push_back(2);
+        };
+
+        auto waiter_3 = [&] {
+            std::unique_lock<Mutex> l{mtx};
+            cv3.wait(l);
+            v.push_back(3);
+        };
+
+        auto notifier = [&] {
+            tls_worker->sleep_for(20ms);
+            cv2.notify_one();
+
+            tls_worker->sleep_for(20ms);
+            cv1.notify_one();
+
+            tls_worker->sleep_for(20ms);
+            cv3.notify_one();
+
+            // Wait for the threads to finish.
+            tls_worker->sleep_for(100ms);
+        };
+
+        task_manager->execute_tasks<false>(waiter_1, waiter_2, waiter_3, notifier);
+
+        ASSERT_TRUE(v.size() == 3);
+        ASSERT_TRUE(v[0] == 2);
+        ASSERT_TRUE(v[1] == 1);
+        ASSERT_TRUE(v[2] == 3);
     };
 
-    auto waiter_2 = [&] {
-        std::unique_lock<Mutex> l{mtx};
-        cv2.wait(l);
-        v.push_back(2);
-    };
-
-    auto waiter_3 = [&] {
-        std::unique_lock<Mutex> l{mtx};
-        cv3.wait(l);
-        v.push_back(3);
-    };
-
-    auto notifier = [&] {
-        tls_worker->sleep_for(1s);
-        cv2.notify_one();
-
-        tls_worker->sleep_for(1s);
-        cv1.notify_one();
-
-        tls_worker->sleep_for(1s);
-        cv3.notify_one();
-
-        // Wait for the threads to finish.
-        tls_worker->sleep_for(2s);
-    };
-
-    task_manager.execute_tasks<false>(waiter_1, waiter_2, waiter_3, notifier);
-
-    ASSERT_TRUE(v.size() == 3);
-    ASSERT_TRUE(v[0] == 2);
-    ASSERT_TRUE(v[1] == 1);
-    ASSERT_TRUE(v[2] == 3);
+    init_ums(test);
 }
 
 TEST(Condition_variable, cv_producer_consumer_test)
 {
-    if (schedulers.workers_count() < 2)
-        GTEST_SKIP() << "At least 2 workers needed for this test.";
+    // if (schedulers->workers_count() < 2)
+    //     GTEST_SKIP() << "At least 2 workers needed for this test.";
 
-    Mutex mutex;
-    Condition_variable cv;
-    int data = 0;
-    bool ready = false;
+    auto test = [] {
+        Mutex mutex;
+        Condition_variable cv;
+        int data = 0;
+        bool ready = false;
 
-    auto producer = [&] {
-        tls_worker->sleep_for(100ms); // Simulate work
+        auto producer = [&] {
+            tls_worker->sleep_for(100ms); // Simulate work
 
-        {
+            {
+                std::unique_lock<Mutex> lock(mutex);
+                data = 42; // Set shared data
+                ready = true;
+            }
+
+            cv.notify_one(); // Notify the consumer
+        };
+
+        auto consumer = [&] {
             std::unique_lock<Mutex> lock(mutex);
-            data = 42; // Set shared data
-            ready = true;
-        }
+            cv.wait(lock, [&] { return ready; });
 
-        cv.notify_one(); // Notify the consumer
+            ASSERT_TRUE(data == 42);
+        };
+
+        task_manager->execute_tasks<false>(producer, consumer);
     };
 
-    auto consumer = [&] {
-        std::unique_lock<Mutex> lock(mutex);
-        cv.wait(lock, [&] { return ready; });
-
-        ASSERT_TRUE(data == 42);
-    };
-
-    task_manager.execute_tasks<false>(producer, consumer);
+    init_ums(test);
 }
 
 TEST(Condition_variable, cv_spurious_wakeup_test)
 {
-    if (schedulers.workers_count() < 2)
-        GTEST_SKIP() << "At least 2 workers needed for this test.";
+    // if (schedulers->workers_count() < 2)
+    //     GTEST_SKIP() << "At least 2 workers needed for this test.";
 
-    Mutex mutex;
-    Condition_variable cv;
-    bool ready = false;
+    auto test = [] {
+        Mutex mutex;
+        Condition_variable cv;
+        bool ready = false;
 
-    auto spurious_wakeup = [&] {
-        std::unique_lock<Mutex> lock(mutex);
-        cv.wait(lock); // This should block until a real notification
-        ASSERT_TRUE(!ready);
+        auto spurious_wakeup = [&] {
+            std::unique_lock<Mutex> lock(mutex);
+            cv.wait(lock); // This should block until a real notification
+            ASSERT_TRUE(!ready);
+        };
+
+        auto notifier = [&] {
+            tls_worker->sleep_for(std::chrono::milliseconds(100)); // Simulate some wait
+            cv.notify_one();
+        };
+
+        task_manager->execute_tasks<false>(spurious_wakeup, notifier);
     };
 
-    auto notifier = [&] {
-        tls_worker->sleep_for(std::chrono::milliseconds(100)); // Simulate some wait
-        cv.notify_one();
-    };
-
-    task_manager.execute_tasks<false>(spurious_wakeup, notifier);
+    init_ums(test);
 }
 
 // https://github.com/microsoft/STL/blob/1e312b38db8df1dfbea17adc344454feb8d00dd9/tests/std/include/test_header_units_and_modules.hpp#L150
 TEST(Condition_variable, cv_complex_test_1)
 {
-    if (schedulers.workers_count() < 2)
-        GTEST_SKIP() << "At least 2 workers needed for this test.";
+    // if (schedulers->workers_count() < 2)
+    //     GTEST_SKIP() << "At least 2 workers needed for this test.";
 
-    Condition_variable cv;
-    Mutex mtx;
-    std::vector<int> vec = {5};
+    auto test = [] {
+        Condition_variable cv;
+        Mutex mtx;
+        std::vector<int> vec = {5};
 
-    auto odd = [&] {
-        std::unique_lock<Mutex> lk{mtx};
+        auto odd = [&] {
+            std::unique_lock<Mutex> lk{mtx};
 
-        while (vec.size() < 6) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 1);
-            cv.notify_one();
-        }
+            while (vec.size() < 6) {
+                cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
+                const int n = vec.back();
+                vec.push_back(n * 10 + 1);
+                cv.notify_one();
+            }
+        };
+
+        auto even = [&] {
+            std::unique_lock<Mutex> lk{mtx};
+
+            while (vec.size() < 7) {
+                cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
+                const int n = vec.back();
+                vec.push_back(n * 10 + 2);
+                cv.notify_one();
+            }
+        };
+
+        task_manager->execute_tasks<false>(odd, even);
+
+        const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
+        ASSERT_TRUE(vec == expected_val);
+
+        static_assert(static_cast<int>(std::cv_status::no_timeout) == 0);
+        static_assert(static_cast<int>(std::cv_status::timeout) == 1);
     };
 
-    auto even = [&] {
-        std::unique_lock<Mutex> lk{mtx};
-
-        while (vec.size() < 7) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 2);
-            cv.notify_one();
-        }
-    };
-
-    task_manager.execute_tasks<false>(odd, even);
-
-    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
-    ASSERT_TRUE(vec == expected_val);
-
-    static_assert(static_cast<int>(std::cv_status::no_timeout) == 0);
-    static_assert(static_cast<int>(std::cv_status::timeout) == 1);
+    init_ums(test);
 }
 
 TEST(Condition_variable, cv_complex_test_2)
 {
-    if (schedulers.workers_count() < 9)
-        GTEST_SKIP() << "At least 9 workers needed for this test.";
+    // if (schedulers->workers_count() < 9)
+    //     GTEST_SKIP() << "At least 9 workers needed for this test.";
 
-    Mutex mutex;
-    Condition_variable increment_cv;
-    Condition_variable notifier_cv;
-    bool ready = false;
+    auto test = [] {
+        Mutex mutex;
+        Condition_variable increment_cv;
+        Condition_variable notifier_cv;
+        bool ready = false;
 
-    std::atomic<uint32_t> atomic_counter = 0;
-    uint32_t threads_count = 8;
+        std::atomic<uint32_t> atomic_counter = 0;
+        uint32_t threads_count = 8;
 
-    auto increment = [&] {
-        // First round of increments.
-        //
-        uint32_t r = ++atomic_counter;
-        ASSERT_TRUE(r > 0 && r <= threads_count);
+        auto increment = [&] {
+            // First round of increments.
+            //
+            uint32_t r = ++atomic_counter;
+            ASSERT_TRUE(r > 0 && r <= threads_count);
 
-        std::unique_lock<Mutex> lock{mutex};
+            std::unique_lock<Mutex> lock{mutex};
 
-        // Waking up notifier when all threads incremented counter.
-        //
-        if (r == threads_count)
-            notifier_cv.notify_one();
+            // Waking up notifier when all threads incremented counter.
+            //
+            if (r == threads_count)
+                notifier_cv.notify_one();
 
-        increment_cv.wait(lock, [&] { return ready; });
+            increment_cv.wait(lock, [&] { return ready; });
 
-        // Second round of increments.
-        //
-        r = ++atomic_counter;
-        ASSERT_TRUE(r > threads_count && r <= 2 * threads_count);
+            // Second round of increments.
+            //
+            r = ++atomic_counter;
+            ASSERT_TRUE(r > threads_count && r <= 2 * threads_count);
+        };
+
+        auto notifier = [&] {
+            std::unique_lock<Mutex> lock{mutex};
+            notifier_cv.wait(lock, [&] { return atomic_counter.load() == threads_count; });
+
+            tls_worker->sleep_for(100ms);
+            ready = true;
+            increment_cv.notify_all();
+        };
+
+        task_manager->execute_tasks<false>(increment, increment, increment, increment, increment,
+                                           increment, increment, increment, notifier);
+
+        ASSERT_TRUE(atomic_counter.load() == 2 * threads_count);
     };
 
-    auto notifier = [&] {
-        std::unique_lock<Mutex> lock{mutex};
-        notifier_cv.wait(lock, [&] { return atomic_counter.load() == threads_count; });
-
-        tls_worker->sleep_for(100ms);
-        ready = true;
-        increment_cv.notify_all();
-    };
-
-    task_manager.execute_tasks<false>(increment, increment, increment, increment, increment,
-                                      increment, increment, increment, notifier);
-
-    ASSERT_TRUE(atomic_counter.load() == 2 * threads_count);
+    init_ums(test);
 }
 
 // Mext section is slightly modified stl mutex tests:
@@ -324,7 +348,7 @@ public:
         , currentMessage(message::idle)
         , tryLockSuccess(false)
     {
-        task_manager.execute_task<true>([&] { thread_func(); });
+        task_manager->execute_task<true>([&] { thread_func(); });
     }
 
     void join() { send_message(message::shutdown); }
@@ -726,7 +750,7 @@ void test_vso_1253916()
 template<typename _Mutex>
 void test_one_writer()
 {
-    if (schedulers.workers_count() < 4)
+    if (schedulers->workers_count() < 4)
         GTEST_SKIP() << "At least 4 workers needed for this test.";
 
     // One simultaneous writer.
@@ -744,14 +768,14 @@ void test_one_writer()
     };
 
     ASSERT_TRUE(atom.exchange(0) == -1);
-    task_manager.execute_tasks<false>(f, f, f, f);
+    task_manager->execute_tasks<false>(f, f, f, f);
     ASSERT_TRUE(atom == 4);
 }
 
 template<typename _Mutex>
 void test_multiple_readers()
 {
-    if (schedulers.workers_count() < 4)
+    if (schedulers->workers_count() < 4)
         GTEST_SKIP() << "At least 4 workers needed for this test.";
 
     // Many simultaneous readers.
@@ -768,14 +792,14 @@ void test_multiple_readers()
     };
 
     ASSERT_TRUE(atom.exchange(0) == -1);
-    task_manager.execute_tasks<false>(f, f, f, f);
+    task_manager->execute_tasks<false>(f, f, f, f);
     ASSERT_TRUE(atom == 4);
 }
 
 template<typename _Mutex>
 void test_writer_blocking_readers()
 {
-    if (schedulers.workers_count() < 5 || schedulers.cpus_count() < 5)
+    if (schedulers->workers_count() < 5 || schedulers->cpus_count() < 5)
         GTEST_SKIP() << "At least 5 workers and 5 CPUs needed for this test.";
 
     // One writer blocking many readers.
@@ -799,14 +823,14 @@ void test_writer_blocking_readers()
         ASSERT_TRUE(atom == 1729);
     };
 
-    task_manager.execute_tasks<false>(f1, f2, f2, f2, f2);
+    task_manager->execute_tasks<false>(f1, f2, f2, f2, f2);
     ASSERT_TRUE(atom == 1729);
 }
 
 template<typename _Mutex>
 void test_readers_blocking_writer()
 {
-    if (schedulers.workers_count() < 5 || schedulers.cpus_count() < 5)
+    if (schedulers->workers_count() < 5 || schedulers->cpus_count() < 5)
         GTEST_SKIP() << "At least 5 workers and 5 CPUs needed for this test.";
     // Many readers blocking one writer.
     std::atomic<int> atom(-5);
@@ -830,7 +854,7 @@ void test_readers_blocking_writer()
     };
 
     // join_and_clear(threads);
-    task_manager.execute_tasks<false>(f1, f1, f1, f1, f2);
+    task_manager->execute_tasks<false>(f1, f1, f1, f1, f2);
     ASSERT_TRUE(atom == 40);
 }
 
@@ -844,7 +868,7 @@ void test_try_lock_and_try_lock_shared()
         std::unique_lock<_Mutex> MainExclusive(mut, std::try_to_lock);
         ASSERT_TRUE(MainExclusive.owns_lock());
 
-        task_manager.execute_task<false>([&] {
+        task_manager->execute_task<false>([&] {
             {
                 std::unique_lock<_Mutex> ExclusiveLock(mut, std::try_to_lock);
                 ASSERT_TRUE(!ExclusiveLock.owns_lock());
@@ -861,7 +885,7 @@ void test_try_lock_and_try_lock_shared()
         std::shared_lock<_Mutex> MainShared(mut, std::try_to_lock);
         ASSERT_TRUE(MainShared.owns_lock());
 
-        task_manager.execute_task<false>([&] {
+        task_manager->execute_task<false>([&] {
             {
                 std::unique_lock<_Mutex> ExclusiveLock(mut, std::try_to_lock);
                 ASSERT_TRUE(!ExclusiveLock.owns_lock());
@@ -884,7 +908,7 @@ void test_timed_behavior()
             std::unique_lock<Shared_timed_mutex> MainExclusive(stm, 25ms);
             ASSERT_TRUE(MainExclusive.owns_lock());
 
-            task_manager.execute_task<false>([&] {
+            task_manager->execute_task<false>([&] {
                 {
                     std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 25ms);
                     ASSERT_TRUE(!ExclusiveLock.owns_lock());
@@ -901,7 +925,7 @@ void test_timed_behavior()
             std::shared_lock<Shared_timed_mutex> MainShared(stm, 25ms);
             ASSERT_TRUE(MainShared.owns_lock());
 
-            task_manager.execute_task<false>([&] {
+            task_manager->execute_task<false>([&] {
                 {
                     std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 25ms);
                     ASSERT_TRUE(!ExclusiveLock.owns_lock());
@@ -917,7 +941,7 @@ void test_timed_behavior()
 
     // Test delayed try_lock_for() success. GENEROUS timing assumptions.
     //
-    if (schedulers.cpus_count() >= 5 && schedulers.workers_count() >= 5) {
+    if (schedulers->cpus_count() >= 5 && schedulers->workers_count() >= 5) {
         std::atomic<int> atom(-5);
         Shared_timed_mutex stm;
 
@@ -944,13 +968,13 @@ void test_timed_behavior()
             ASSERT_TRUE(atom == val);
         };
 
-        task_manager.execute_tasks<false>(f1, f2, f2, f2, f2);
+        task_manager->execute_tasks<false>(f1, f2, f2, f2, f2);
         ASSERT_TRUE(atom == 400);
     }
 
     // Test delayed try_lock_shared_for() success. GENEROUS timing assumptions.
     //
-    if (schedulers.cpus_count() >= 5 && schedulers.workers_count() >= 5) {
+    if (schedulers->cpus_count() >= 5 && schedulers->workers_count() >= 5) {
         std::atomic<int> atom(-5);
         Shared_timed_mutex stm;
 
@@ -977,14 +1001,14 @@ void test_timed_behavior()
             }
         };
 
-        task_manager.execute_tasks<false>(f1, f2, f2, f2, f2);
+        task_manager->execute_tasks<false>(f1, f2, f2, f2, f2);
         ASSERT_TRUE(atom == 44);
     }
 
     // THE GRAND FINALE: If try_lock_for() gives up due to stubborn readers,
     // it needs to deliver notifications. No timing assumptions.
     //
-    if (schedulers.cpus_count() >= 3 && schedulers.workers_count() >= 3) {
+    if (schedulers->cpus_count() >= 3 && schedulers->workers_count() >= 3) {
         std::atomic<bool> launch_readers(false);
         Shared_timed_mutex stm;
 
@@ -1012,7 +1036,7 @@ void test_timed_behavior()
 
         std::shared_lock<Shared_timed_mutex> MainShared(stm);
 
-        task_manager.execute_tasks<false>(f1, f2, f3);
+        task_manager->execute_tasks<false>(f1, f2, f3);
 
         std::atomic<int> readers(0);
 
@@ -1023,7 +1047,7 @@ void test_timed_behavior()
             }
         };
 
-        task_manager.execute_tasks<false>(f4, f4, f4, f4);
+        task_manager->execute_tasks<false>(f4, f4, f4, f4);
 
         // join_and_clear(threads);
         ASSERT_TRUE(readers == 4);
@@ -1032,41 +1056,49 @@ void test_timed_behavior()
 
 TEST(Mutex, mutex_sanity_test_1)
 {
-    Mutex mutex;
-    int counter = 0;
+    auto test = [] {
+        Mutex mutex;
+        int counter = 0;
 
-    auto f = [&] {
-        mutex.lock();
-        ++counter;
-        mutex.unlock();
+        auto f = [&] {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        };
+
+        task_manager->execute_tasks<false>(f, f);
+        ASSERT_TRUE(counter == 2);
     };
 
-    task_manager.execute_tasks<false>(f, f);
-    ASSERT_TRUE(counter == 2);
+    init_ums(test);
 }
 
 TEST(Mutex, mutex_sanity_test_2)
 {
-    Mutex mutex;
-    int counter = 0;
-    int iterations = 100000;
+    auto test = [] {
+        Mutex mutex;
+        int counter = 0;
+        int iterations = 100000;
 
-    // Test 2: Mutex Contention Test
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            mutex.lock();
-            ++counter;
-            mutex.unlock();
-        }
+        // Test 2: Mutex Contention Test
+        auto f = [&] {
+            for (int i = 0; i < iterations; ++i) {
+                mutex.lock();
+                ++counter;
+                mutex.unlock();
+            }
+        };
+
+        task_manager->execute_tasks<false>(f, f, f, f);
+        ASSERT_TRUE(counter == 4 * iterations);
     };
 
-    task_manager.execute_tasks<false>(f, f, f, f);
-    ASSERT_TRUE(counter == 4 * iterations);
+    init_ums(test);
 }
 
 TEST(Mutex, mutex_sanity_test_3)
 {
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         try {
             Mutex mutex;
 
@@ -1077,93 +1109,109 @@ TEST(Mutex, mutex_sanity_test_3)
             ASSERT_TRUE(ex.code() ==
                         std::make_error_code(std::errc::resource_deadlock_would_occur));
         }
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Mutex, mutex_sanity_test_4)
 {
-    std::condition_variable_any cv;
-    Mutex mut;
-    std::vector<int> vec = {5};
+    auto test = [] {
+        std::condition_variable_any cv;
+        Mutex mut;
+        std::vector<int> vec = {5};
 
-    auto odd = [&] {
-        std::unique_lock<Mutex> lk{mut};
+        auto odd = [&] {
+            std::unique_lock<Mutex> lk{mut};
 
-        while (vec.size() < 6) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 1);
-            cv.notify_one();
-        }
+            while (vec.size() < 6) {
+                cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
+                const int n = vec.back();
+                vec.push_back(n * 10 + 1);
+                cv.notify_one();
+            }
+        };
+
+        auto even = [&] {
+            std::unique_lock<Mutex> lk{mut};
+
+            while (vec.size() < 7) {
+                cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
+                const int n = vec.back();
+                vec.push_back(n * 10 + 2);
+                cv.notify_one();
+            }
+        };
+
+        task_manager->execute_tasks<false>(odd, even);
+
+        const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
+        ASSERT_TRUE(vec == expected_val);
     };
 
-    auto even = [&] {
-        std::unique_lock<Mutex> lk{mut};
-
-        while (vec.size() < 7) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 2);
-            cv.notify_one();
-        }
-    };
-
-    task_manager.execute_tasks<false>(odd, even);
-
-    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
-    ASSERT_TRUE(vec == expected_val);
+    init_ums(test);
 }
 
 TEST(Mutex, mutex_test_fixture)
 {
-    if (schedulers.workers_count() < 3)
-        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+    // if (schedulers->workers_count() < 3)
+    //     GTEST_SKIP() << "At least 3 CPUs needed for this test.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         mutex_test_fixture<Mutex> fixture;
         fixture.test_lockable();
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Shared_mutex, mutex_sanity_test_1)
 {
-    Shared_mutex mutex;
-    int counter = 0;
+    auto test = [] {
+        Shared_mutex mutex;
+        int counter = 0;
 
-    auto f = [&] {
-        mutex.lock();
-        ++counter;
-        mutex.unlock();
+        auto f = [&] {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        };
+
+        task_manager->execute_tasks<false>(f, f);
+        ASSERT_TRUE(counter == 2);
     };
 
-    task_manager.execute_tasks<false>(f, f);
-    ASSERT_TRUE(counter == 2);
+    init_ums(test);
 }
 
 TEST(Shared_mutex, mutex_sanity_test_2)
 {
-    Shared_mutex mutex;
-    int counter = 0;
-    int iterations = 100000;
+    auto test = [] {
+        Shared_mutex mutex;
+        int counter = 0;
+        int iterations = 100000;
 
-    // Test 2: Mutex Contention Test
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            mutex.lock();
-            ++counter;
-            mutex.unlock();
-        }
+        // Test 2: Mutex Contention Test
+        auto f = [&] {
+            for (int i = 0; i < iterations; ++i) {
+                mutex.lock();
+                ++counter;
+                mutex.unlock();
+            }
+        };
+
+        task_manager->execute_tasks<false>(f, f, f, f);
+        ASSERT_TRUE(counter == 4 * iterations);
     };
 
-    task_manager.execute_tasks<false>(f, f, f, f);
-    ASSERT_TRUE(counter == 4 * iterations);
+    init_ums(test);
 }
 
 TEST(Shared_mutex, mutex_sanity_test_3)
 {
     GTEST_SKIP() << "Skipping test. Not implement throwing for deadlock on shared mutex.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         try {
             Shared_mutex mutex;
 
@@ -1175,116 +1223,138 @@ TEST(Shared_mutex, mutex_sanity_test_3)
             ASSERT_TRUE(ex.code() ==
                         std::make_error_code(std::errc::resource_deadlock_would_occur));
         }
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Shared_mutex, sanity_test_4)
 {
-    std::condition_variable_any cv;
-    Shared_mutex mut;
-    std::vector<int> vec = {5};
+    auto test = [] {
+        std::condition_variable_any cv;
+        Shared_mutex mut;
+        std::vector<int> vec = {5};
 
-    auto odd = [&] {
-        std::unique_lock<Shared_mutex> lk{mut};
+        auto odd = [&] {
+            std::unique_lock<Shared_mutex> lk{mut};
 
-        while (vec.size() < 6) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 1);
-            cv.notify_one();
-        }
+            while (vec.size() < 6) {
+                cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
+                const int n = vec.back();
+                vec.push_back(n * 10 + 1);
+                cv.notify_one();
+            }
+        };
+
+        auto even = [&] {
+            std::unique_lock<Shared_mutex> lk{mut};
+
+            while (vec.size() < 7) {
+                cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
+                const int n = vec.back();
+                vec.push_back(n * 10 + 2);
+                cv.notify_one();
+            }
+        };
+
+        task_manager->execute_tasks<false>(odd, even);
+
+        const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
+        ASSERT_TRUE(vec == expected_val);
     };
 
-    auto even = [&] {
-        std::unique_lock<Shared_mutex> lk{mut};
-
-        while (vec.size() < 7) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 2);
-            cv.notify_one();
-        }
-    };
-
-    task_manager.execute_tasks<false>(odd, even);
-
-    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
-    ASSERT_TRUE(vec == expected_val);
+    init_ums(test);
 }
 
 TEST(Shared_mutex, mutex_test_fixture)
 {
-    if (schedulers.workers_count() < 3)
-        GTEST_SKIP() << "At least 3 workers needed for this test.";
+    // if (schedulers->workers_count() < 3)
+    //     GTEST_SKIP() << "At least 3 workers needed for this test.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         mutex_test_fixture<Shared_mutex> fixture;
         fixture.test_lockable();
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Shared_mutex, complex_tests)
 {
-    test_one_writer<Shared_mutex>();
-    test_multiple_readers<Shared_mutex>();
-    test_writer_blocking_readers<Shared_mutex>();
-    test_readers_blocking_writer<Shared_mutex>();
-    test_try_lock_and_try_lock_shared<Shared_mutex>();
+    auto test = [] {
+        test_one_writer<Shared_mutex>();
+        test_multiple_readers<Shared_mutex>();
+        test_writer_blocking_readers<Shared_mutex>();
+        test_readers_blocking_writer<Shared_mutex>();
+        test_try_lock_and_try_lock_shared<Shared_mutex>();
+    };
+
+    init_ums(test);
 }
 
 TEST(Recursive_mutex, mutex_sanity_test_1)
 {
-    Recursive_mutex mutex;
-    int counter = 0;
+    auto test = [] {
+        Recursive_mutex mutex;
+        int counter = 0;
 
-    auto f = [&] {
-        mutex.lock();
-        ++counter;
-        mutex.unlock();
+        auto f = [&] {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        };
+
+        task_manager->execute_tasks<false>(f, f);
+        ASSERT_TRUE(counter == 2);
     };
 
-    task_manager.execute_tasks<false>(f, f);
-    ASSERT_TRUE(counter == 2);
+    init_ums(test);
 }
 
 TEST(Recursive_mutex, mutex_sanity_test_2)
 {
-    Recursive_mutex mutex;
-    int counter = 0;
-    int iterations = 100000;
+    auto test = [] {
+        Recursive_mutex mutex;
+        int counter = 0;
+        int iterations = 100000;
 
-    // Test 2: Mutex Contention Test
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            mutex.lock();
-            ++counter;
-            mutex.unlock();
-        }
+        // Test 2: Mutex Contention Test
+        auto f = [&] {
+            for (int i = 0; i < iterations; ++i) {
+                mutex.lock();
+                ++counter;
+                mutex.unlock();
+            }
+        };
+
+        task_manager->execute_tasks<false>(f, f, f, f);
+        ASSERT_TRUE(counter == 4 * iterations);
     };
 
-    task_manager.execute_tasks<false>(f, f, f, f);
-    ASSERT_TRUE(counter == 4 * iterations);
+    init_ums(test);
 }
 
 TEST(Recursive_mutex, mutex_sanity_test_3)
 {
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         Recursive_mutex mutex;
 
         mutex.lock();
         mutex.lock();
         mutex.unlock();
         mutex.unlock();
-    });
 
-    ASSERT_TRUE(true);
+        ASSERT_TRUE(true);
+    };
+
+    init_ums(test);
 }
 
 TEST(Recursive_mutex, sanity_test_4)
 {
     GTEST_SKIP() << "Skipping test since it lasts long, especially for debug build.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         try {
             Recursive_mutex mutex;
 
@@ -1295,60 +1365,72 @@ TEST(Recursive_mutex, sanity_test_4)
             ASSERT_TRUE(ex.code() ==
                         std::make_error_code(std::errc::resource_unavailable_try_again));
         }
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Recursive_mutex, recursive_mutex_test_fixture)
 {
-    if (schedulers.workers_count() < 3)
-        GTEST_SKIP() << "At least 3 workers needed for this test.";
+    // if (schedulers->workers_count() < 3)
+    //     GTEST_SKIP() << "At least 3 workers needed for this test.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         mutex_test_fixture<Recursive_mutex> fixture;
         fixture.test_lockable();
         fixture.test_recursive_lockable();
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Timed_mutex, mutex_sanity_test_1)
 {
-    Timed_mutex mutex;
-    int counter = 0;
+    auto test = [] {
+        Timed_mutex mutex;
+        int counter = 0;
 
-    auto f = [&] {
-        mutex.lock();
-        ++counter;
-        mutex.unlock();
+        auto f = [&] {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        };
+
+        task_manager->execute_tasks<false>(f, f);
+        ASSERT_TRUE(counter == 2);
     };
 
-    task_manager.execute_tasks<false>(f, f);
-    ASSERT_TRUE(counter == 2);
+    init_ums(test);
 }
 
 TEST(Timed_mutex, mutex_sanity_test_2)
 {
-    Timed_mutex mutex;
-    int counter = 0;
-    int iterations = 100000;
+    auto test = [] {
+        Timed_mutex mutex;
+        int counter = 0;
+        int iterations = 100000;
 
-    // Test 2: Mutex Contention Test
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            mutex.lock();
-            ++counter;
-            mutex.unlock();
-        }
+        // Test 2: Mutex Contention Test
+        auto f = [&] {
+            for (int i = 0; i < iterations; ++i) {
+                mutex.lock();
+                ++counter;
+                mutex.unlock();
+            }
+        };
+
+        task_manager->execute_tasks<false>(f, f, f, f);
+        ASSERT_TRUE(counter == 4 * iterations);
     };
 
-    task_manager.execute_tasks<false>(f, f, f, f);
-    ASSERT_TRUE(counter == 4 * iterations);
+    init_ums(test);
 }
 
 TEST(Timed_mutex, mutex_sanity_test_3)
 {
     GTEST_SKIP() << "Deadlock detection not implemented.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         try {
             Timed_mutex mutex;
 
@@ -1359,150 +1441,170 @@ TEST(Timed_mutex, mutex_sanity_test_3)
             ASSERT_TRUE(ex.code() ==
                         std::make_error_code(std::errc::resource_deadlock_would_occur));
         }
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Timed_mutex, mutex_sanity_test_4)
 {
-    std::condition_variable_any cv;
-    Timed_mutex mut;
-    std::vector<int> vec = {5};
+    auto test = [] {
+        std::condition_variable_any cv;
+        Timed_mutex mut;
+        std::vector<int> vec = {5};
 
-    auto odd = [&] {
-        std::unique_lock<Timed_mutex> lk{mut};
+        auto odd = [&] {
+            std::unique_lock<Timed_mutex> lk{mut};
 
-        while (vec.size() < 6) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 1);
-            cv.notify_one();
-        }
+            while (vec.size() < 6) {
+                cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
+                const int n = vec.back();
+                vec.push_back(n * 10 + 1);
+                cv.notify_one();
+            }
+        };
+
+        auto even = [&] {
+            std::unique_lock<Timed_mutex> lk{mut};
+
+            while (vec.size() < 7) {
+                cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
+                const int n = vec.back();
+                vec.push_back(n * 10 + 2);
+                cv.notify_one();
+            }
+        };
+
+        task_manager->execute_tasks<false>(odd, even);
+
+        const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
+        ASSERT_TRUE(vec == expected_val);
     };
 
-    auto even = [&] {
-        std::unique_lock<Timed_mutex> lk{mut};
-
-        while (vec.size() < 7) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 2);
-            cv.notify_one();
-        }
-    };
-
-    task_manager.execute_tasks<false>(odd, even);
-
-    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
-    ASSERT_TRUE(vec == expected_val);
+    init_ums(test);
 }
 
 TEST(Timed_mutex, timed_mutex_test_fixture)
 {
-    if (schedulers.workers_count() < 3)
-        GTEST_SKIP() << "At least 3 workers needed for this test.";
+    // if (schedulers->workers_count() < 3)
+    //     GTEST_SKIP() << "At least 3 workers needed for this test.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         mutex_test_fixture<Timed_mutex> fixture;
         fixture.test_lockable();
         fixture.test_timed_lockable();
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Timed_mutex, timed_mutex_complex_test)
 {
-    // Test try_lock_for() and try_lock_shared_for(). No timing assumptions.
-    //
-    {
-        Timed_mutex timed_mutex;
+    auto test = [] {
+        // Test try_lock_for() and try_lock_shared_for(). No timing assumptions.
+        //
+        {
+            Timed_mutex timed_mutex;
 
-        std::unique_lock<Timed_mutex> MainExclusive(timed_mutex, 25ms);
-        ASSERT_TRUE(MainExclusive.owns_lock());
+            std::unique_lock<Timed_mutex> MainExclusive(timed_mutex, 25ms);
+            ASSERT_TRUE(MainExclusive.owns_lock());
 
-        task_manager.execute_task<false>([&] {
-            std::unique_lock<Timed_mutex> ExclusiveLock(timed_mutex, 25ms);
-            ASSERT_TRUE(!ExclusiveLock.owns_lock());
-        });
-    }
+            task_manager->execute_task<false>([&] {
+                std::unique_lock<Timed_mutex> ExclusiveLock(timed_mutex, 25ms);
+                ASSERT_TRUE(!ExclusiveLock.owns_lock());
+            });
+        }
 
-    // Test delayed try_lock_for() success. GENEROUS timing assumptions.
-    //
-    if (schedulers.cpus_count() >= 4 && schedulers.workers_count() >= 4) {
-        std::atomic<int> atom(-4);
-        Timed_mutex timed_mutex;
+        // Test delayed try_lock_for() success. GENEROUS timing assumptions.
+        //
+        if (schedulers->cpus_count() >= 4 && schedulers->workers_count() >= 4) {
+            std::atomic<int> atom(-4);
+            Timed_mutex timed_mutex;
 
-        auto f = [&] {
-            tls_worker->sleep_for(50ms);
+            auto f = [&] {
+                tls_worker->sleep_for(50ms);
 
-            ++atom;
-            while (atom < 0) {
-            }
-            std::unique_lock<Timed_mutex> TryExclusiveLock(timed_mutex, std::try_to_lock);
-            ASSERT_TRUE(!TryExclusiveLock.owns_lock());
+                ++atom;
+                while (atom < 0) {
+                }
+                std::unique_lock<Timed_mutex> TryExclusiveLock(timed_mutex, std::try_to_lock);
+                ASSERT_TRUE(!TryExclusiveLock.owns_lock());
 
-            std::unique_lock<Timed_mutex> TryTimedExclusiveLock(timed_mutex, 5ms);
-            ASSERT_TRUE(!TryExclusiveLock.owns_lock());
+                std::unique_lock<Timed_mutex> TryTimedExclusiveLock(timed_mutex, 5ms);
+                ASSERT_TRUE(!TryExclusiveLock.owns_lock());
 
-            std::unique_lock<Timed_mutex> ExclusiveLock(timed_mutex, 1min);
-            ASSERT_TRUE(ExclusiveLock.owns_lock());
-            const int val = (atom += 100);
-            tls_worker->sleep_for(25ms);
-            ASSERT_TRUE(atom == val);
-        };
+                std::unique_lock<Timed_mutex> ExclusiveLock(timed_mutex, 1min);
+                ASSERT_TRUE(ExclusiveLock.owns_lock());
+                const int val = (atom += 100);
+                tls_worker->sleep_for(25ms);
+                ASSERT_TRUE(atom == val);
+            };
 
-        auto f2 = [&] {
-            std::unique_lock<Timed_mutex> MainUnique(timed_mutex);
-            tls_worker->sleep_for(50ms);
+            auto f2 = [&] {
+                std::unique_lock<Timed_mutex> MainUnique(timed_mutex);
+                tls_worker->sleep_for(50ms);
 
-            ++atom;
-            while (atom < 0) {
-            }
+                ++atom;
+                while (atom < 0) {
+                }
 
-            tls_worker->sleep_for(50ms);
-            MainUnique.unlock();
-        };
+                tls_worker->sleep_for(50ms);
+                MainUnique.unlock();
+            };
 
-        task_manager.execute_tasks<false>(f, f, f, f2);
-        ASSERT_TRUE(atom == 300);
-    }
+            task_manager->execute_tasks<false>(f, f, f, f2);
+            ASSERT_TRUE(atom == 300);
+        }
+    };
+
+    init_ums(test);
 }
 
 TEST(Recursive_timed_mutex, mutex_sanity_test_1)
 {
-    Recursive_timed_mutex mutex;
-    int counter = 0;
+    auto test = [] {
+        Recursive_timed_mutex mutex;
+        int counter = 0;
 
-    auto f = [&] {
-        mutex.lock();
-        ++counter;
-        mutex.unlock();
+        auto f = [&] {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        };
+
+        task_manager->execute_tasks<false>(f, f);
+        ASSERT_TRUE(counter == 2);
     };
 
-    task_manager.execute_tasks<false>(f, f);
-    ASSERT_TRUE(counter == 2);
+    init_ums(test);
 }
 
 TEST(Recursive_timed_mutex, mutex_sanity_test_2)
 {
-    Recursive_timed_mutex mutex;
-    int counter = 0;
-    int iterations = 100000;
+    auto test = [] {
+        Recursive_timed_mutex mutex;
+        int counter = 0;
+        int iterations = 100000;
 
-    // Test 2: Mutex Contention Test
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            mutex.lock();
-            ++counter;
-            mutex.unlock();
-        }
+        // Test 2: Mutex Contention Test
+        auto f = [&] {
+            for (int i = 0; i < iterations; ++i) {
+                mutex.lock();
+                ++counter;
+                mutex.unlock();
+            }
+        };
+
+        task_manager->execute_tasks<false>(f, f, f, f);
+        ASSERT_TRUE(counter == 4 * iterations);
     };
 
-    task_manager.execute_tasks<false>(f, f, f, f);
-    ASSERT_TRUE(counter == 4 * iterations);
+    init_ums(test);
 }
 
 TEST(Recursive_timed_mutex, mutex_sanity_test_3)
 {
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         Recursive_timed_mutex mutex;
 
         mutex.lock();
@@ -1511,14 +1613,16 @@ TEST(Recursive_timed_mutex, mutex_sanity_test_3)
         mutex.unlock();
 
         ASSERT_TRUE(true);
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Recursive_timed_mutex, mutex_sanity_test_4)
 {
     GTEST_SKIP() << "Skipping test since it lasts long, especially for debug build.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         try {
             Recursive_timed_mutex mutex;
 
@@ -1529,61 +1633,73 @@ TEST(Recursive_timed_mutex, mutex_sanity_test_4)
             ASSERT_TRUE(ex.code() ==
                         std::make_error_code(std::errc::resource_unavailable_try_again));
         }
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Recursive_timed_mutex, recursive_timed_mutex_test_fixture)
 {
-    if (schedulers.workers_count() < 3)
-        GTEST_SKIP() << "At least 3 workers needed for this test.";
+    // if (schedulers->workers_count() < 3)
+    //     GTEST_SKIP() << "At least 3 workers needed for this test.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         mutex_test_fixture<Recursive_timed_mutex> fixture;
         fixture.test_lockable();
         fixture.test_timed_lockable();
         fixture.test_recursive_lockable();
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Shared_timed_mutex, mutex_sanity_test_1)
 {
-    Shared_timed_mutex mutex;
-    int counter = 0;
+    auto test = [] {
+        Shared_timed_mutex mutex;
+        int counter = 0;
 
-    auto f = [&] {
-        mutex.lock();
-        ++counter;
-        mutex.unlock();
+        auto f = [&] {
+            mutex.lock();
+            ++counter;
+            mutex.unlock();
+        };
+
+        task_manager->execute_tasks<false>(f, f);
+        ASSERT_TRUE(counter == 2);
     };
 
-    task_manager.execute_tasks<false>(f, f);
-    ASSERT_TRUE(counter == 2);
+    init_ums(test);
 }
 
 TEST(Shared_timed_mutex, mutex_sanity_test_2)
 {
-    Shared_timed_mutex mutex;
-    int counter = 0;
-    int iterations = 100000;
+    auto test = [] {
+        Shared_timed_mutex mutex;
+        int counter = 0;
+        int iterations = 100000;
 
-    // Test 2: Mutex Contention Test
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            mutex.lock();
-            ++counter;
-            mutex.unlock();
-        }
+        // Test 2: Mutex Contention Test
+        auto f = [&] {
+            for (int i = 0; i < iterations; ++i) {
+                mutex.lock();
+                ++counter;
+                mutex.unlock();
+            }
+        };
+
+        task_manager->execute_tasks<false>(f, f, f, f);
+        ASSERT_TRUE(counter == 4 * iterations);
     };
 
-    task_manager.execute_tasks<false>(f, f, f, f);
-    ASSERT_TRUE(counter == 4 * iterations);
+    init_ums(test);
 }
 
 TEST(Shared_timed_mutex, mutex_sanity_test_3)
 {
     GTEST_SKIP() << "Skipping test. Not implement throwing for deadlock on shared timed mutex.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         try {
             Shared_timed_mutex mutex;
 
@@ -1595,88 +1711,100 @@ TEST(Shared_timed_mutex, mutex_sanity_test_3)
             ASSERT_TRUE(ex.code() ==
                         std::make_error_code(std::errc::resource_deadlock_would_occur));
         }
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Shared_timed_mutex, sanity_test_4)
 {
-    std::condition_variable_any cv;
-    Shared_timed_mutex mut;
-    std::vector<int> vec = {5};
+    auto test = [] {
+        std::condition_variable_any cv;
+        Shared_timed_mutex mut;
+        std::vector<int> vec = {5};
 
-    auto odd = [&] {
-        std::unique_lock<Shared_timed_mutex> lk{mut};
+        auto odd = [&] {
+            std::unique_lock<Shared_timed_mutex> lk{mut};
 
-        while (vec.size() < 6) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 1);
-            cv.notify_one();
-        }
+            while (vec.size() < 6) {
+                cv.wait(lk, [&vec] { return vec.size() % 2 == 1; });
+                const int n = vec.back();
+                vec.push_back(n * 10 + 1);
+                cv.notify_one();
+            }
+        };
+
+        auto even = [&] {
+            std::unique_lock<Shared_timed_mutex> lk{mut};
+
+            while (vec.size() < 7) {
+                cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
+                const int n = vec.back();
+                vec.push_back(n * 10 + 2);
+                cv.notify_one();
+            }
+        };
+
+        task_manager->execute_tasks<false>(odd, even);
+
+        const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
+        ASSERT_TRUE(vec == expected_val);
     };
 
-    auto even = [&] {
-        std::unique_lock<Shared_timed_mutex> lk{mut};
-
-        while (vec.size() < 7) {
-            cv.wait(lk, [&vec] { return vec.size() % 2 == 0; });
-            const int n = vec.back();
-            vec.push_back(n * 10 + 2);
-            cv.notify_one();
-        }
-    };
-
-    task_manager.execute_tasks<false>(odd, even);
-
-    const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
-    ASSERT_TRUE(vec == expected_val);
+    init_ums(test);
 }
 
 TEST(Shared_timed_mutex, shared_timed_mutex_test_fixture)
 {
-    if (schedulers.workers_count() < 3)
-        GTEST_SKIP() << "At least 3 workers needed for this test.";
+    // if (schedulers->workers_count() < 3)
+    //     GTEST_SKIP() << "At least 3 workers needed for this test.";
 
-    task_manager.execute_task<false>([] {
+    auto test = [] {
         mutex_test_fixture<Shared_timed_mutex> fixture;
         fixture.test_lockable();
         fixture.test_timed_lockable();
-    });
+    };
+
+    init_ums(test);
 }
 
 TEST(Shared_timed_mutex, complex_tests_1)
 {
-    test_one_writer<Shared_timed_mutex>();
-    test_multiple_readers<Shared_timed_mutex>();
-    test_writer_blocking_readers<Shared_timed_mutex>();
-    test_readers_blocking_writer<Shared_timed_mutex>();
-    test_try_lock_and_try_lock_shared<Shared_timed_mutex>();
+    auto test = [] {
+        test_one_writer<Shared_timed_mutex>();
+        test_multiple_readers<Shared_timed_mutex>();
+        test_writer_blocking_readers<Shared_timed_mutex>();
+        test_readers_blocking_writer<Shared_timed_mutex>();
+        test_try_lock_and_try_lock_shared<Shared_timed_mutex>();
+    };
+
+    init_ums(test);
 }
 
 TEST(Shared_timed_mutex, complex_tests_2)
 {
-    test_timed_behavior();
+    init_ums(test_timed_behavior);
 }
 
 TEST(STL_Mutex, nonmember_lock_test)
 {
-    if (schedulers.workers_count() < 3)
-        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+    // if (schedulers->workers_count() < 3)
+    //     GTEST_SKIP() << "At least 3 CPUs needed for this test.";
 
-    task_manager.execute_task<false>([] { test_nonmember_lock(); });
+    init_ums(test_nonmember_lock);
 }
 
 TEST(STL_Mutex, nonmember_try_lock_test)
 {
-    if (schedulers.workers_count() < 3)
-        GTEST_SKIP() << "At least 3 CPUs needed for this test.";
+    // if (schedulers->workers_count() < 3)
+    //     GTEST_SKIP() << "At least 3 CPUs needed for this test.";
 
-    task_manager.execute_task<false>([] { test_nonmember_try_lock(); });
+    init_ums(test_nonmember_try_lock);
 }
 
 TEST(STL_Mutex, test_vso_1253916)
 {
-    task_manager.execute_task<false>([] { test_vso_1253916(); });
+    init_ums(test_vso_1253916);
 }
 
 // More mutex tests:

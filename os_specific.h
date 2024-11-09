@@ -8,6 +8,8 @@
 class IO_Request;
 struct IO_Control;
 
+namespace os {
+
 // CPU and thread related functions.
 //
 uint32_t cpus_count() noexcept; // maybe just std::thread::hardware_concurrency?
@@ -21,5 +23,7 @@ void read_file(IO_Request& io) noexcept;
 void write_file(IO_Request& io) noexcept;
 bool io_completed(IO_Control& io_control) noexcept;
 void update_io_state(IO_Request& io) noexcept;
+
+} // namespace os
 
 #endif // OS_SPECIFIC_H

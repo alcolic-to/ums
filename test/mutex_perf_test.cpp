@@ -8,10 +8,10 @@
 #include "condition_variable.h"
 #include "gtest/gtest.h"
 #include "mutex.h"
-#include "task_manager.h"
+#include "ums.h"
 #include "util.h"
 
-// #define RUN_PERF_TESTS
+#define RUN_PERF_TESTS
 #ifdef RUN_PERF_TESTS
 
 template<class Lockable>
@@ -62,36 +62,44 @@ TEST(Mutex, mutex_vs_spinlock_perf_test_1)
 
 TEST(Mutex, mutex_peft_test_1)
 {
-    Mutex mutex;
-    int counter = 0;
-    int iterations = 100000000;
+    auto test = [] {
+        Mutex mutex;
+        int counter = 0;
+        int iterations = 100000000;
 
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            std::scoped_lock<Mutex> lock{mutex};
-            ++counter;
-        }
+        auto f = [&] {
+            for (int i = 0; i < iterations; ++i) {
+                std::scoped_lock<Mutex> lock{mutex};
+                ++counter;
+            }
+        };
+
+        task_manager->execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
+        ASSERT_TRUE(counter == 16 * iterations);
     };
 
-    task_manager.execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
-    ASSERT_TRUE(counter == 16 * iterations);
+    init_ums(test);
 }
 
 TEST(Mutex, spinlock_peft_test_1)
 {
-    Spinlock mutex;
-    int counter = 0;
-    int iterations = 100000000;
+    auto test = [] {
+        Spinlock mutex;
+        int counter = 0;
+        int iterations = 100000000;
 
-    auto f = [&] {
-        for (int i = 0; i < iterations; ++i) {
-            std::scoped_lock<Spinlock> lock{mutex};
-            ++counter;
-        }
+        auto f = [&] {
+            for (int i = 0; i < iterations; ++i) {
+                std::scoped_lock<Spinlock> lock{mutex};
+                ++counter;
+            }
+        };
+
+        task_manager->execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
+        ASSERT_TRUE(counter == 16 * iterations);
     };
 
-    task_manager.execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
-    ASSERT_TRUE(counter == 16 * iterations);
+    init_ums(test);
 }
 
 TEST(Mutex, std_mutex_peft_test_1)
@@ -122,34 +130,42 @@ TEST(Mutex, std_mutex_peft_test_1)
 
 TEST(Mutex, mutex_peft_test_2)
 {
-    Mutex mutex;
-    int counter = 0;
-    int iterations = 100000000;
+    auto test = [] {
+        Mutex mutex;
+        int counter = 0;
+        int iterations = 100000000;
 
-    auto f = [&] {
-        std::scoped_lock<Mutex> lock{mutex};
-        for (int i = 0; i < iterations; ++i)
-            ++counter;
+        auto f = [&] {
+            std::scoped_lock<Mutex> lock{mutex};
+            for (int i = 0; i < iterations; ++i)
+                ++counter;
+        };
+
+        task_manager->execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
+        ASSERT_TRUE(counter == 16 * iterations);
     };
 
-    task_manager.execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
-    ASSERT_TRUE(counter == 16 * iterations);
+    init_ums(test);
 }
 
 TEST(Mutex, spinlock_peft_test_2)
 {
-    Spinlock mutex;
-    int counter = 0;
-    int iterations = 100000000;
+    auto test = [] {
+        Spinlock mutex;
+        int counter = 0;
+        int iterations = 100000000;
 
-    auto f = [&] {
-        std::scoped_lock<Spinlock> lock{mutex};
-        for (int i = 0; i < iterations; ++i)
-            ++counter;
+        auto f = [&] {
+            std::scoped_lock<Spinlock> lock{mutex};
+            for (int i = 0; i < iterations; ++i)
+                ++counter;
+        };
+
+        task_manager->execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
+        ASSERT_TRUE(counter == 16 * iterations);
     };
 
-    task_manager.execute_tasks<false>(f, f, f, f, f, f, f, f, f, f, f, f, f, f, f, f);
-    ASSERT_TRUE(counter == 16 * iterations);
+    init_ums(test);
 }
 
 TEST(Mutex, std_mutex_peft_test_2)

@@ -1,9 +1,7 @@
-
-
 #include <chrono>
 #include <gtest/gtest.h>
 
-#include "task_manager.h"
+#include "ums.h"
 #include "util.h"
 #include "worker.h"
 
@@ -13,15 +11,19 @@ using namespace std::chrono_literals;
 
 void sleep_test(const uint32_t iterations, const auto sleep_time)
 {
-    auto start = now();
+    auto test = [&] {
+        auto start = now();
 
-    for (uint32_t i = 0; i < iterations; ++i)
-        task_manager.execute_task<false>([&] { tls_worker->sleep_for(sleep_time); });
+        for (uint32_t i = 0; i < iterations; ++i)
+            task_manager->execute_task<false>([&] { tls_worker->sleep_for(sleep_time); });
 
-    auto duration = now() - start;
-    auto expected_duration = iterations * sleep_time;
+        auto duration = now() - start;
+        auto expected_duration = iterations * sleep_time;
 
-    ASSERT_LE(std::chrono::abs(expected_duration - duration), 20ms);
+        ASSERT_LE(std::chrono::abs(expected_duration - duration), 20ms);
+    };
+
+    init_ums(test);
 }
 
 TEST(Sleep, SimpleSleepTest)

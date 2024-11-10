@@ -6,6 +6,8 @@
 
 #include "io_api.h"
 
+namespace os {
+
 // OS specific preprocessor definitions.
 //
 #if defined _WIN32
@@ -303,3 +305,5 @@ void update_io_state(IO_Request& io) noexcept
 #else
 static_assert(!"Unknown OS.");
 #endif
+
+} // namespace os

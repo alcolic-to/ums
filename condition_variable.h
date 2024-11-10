@@ -9,8 +9,8 @@
 
 #include "spinlock.h"
 #include "util.h"
-#include "worker.h"
 
+class Worker;
 class Mutex;
 
 class Condition_variable {

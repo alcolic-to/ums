@@ -15,7 +15,6 @@
 #include "task_manager.h"
 #include "worker.h" // This can be moved and class Worker can be forward declared if we dispose Worker::State.
 
-
 using Cpu_Mask = std::bitset<CFG_max_cpu_count>;
 
 class CPU final {
@@ -28,15 +27,16 @@ public:
 
 // Synchronization context for scheduler.
 //
-enum class SyncCtx : int { main, yield, wait_cond_or_sleep, io };
+enum class Sync_context : int { main, yield, wait_cond_or_sleep, io };
 
 class Scheduler final {
+    friend class Schedulers;
     friend class Worker;
 
 public:
-    enum class State : int { initializing, running, idle, exiting };
+    enum class State : int { initializing, running, idle_wait, idle_sleep, exiting };
 
-    explicit Scheduler(uint64_t cpu_id);
+    explicit Scheduler(Schedulers& schedulers, uint64_t cpu_id);
     ~Scheduler() noexcept;
 
     Scheduler(const Scheduler&) = delete;
@@ -73,14 +73,14 @@ public:
 
     void schedule();
 
-    void idle_sleep() noexcept;
-    void notify() noexcept;
+    void sleep() noexcept;
+    void notify();
 
     [[nodiscard]] bool initializing() const noexcept { return m_state == State::initializing; }
 
     [[nodiscard]] bool running() const noexcept { return m_state == State::running; }
 
-    [[nodiscard]] bool idle() const noexcept { return m_state == State::idle; }
+    [[nodiscard]] bool idle() const noexcept { return m_state == State::idle_sleep; }
 
     [[nodiscard]] bool exiting() const noexcept { return m_state == State::exiting; }
 
@@ -95,15 +95,14 @@ public:
 
     void context_switch(Worker* prev_worker);
 
-    template<SyncCtx ctx>
+    template<Sync_context ctx>
     void save_worker(Worker* worker);
 
     bool sync_init(Worker* worker);
 
-    template<SyncCtx ctx>
+    template<Sync_context ctx>
     void sync(Worker* worker);
 
-    void exit_workers();
     void exit();
 
     [[nodiscard]] uint32_t workers_count() const noexcept { return m_workers.size(); }
@@ -159,6 +158,10 @@ public:
     };
 
 private:
+    void wait(std::unique_lock<std::mutex>& lock, Time_point abs_time = Time_point::max());
+    void notify(const std::unique_lock<std::mutex>& lock) noexcept;
+
+    Schedulers& m_schedulers;
     CPU m_cpu;
     Worker* m_worker{nullptr};
     std::deque<Worker*> m_runnable_queue;
@@ -171,6 +174,7 @@ private:
     std::condition_variable m_cv;
     Tasks m_tasks;
     State m_state{State::initializing};
+    bool m_running{true}; // Flag used for spurious wakeup check.
     bool m_workers_started{false};
     uint64_t m_load{0};
     std::atomic<bool> m_exit{false};
@@ -188,13 +192,18 @@ public:
     [[nodiscard]] uint32_t workers_count() const noexcept;
     [[nodiscard]] uint32_t cpus_count() const noexcept;
 
+    bool all_idle() noexcept;
+    void signal_idle() noexcept;
+    void signal_running() noexcept;
+    void wait_exit();
+
 private:
     uint32_t m_system_cpus_count;
     Cpu_Mask m_avail_cpus_mask;
+    std::mutex m_mtx;
+    std::condition_variable m_cv;
+    std::atomic<uint32_t> m_idle_schedulers{0};
     std::vector<std::unique_ptr<Scheduler>> m_schedulers;
 };
-
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-extern Schedulers schedulers;
 
 #endif // COS_SCHEDULER_H

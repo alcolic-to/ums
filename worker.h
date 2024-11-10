@@ -55,8 +55,8 @@ public:
 
     void set_state(State state) noexcept;
 
-    void notify(std::unique_lock<std::mutex>& lock) noexcept;
     void wait(std::unique_lock<std::mutex>& lock);
+    void notify(const std::unique_lock<std::mutex>& lock) noexcept;
 
     [[nodiscard]] constexpr uint64_t id() const noexcept { return m_id; }
 
@@ -138,7 +138,6 @@ private:
     std::thread m_thread;
 };
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-extern thread_local Worker* tls_worker;
+extern thread_local Worker* tls_worker; // NOLINT
 
 #endif // COS_WORKER_H

@@ -1,12 +1,12 @@
 // NOLINTBEGIN
 
+#include <gtest/gtest.h>
 #include <iostream>
 #include <mutex>
 #include <thread>
 #include <vector>
 
 #include "condition_variable.h"
-#include "gtest/gtest.h"
 #include "mutex.h"
 #include "ums.h"
 #include "util.h"
@@ -191,6 +191,6 @@ TEST(Mutex, std_mutex_peft_test_2)
     ASSERT_TRUE(counter == 16 * iterations);
 }
 
-#endif
+#endif // RUN_PERF_TESTS
 
 // NOLINTEND

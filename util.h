@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <type_traits>
 #include <utility>
@@ -87,5 +88,8 @@ private:
 //
 template<typename T = uint64_t>
 T random() noexcept;
+
+std::string file_to_string(const std::string& path);
+std::vector<char> file_to_vector(const std::string& path);
 
 #endif // COS_UTIL_H

@@ -1,6 +1,11 @@
 #include "util.h"
 
 #include <cstdint>
+#include <fstream>
+#include <ios>
+#include <iterator>
+#include <string>
+#include <vector>
 
 class PRNG {
 public:
@@ -35,3 +40,15 @@ template uint8_t random<uint8_t>() noexcept;
 template uint16_t random<uint16_t>() noexcept;
 template uint32_t random<uint32_t>() noexcept;
 template uint64_t random<uint64_t>() noexcept;
+
+std::string file_to_string(const std::string& path)
+{
+    std::ifstream f{path, std::ios_base::binary};
+    return std::string{std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
+}
+
+std::vector<char> file_to_vector(const std::string& path)
+{
+    std::ifstream f{path, std::ios_base::binary};
+    return std::vector<char>{std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
+}

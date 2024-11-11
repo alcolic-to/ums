@@ -1,6 +1,7 @@
 // NOLINTBEGIN
 
 #include <atomic>
+#include <gtest/gtest.h>
 #include <iostream>
 #include <mutex>
 #include <shared_mutex>
@@ -8,12 +9,12 @@
 #include <vector>
 
 #include "condition_variable.h"
-#include "gtest/gtest.h"
 #include "mutex.h"
 #include "scheduler.h"
 #include "shared_mutex.h"
 #include "ums.h"
 #include "util.h"
+
 
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 

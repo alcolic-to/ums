@@ -1,0 +1,400 @@
+// NOLINTBEGIN
+
+#include <algorithm>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <gtest/gtest.h>
+#include <vector>
+
+#include "io_api.h"
+#include "ums.h"
+#include "util.h"
+
+using namespace std::chrono_literals;
+namespace fs = std::filesystem;
+
+#if defined _WIN32
+
+#include <windows.h>
+#undef min
+#undef max
+
+constexpr auto file_access = GENERIC_READ | GENERIC_WRITE;
+constexpr auto file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS |
+                                 FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING |
+                                 FILE_FLAG_WRITE_THROUGH;
+
+class File_handle {
+public:
+    File_handle(const fs::path& file_path)
+        : m_file_path{file_path}
+        , m_handle{CreateFile(file_path.string().c_str(), file_access, 0, 0, OPEN_ALWAYS,
+                              file_attributes, 0)}
+    {
+        if (m_handle == INVALID_HANDLE_VALUE) {
+            std::string error{std::format("Create file failed with error: {}", GetLastError())};
+            std::cout << error << "\n";
+            throw std::exception{error.c_str()};
+        }
+    }
+
+    ~File_handle() { CloseHandle(m_handle); }
+
+    operator void*() { return m_handle; }
+
+    const fs::path& path() const noexcept { return m_file_path; }
+
+    void* handle() const noexcept { return m_handle; }
+
+private:
+    const fs::path m_file_path;
+    void* m_handle;
+};
+
+void test_write_read_file(uint64_t io_size)
+{
+    const fs::path file_path{"io_file"};
+
+    std::vector<char> io_data(io_size, 'a');
+
+    {
+        File_handle file{file_path};
+        cos_write_file(file, {io_data.data(), io_data.size()}, 0);
+
+        std::vector<char> read_vec(io_size);
+        cos_read_file(file, {read_vec.data(), read_vec.size()}, 0);
+
+        ASSERT_TRUE(io_data == read_vec);
+    }
+
+    fs::remove(file_path);
+}
+
+void seq_writes_and_reads(uint64_t io_size, uint32_t iterations, bool forward = true)
+{
+    const fs::path file_path{"io_file"};
+    std::vector<std::vector<char>> io_data(iterations, std::vector<char>(io_size));
+
+    {
+        File_handle file{file_path};
+
+        for (uint32_t i = 0; i < iterations; ++i) {
+            std::ranges::fill(io_data[i], char('a' + i));
+            uint64_t offset = io_size * (forward ? i : (iterations - 1 - i));
+            cos_write_file(file, {io_data[i].data(), io_data[i].size()}, offset);
+        }
+
+        for (uint32_t i = 0; i < iterations; ++i) {
+            std::vector<char> read_vec(io_size);
+            uint64_t offset = io_size * (forward ? i : (iterations - 1 - i));
+            cos_read_file(file, {read_vec.data(), read_vec.size()}, offset);
+            ASSERT_TRUE(io_data[i] == read_vec);
+        }
+    }
+
+    fs::remove(file_path);
+}
+
+void random_writes_and_reads(uint64_t io_size, uint32_t iterations)
+{
+    const fs::path file_path{"io_file"};
+    std::vector<std::vector<char>> io_data(iterations, std::vector<char>(io_size));
+
+    std::vector<uint32_t> v_rand(iterations);
+    std::generate(v_rand.begin(), v_rand.end(), [&] { return random() % iterations; });
+
+    {
+        File_handle file{file_path};
+
+        for (uint32_t i = 0; i < iterations; ++i) {
+            uint32_t idx = v_rand[i];
+            std::vector<char>& io_v = io_data[idx];
+            std::ranges::fill(io_v, char('a' + idx));
+            cos_write_file(file, {io_v.data(), io_v.size()}, io_size * idx);
+        }
+
+        for (uint32_t i = 0; i < iterations; ++i) {
+            uint32_t idx = v_rand[i];
+            std::vector<char> read_vec(io_size);
+            cos_read_file(file, {read_vec.data(), read_vec.size()}, io_size * idx);
+            ASSERT_TRUE(io_data[idx] == read_vec);
+        }
+    }
+
+    fs::remove(file_path);
+}
+
+// Writes/reads total_bytes bytes at the offset by issuing I/O requests with io_size.
+//
+void multiple_ios(File_handle& file, bool write, uint64_t total_bytes, uint64_t io_size,
+                  uint64_t offset = 0)
+{
+    for (uint64_t idx = 0; total_bytes > 0; ++idx, total_bytes -= io_size) {
+        std::vector<char> io_v(io_size, 'a');
+        if (write)
+            cos_write_file(file, {io_v.data(), io_v.size()}, offset + idx * io_size);
+        else
+            cos_read_file(file, {io_v.data(), io_v.size()}, offset + idx * io_size);
+    }
+}
+
+// Creates file and calls multiple_ios.
+//
+void multiple_ios(bool write, uint64_t total_bytes, int64_t io_size, uint64_t offset = 0)
+{
+    const fs::path file_path{"io_file"};
+
+    {
+        File_handle file{file_path};
+        multiple_ios(file, write, total_bytes, io_size, offset);
+    }
+
+    fs::remove(file_path);
+}
+
+TEST(IO, sanity_test)
+{
+    const fs::path file_path{"io_file"};
+    std::string text{"Let's assure that I/O is working on a machine."};
+
+    {
+        std::ofstream f1{file_path};
+        f1 << text;
+    }
+
+    std::string str_file{file_to_string(file_path.string())};
+
+    ASSERT_TRUE(text == str_file);
+
+    fs::remove(file_path);
+
+    std::vector<char> data(100, 'a');
+
+    {
+        std::ofstream f2{file_path};
+        f2.write(data.data(), data.size());
+    }
+
+    std::vector<char> vec_file{file_to_vector(file_path.string())};
+
+    ASSERT_TRUE(data == vec_file);
+
+    fs::remove(file_path);
+}
+
+TEST(IO, sanity_write_test)
+{
+    auto test = [] {
+        constexpr uint64_t io_size = 1 * 1024;
+        const fs::path file_path{"io_file"};
+
+        std::vector<char> io_data(io_size, 'a');
+
+        {
+            File_handle file{file_path};
+            cos_write_file(file, {io_data.data(), io_data.size()}, 0);
+        }
+
+        auto vec{file_to_vector(file_path.string())};
+
+        ASSERT_TRUE(vec == io_data);
+
+        fs::remove(file_path);
+    };
+
+    init_ums(test);
+}
+
+TEST(IO, sanity_read_test)
+{
+    auto test = [] {
+        constexpr uint64_t io_size = 1 * 1024;
+        const fs::path file_path{"io_file"};
+
+        std::vector<char> io_data(io_size, 'a');
+
+        {
+            std::ofstream f{file_path};
+            f.write(io_data.data(), io_data.size());
+        }
+
+        std::vector<char> read_vec(io_size);
+
+        {
+            File_handle file{file_path};
+            cos_read_file(file, {read_vec.data(), read_vec.size()}, 0);
+        }
+
+        ASSERT_TRUE(io_data == read_vec);
+
+        fs::remove(file_path);
+    };
+
+    init_ums(test);
+}
+
+TEST(IO, sanity_write_read_test)
+{
+    auto test = [] {
+        constexpr uint64_t io_size = 1 * 1024;
+        const fs::path file_path{"io_file"};
+
+        std::vector<char> io_data(io_size, 'a');
+
+        {
+            File_handle file{file_path};
+            cos_write_file(file, {io_data.data(), io_data.size()}, 0);
+
+            std::vector<char> read_vec(io_size);
+            cos_read_file(file, {read_vec.data(), read_vec.size()}, 0);
+
+            ASSERT_TRUE(io_data == read_vec);
+        }
+
+        fs::remove(file_path);
+    };
+
+    init_ums(test);
+}
+
+TEST(IO, io_with_different_sizes)
+{
+    auto test = [] {
+        for (uint64_t io_size = 1024; io_size <= 10 * 1024 * 1024; io_size <<= 1U)
+            test_write_read_file(io_size);
+    };
+
+    init_ums(test);
+}
+
+TEST(IO, io_seq_writes_and_reads)
+{
+    auto test = [] {
+        for (uint32_t i = 1; i <= 10; ++i) {
+            for (uint32_t io_size = 512; io_size <= 1 * 1024 * 1024; io_size <<= 1U) {
+                seq_writes_and_reads(io_size, i, true);
+                seq_writes_and_reads(io_size, i, false);
+            }
+        }
+    };
+
+    init_ums(test);
+}
+
+TEST(IO, io_random_writes_and_reads)
+{
+    auto test = [] {
+        for (uint32_t i = 1; i <= 10; ++i)
+            for (uint32_t io_size = 512; io_size <= 1 * 1024 * 1024; io_size <<= 1U)
+                random_writes_and_reads(io_size, i);
+    };
+
+    init_ums(test);
+}
+
+#define RUN_BENCHMARK
+#ifdef RUN_BENCHMARK
+
+TEST(IO_benchmark, single_thread)
+{
+    auto test = [] {
+        constexpr uint64_t total_bytes = 128 * 1024 * 1024; // 100MB
+
+        for (uint64_t io_size = 512; io_size <= 1024 * 1024; io_size <<= 1U) {
+            Stopwatch s{std::format("Write benchmark. Size: Total bytes: {}MB, I/O size: {}KB",
+                                    total_bytes / 1024 / 1024, io_size / 1024)};
+            multiple_ios(true, total_bytes, io_size);
+        }
+
+        for (uint64_t io_size = 512; io_size <= 1024 * 1024; io_size <<= 1U) {
+            Stopwatch s{std::format("Read benchmark. Size: Total bytes: {}MB, I/O size: {}KB",
+                                    total_bytes / 1024 / 1024, io_size / 1024)};
+            multiple_ios(false, total_bytes, io_size);
+        }
+    };
+
+    init_ums(test);
+}
+
+TEST(IO_benchmark, multiple_threads)
+{
+    auto test = [] {
+        const fs::path file_path{"io_file"};
+
+        {
+            File_handle file{file_path};
+
+            constexpr uint64_t min_bytes = 10ULL * 1024 * 1024;       // 10MB
+            constexpr uint64_t max_bytes = 4ULL * 1024 * 1024 * 1024; // 4GB
+
+            // Write benchmark.
+            //
+            for (uint32_t threads = 2; threads <= 32; threads <<= 1U) {
+                for (uint64_t io_size = 512; io_size <= 1024 * 1024; io_size <<= 1U) {
+                    uint64_t total_bytes =
+                        std::clamp(io_size * threads * 1024, min_bytes, max_bytes);
+
+                    Stopwatch s{std::format("Write benchmark ({} thread(s)). Size: Total "
+                                            "bytes: {}MB, I/O size: {}KB",
+                                            threads, total_bytes / 1024 / 1024, io_size / 1024)};
+
+                    std::vector<std::shared_ptr<Task>> tasks;
+                    tasks.reserve(threads);
+
+                    for (uint32_t i = 0; i < threads; ++i) {
+                        auto task = task_manager->execute_task([&] {
+                            multiple_ios(file, true, total_bytes / threads, io_size,
+                                         i * (total_bytes / threads));
+                        });
+
+                        tasks.emplace_back(task);
+                    }
+
+                    for (auto& task : tasks)
+                        task->wait();
+                }
+            }
+
+            // Read benchmark.
+            //
+            for (uint32_t threads = 2; threads <= 32; threads <<= 1U) {
+                for (uint64_t io_size = 512; io_size <= 1024 * 1024; io_size <<= 1U) {
+                    uint64_t total_bytes =
+                        std::clamp(io_size * threads * 1024, min_bytes, max_bytes);
+
+                    Stopwatch s{std::format("Read benchmark ({} thread(s)). Size: Total "
+                                            "bytes: {}MB, I/O size: {}KB",
+                                            threads, total_bytes / 1024 / 1024, io_size / 1024)};
+
+                    std::vector<std::shared_ptr<Task>> tasks;
+                    tasks.reserve(threads);
+
+                    for (uint32_t i = 0; i < threads; ++i) {
+                        auto task = task_manager->execute_task([&] {
+                            multiple_ios(file, false, total_bytes / threads, io_size,
+                                         i * (total_bytes / threads));
+                        });
+
+                        tasks.emplace_back(task);
+                    }
+
+                    for (auto& task : tasks)
+                        task->wait();
+                }
+            }
+        }
+
+        fs::remove(file_path);
+    };
+
+    init_ums(test);
+}
+
+#endif // RUN_BENCHMARK
+
+#else
+
+#endif // _WIN32
+
+// NOLINTEND

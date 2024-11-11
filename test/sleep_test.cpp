@@ -26,7 +26,7 @@ void sleep_test(const uint32_t iterations, const auto sleep_time)
     init_ums(test);
 }
 
-TEST(Sleep, SimpleSleepTest)
+TEST(Sleep, sleep_test)
 {
     for (uint32_t i = 1; i <= 5; ++i)
         for (uint32_t sleep_ms = 1; sleep_ms <= 512; sleep_ms *= 2)

@@ -14,15 +14,14 @@ class Task {
 public:
     enum class State : int { not_started, running, done };
 
-    Task() noexcept;
-    explicit Task(const std::function<void()>& function) noexcept;
+    explicit Task(std::function<void()> function) noexcept : m_func{std::move(function)} {}
 
     void wait();
     void notify() noexcept;
     void operator()();
 
     std::function<void()> m_func;
-    State m_state;
+    State m_state{State::not_started};
     Mutex m_mtx;
     Condition_variable m_cv;
 };
@@ -41,36 +40,41 @@ public:
     void enque_task(const std::shared_ptr<Task>& task);
 
     template<bool async = true>
-    void execute_task(const std::function<void()>& func);
+    std::shared_ptr<Task> execute_task(std::function<void()> func);
 
+    // Don't look at code below to prevent brain damage...
+    //
     template<bool async, typename Fn, typename... Fns>
-    void execute_tasks_helper(auto& tasks, Fn fn, Fns... fns)
+    void execute_tasks_helper(auto& tasks, Fn&& fn, Fns&&... fns)
     {
-        std::shared_ptr<Task> task = std::make_shared<Task>(fn);
+        std::shared_ptr<Task> task{std::make_shared<Task>(std::forward<Fn>(fn))};
         enque_task(task);
         tasks.push_back(std::move(task));
 
-        this->execute_tasks_helper<async>(tasks, fns...);
+        this->execute_tasks_helper<async>(tasks, std::forward<Fns>(fns)...);
     }
 
     template<bool async>
-    constexpr void execute_tasks_helper(auto& tasks)
+    void execute_tasks_helper(auto& tasks)
     {
     }
 
     template<bool async = true, typename... Fns>
-    constexpr void execute_tasks(Fns... fns)
+    std::vector<std::shared_ptr<Task>> execute_tasks(Fns&&... fns)
     {
         std::vector<std::shared_ptr<Task>> tasks;
         tasks.reserve(sizeof...(Fns));
 
-        this->execute_tasks_helper<async>(tasks, fns...);
+        this->execute_tasks_helper<async>(tasks, std::forward<Fns>(fns)...);
 
         if constexpr (!async)
             for (auto&& task : tasks)
                 task->wait();
+
+        return tasks;
     }
 
+private:
     const Schedulers& m_schedulers;
 };
 

@@ -3,17 +3,10 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <utility>
 
 #include "mutex.h"
 #include "scheduler.h"
-
-Task::Task() noexcept : m_state{State::not_started} {}
-
-Task::Task(const std::function<void()>& function) noexcept
-    : m_func{function}
-    , m_state{State::not_started}
-{
-}
 
 void Task::wait()
 {
@@ -23,8 +16,11 @@ void Task::wait()
 
 void Task::notify() noexcept
 {
-    const std::unique_lock<Mutex> lock{m_mtx};
-    m_state = State::done;
+    {
+        const std::unique_lock<Mutex> lock{m_mtx};
+        m_state = State::done;
+    }
+
     m_cv.notify_one();
 }
 
@@ -42,15 +38,17 @@ void Task_manager::enque_task(const std::shared_ptr<Task>& task)
 }
 
 template<bool async>
-void Task_manager::execute_task(const std::function<void()>& func)
+std::shared_ptr<Task> Task_manager::execute_task(std::function<void()> func)
 {
-    const std::shared_ptr<Task> task = std::make_shared<Task>(func);
+    const std::shared_ptr<Task> task{std::make_shared<Task>(std::move(func))};
 
     enque_task(task);
 
     if constexpr (!async)
         task->wait();
+
+    return task;
 }
 
-template void Task_manager::execute_task<true>(const std::function<void()>& func);
-template void Task_manager::execute_task<false>(const std::function<void()>& func);
+template std::shared_ptr<Task> Task_manager::execute_task<true>(std::function<void()> func);
+template std::shared_ptr<Task> Task_manager::execute_task<false>(std::function<void()> func);

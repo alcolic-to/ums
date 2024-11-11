@@ -71,9 +71,6 @@ uint64_t f3()
         uint64_t sum = first + second;
         first = second;
         second = sum;
-
-        // if (i % 10000 == 0)
-        //     tls_worker->wait_event(e);
     }
 
     return second;
@@ -97,9 +94,6 @@ uint64_t f4()
         uint64_t sum = first + second;
         first = second;
         second = sum;
-
-        // if (i % 10000 == 0)
-        //     tls_worker->wait_event(e);
     }
 
     return second;
@@ -107,22 +101,10 @@ uint64_t f4()
 
 void ms3_function()
 {
-    auto start = now();
+    Stopwatch s;
 
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < 1000; ++i)
         task_manager->execute_task<true>(f4);
-        // std::cout << GetCurrentProcessorNumber() << "\n";
-        // r += f4();
-    }
-
-    auto end = now();
-
-    std::chrono::duration<double, std::milli> duration = end - start;
-    std::cout << "Total exec time: " << duration.count() << "ms.\n";
-
-    // std::this_thread::sleep_for(10s);
-
-    // std::cout << r << "\n";
 }
 
 #if defined _WIN32
@@ -131,6 +113,11 @@ HANDLE file = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, N
                          FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS | FILE_FLAG_OVERLAPPED |
                              FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH,
                          NULL);
+#else
+
+void* file = nullptr;
+
+#endif
 
 void single_read()
 {
@@ -175,37 +162,20 @@ void write_to_file()
                    (random() % max_file_size) * io_str.size());
 }
 
-void f122()
-{
-    std::cout << "f122\n";
-}
-
 // int ums_main(int argc, char* argv[])
 void ums_main()
 {
-    Stopwatch<std::chrono::microseconds> s{"Stopwatch"};
+    Stopwatch<std::chrono::microseconds> s;
 
-    // task_manager->execute_task<true>(ms3_function);
-
-    for (int i = 0; i < 1000; ++i)
-        task_manager->execute_task<true>(f4);
+    for (int i = 0; i < 1000; ++i) {
+        auto task{task_manager->execute_task<true>(f4)};
+        task->wait();
+    }
 }
 
 int main(int argc, char* argv[])
 {
     init_ums(ums_main);
 }
-
-#else
-
-int main(int argc, char* argv[])
-{
-    Stopwatch sw("Sleep test");
-
-    for (std::size_t i = 0; i < 10; ++i)
-        task_manager->execute_task<false>(sleep_test);
-}
-
-#endif
 
 // NOLINTEND

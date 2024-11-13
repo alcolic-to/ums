@@ -1,34 +1,17 @@
 // NOLINTBEGIN
 
-#include <atomic>
-#include <barrier>
 #include <chrono>
-#include <condition_variable>
 #include <cstdint>
-#include <future>
 #include <iostream>
-#include <latch>
 #include <memory>
-#include <mutex>
-#include <shared_mutex>
-#include <thread>
 #include <vector>
 
-#ifdef _WIN32
-#include <windows.h>
-#undef min
-#undef max
-#endif
-
 #include "condition_variable.h"
-#include "io_api.h"
-#include "mutex.h"
-#include "shared_mutex.h"
-#include "spinlock.h"
 #include "task_manager.h"
 #include "ums.h"
 #include "util.h"
 #include "worker.h"
+
 
 using namespace std::chrono_literals;
 
@@ -105,61 +88,6 @@ void ms3_function()
 
     for (int i = 0; i < 1000; ++i)
         task_manager->execute_task<true>(f4);
-}
-
-#if defined _WIN32
-
-HANDLE file = CreateFile("io_testing_file_0", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
-                         FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS | FILE_FLAG_OVERLAPPED |
-                             FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH,
-                         NULL);
-#else
-
-void* file = nullptr;
-
-#endif
-
-void single_read()
-{
-    constexpr int read_size = 8 * 1024;
-
-    auto buf = std::make_unique<char[]>(read_size);
-
-    cos_read_file(file, IO_Buffer{buf.get(), read_size}, 0);
-    std::cout << "Read buffer: " << buf.get() << "\n";
-}
-
-void single_write()
-{
-    int write_size = 8 * 1024;
-
-    std::string io_str(write_size, 'a');
-
-    cos_write_file(file, {io_str.data(), io_str.size()}, 0);
-}
-
-void read_from_file()
-{
-    constexpr int read_size = 8 * 1024;
-
-    auto buf = std::make_unique<char[]>(read_size);
-
-    cos_read_file(file, {buf.get(), read_size}, (random() % read_size) * read_size);
-    // std::cout << "Read buffer: " << buf.get() << "\n";
-}
-
-void write_to_file()
-{
-    int write_size = 8 * 1024;
-    int max_file_size = write_size * 128;
-
-    std::string io_str(write_size, 'a');
-
-    // for (int i = 0; i < 10; ++i)
-    //     std::cout << prng.rand<uint64_t>() << "\n";
-
-    cos_write_file(file, {io_str.data(), io_str.size()},
-                   (random() % max_file_size) * io_str.size());
 }
 
 // int ums_main(int argc, char* argv[])

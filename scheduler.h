@@ -8,6 +8,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <ranges>
 #include <vector>
 
 #include "config.h"
@@ -25,9 +26,50 @@ public:
     Cpu_Mask m_mask;
 };
 
+// Tasks queue which allows concurrent access.
+// Note that all memory operations can be relaxed, because Spinlock has acquire-release memory
+// order.
+//
+class alignas(cache_line_size) Tasks {
+public:
+    void enque(std::shared_ptr<Task> task)
+    {
+        const std::scoped_lock<Spinlock> l{m_lock};
+
+        m_tasks.push_back(std::move(task));
+        m_size.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    std::shared_ptr<Task> deque() noexcept
+    {
+        const std::scoped_lock<Spinlock> l{m_lock};
+
+        if (m_tasks.empty())
+            return nullptr;
+
+        std::shared_ptr<Task> t{std::move(m_tasks.front())};
+        m_tasks.pop_front();
+
+        m_size.fetch_sub(1, std::memory_order_relaxed);
+        return t;
+    }
+
+    [[nodiscard]] std::size_t size() const noexcept
+    {
+        return m_size.load(std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] bool empty() const noexcept { return size() == 0; }
+
+private:
+    Spinlock m_lock;
+    std::deque<std::shared_ptr<Task>> m_tasks;
+    std::atomic<std::size_t> m_size{0};
+};
+
 // Synchronization context for scheduler.
 //
-enum class Sync_context : int { main, yield, wait_cond_or_sleep, io };
+enum class Sync_context : int { main, yield, wait, io };
 
 class Scheduler final {
     friend class Schedulers;
@@ -50,24 +92,28 @@ public:
     bool has_waiting_workers() const noexcept;
     bool has_pending_io_workers() const noexcept;
 
-    void save_runnable(Worker* worker);
-    void save_waiting(Worker* worker);
-    void save_pending_io(Worker* worker);
+    void park_runnable(Worker* worker);
+    void park_waiting(Worker* worker);
+    void park_pending_io(Worker* worker);
 
     template<bool back>
-    void save_idle(Worker* worker);
+    void park_idle(Worker* worker);
+
+    template<Sync_context ctx>
+    void park_worker(Worker* worker);
 
     void prepare_next_worker() noexcept;
 
-    void enqueue_task(const std::shared_ptr<Task>& task);
+    void enqueue_task(std::shared_ptr<Task> task);
     std::shared_ptr<Task> next_task() noexcept;
     bool has_tasks() const noexcept;
 
-    void schedule_idle_worker();
+    void schedule_idle_worker(std::shared_ptr<Task> task = nullptr);
 
     void schedule_io_workers();
     void schedule_waiting_workers();
     void schedule_idle_workers();
+    void steal_work();
     void schedule_workers();
 
     void schedule();
@@ -94,9 +140,6 @@ public:
 
     void context_switch(Worker* prev_worker);
 
-    template<Sync_context ctx>
-    void save_worker(Worker* worker);
-
     bool sync_init(Worker* worker);
 
     template<Sync_context ctx>
@@ -114,47 +157,9 @@ public:
 
     bool should_exit() const noexcept;
 
-    // Since we are only accessing size under lock, all memory operations can be
-    // relaxed, because Spinlock has acquire-release memory order.
-    //
-    class Tasks {
-    public:
-        void enque(const std::shared_ptr<Task>& task)
-        {
-            const std::scoped_lock<Spinlock> l{m_lock};
+    [[nodiscard]] const Tasks& tasks() const noexcept { return m_tasks; }
 
-            m_tasks.push_back(task);
-            m_size.fetch_add(1, std::memory_order_relaxed);
-        }
-
-        // This function is only executed by scheduler (single threaded), so
-        // caller just needs to check once if there are tasks and call this function.
-        //
-        std::shared_ptr<Task> deque() noexcept
-        {
-            const std::scoped_lock<Spinlock> l{m_lock};
-
-            std::shared_ptr<Task> t{std::move(m_tasks.front())};
-            m_tasks.pop_front();
-
-            m_size.fetch_sub(1, std::memory_order_relaxed);
-            return t;
-        }
-
-        [[nodiscard]] std::size_t size() const noexcept
-        {
-            return m_size.load(std::memory_order_relaxed);
-        }
-
-        [[nodiscard]] bool empty() const noexcept { return size() == 0; }
-
-    private:
-        // TODO: Create nonaligned spinlock for this and align whole struct on a cache line.
-        //
-        Spinlock m_lock;
-        std::deque<std::shared_ptr<Task>> m_tasks;
-        std::atomic<std::size_t> m_size{0};
-    };
+    [[nodiscard]] uint64_t id() const noexcept { return m_cpu.m_id; }
 
 private:
     void wait(std::unique_lock<std::mutex>& lock, Time_point abs_time = Time_point::max());
@@ -187,12 +192,28 @@ private:
 };
 
 class Schedulers final {
+    friend class Scheduler;
+
 public:
     Schedulers() noexcept;
 
     [[nodiscard]] Scheduler& min_load_scheduler() const noexcept;
+    [[nodiscard]] Scheduler& max_load_scheduler() const noexcept;
     [[nodiscard]] uint32_t workers_count() const noexcept;
     [[nodiscard]] uint32_t cpus_count() const noexcept;
+
+    [[nodiscard]] auto begin() const noexcept { return m_schedulers.begin(); }
+
+    [[nodiscard]] auto end() const noexcept { return m_schedulers.end(); }
+
+    // Returns filtered view of schedulers.
+    // I like this so much, that I am not even going to look at performance costs.
+    //
+    template<typename Predicate>
+    [[nodiscard]] auto filter(Predicate pred) const noexcept
+    {
+        return m_schedulers | std::ranges::views::filter(std::forward<Predicate>(pred));
+    }
 
     bool all_idle() noexcept;
     void signal_idle() noexcept;

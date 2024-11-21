@@ -56,7 +56,7 @@ void Worker::yield()
 void Worker::wait_cond_or_sleep()
 {
     if (!check_wait_info())
-        m_scheduler.sync<Sync_context::wait_cond_or_sleep>(this);
+        m_scheduler.sync<Sync_context::wait>(this);
 }
 
 void Worker::sleep_until_internal(const Time_point& time_point)
@@ -134,8 +134,5 @@ void Worker::main_loop()
 
         // std::cout << "CPU " << m_scheduler.m_cpu.m_id << ": worker id " << id() << " task done.\n
         // ";
-
-        m_task->notify();
-        m_task.reset();
     }
 }

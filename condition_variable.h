@@ -26,6 +26,8 @@ public:
 
     void wait(std::unique_lock<Mutex>& lock);
 
+    // TODO: Check whether predicate should be perfectly forwarded.
+    //
     template<class Predicate>
     void wait(std::unique_lock<Mutex>& lock, Predicate pred)
     {
@@ -40,6 +42,8 @@ public:
         return wait_until(lock, now() + time);
     }
 
+    // TODO: Check whether predicate should be perfectly forwarded.
+    //
     template<class Rep, class Period, class Predicate>
     bool wait_for(std::unique_lock<Mutex>& lock, const std::chrono::duration<Rep, Period>& time,
                   Predicate pred)
@@ -57,6 +61,8 @@ public:
             return wait_until_internal(lock, time_point);
     }
 
+    // TODO: Check whether predicate should be perfectly forwarded.
+    //
     template<class Clock, class Duration, class Predicate>
     bool wait_until(std::unique_lock<Mutex>& lock,
                     const std::chrono::time_point<Clock, Duration>& time_point, Predicate pred)

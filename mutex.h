@@ -11,12 +11,6 @@
 #include "spinlock.h"
 #include "util.h"
 
-#ifdef __cpp_lib_hardware_interference_size
-constexpr std::size_t cache_line_size = std::hardware_destructive_interference_size;
-#else
-constexpr std::size_t cache_line_size = 64;
-#endif
-
 class Mutex;
 class Recursive_mutex;
 

@@ -94,7 +94,7 @@ TEST(Scheduler_tests, parallel_execution)
 //
 TEST(Scheduler_tests, work_steeling)
 {
-    GTEST_SKIP() << "Work steeling not implemented.";
+    // GTEST_SKIP() << "Work steeling not implemented.";
 
     auto test = [&] {
         std::vector<std::shared_ptr<Task>> tasks;

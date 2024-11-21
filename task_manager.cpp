@@ -31,10 +31,10 @@ void Task::operator()()
 
 Task_manager::Task_manager(const Schedulers& schedulers) noexcept : m_schedulers{schedulers} {}
 
-void Task_manager::enque_task(const std::shared_ptr<Task>& task)
+void Task_manager::enque_task(std::shared_ptr<Task> task)
 {
     Scheduler& best_scheduler = m_schedulers.min_load_scheduler();
-    best_scheduler.enqueue_task(task);
+    best_scheduler.enqueue_task(std::move(task));
 }
 
 template<bool async>

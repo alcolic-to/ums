@@ -15,7 +15,6 @@
 #include "ums.h"
 #include "util.h"
 
-
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 
 // Condition_variable, shared mutex and timed mutex does not have standard layout because
@@ -900,6 +899,10 @@ void test_try_lock_and_try_lock_shared()
     }
 }
 
+// BIG TODO: Mutex tests are written with possibly blocking threads which is not sutable for
+// non-preemptive scheduler that we are developing, so they should be refactored.
+// BIG TODO
+//
 void test_timed_behavior()
 {
     { // Test try_lock_for() and try_lock_shared_for(). No timing assumptions.
@@ -1280,6 +1283,10 @@ TEST(Shared_mutex, mutex_test_fixture)
     init_ums(test);
 }
 
+// BIG TODO: Mutex tests are written with possibly blocking threads which is not sutable for
+// non-preemptive scheduler that we are developing, so they should be refactored.
+// BIG TODO
+//
 TEST(Shared_mutex, complex_tests)
 {
     auto test = [] {
@@ -1499,6 +1506,10 @@ TEST(Timed_mutex, timed_mutex_test_fixture)
     init_ums(test);
 }
 
+// BIG TODO: Mutex tests are written with possibly blocking threads which is not sutable for
+// non-preemptive scheduler that we are developing, so they should be refactored.
+// BIG TODO
+//
 TEST(Timed_mutex, timed_mutex_complex_test)
 {
     auto test = [] {

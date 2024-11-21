@@ -37,7 +37,7 @@ public:
     Task_manager(Task_manager&& rhs) noexcept = delete;
     Task_manager& operator=(Task_manager&& rhs) = delete;
 
-    void enque_task(const std::shared_ptr<Task>& task);
+    void enque_task(std::shared_ptr<Task> task);
 
     template<bool async = true>
     std::shared_ptr<Task> execute_task(std::function<void()> func);

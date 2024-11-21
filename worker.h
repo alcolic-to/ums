@@ -125,15 +125,15 @@ public:
     void sleep_until_internal(const Time_point& time_point);
 
 private:
-    // TODO: reorganize data members for quick access.
+    // TODO: reorganize data members for quicker access.
     //
     std::condition_variable m_cv;
     uint64_t m_id;
     State m_state{State::initializing};
     bool m_running{true}; // Flag used for spurious wakeup check.
     Wait_info m_wait_info;
-    std::shared_ptr<Task> m_task;
-    std::unique_ptr<IO_Request> m_io_request;
+    std::shared_ptr<Task> m_task{nullptr};
+    std::unique_ptr<IO_Request> m_io_request{nullptr};
     Scheduler& m_scheduler;
     std::thread m_thread;
 };

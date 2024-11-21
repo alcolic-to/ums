@@ -8,6 +8,7 @@
 #include <exception>
 #include <memory>
 #include <mutex>
+#include <utility>
 
 #include "config.h"
 #include "io_api.h"
@@ -41,6 +42,16 @@ Scheduler& Schedulers::min_load_scheduler() const noexcept
     };
 
     return **std::min_element(m_schedulers.begin(), m_schedulers.end(), cmp);
+}
+
+Scheduler& Schedulers::max_load_scheduler() const noexcept
+{
+    // NOLINTNEXTLINE(readability-suspicious-call-argument)
+    const auto cmp = [](const auto& left, const auto& right) {
+        return left->load() > right->load();
+    };
+
+    return **std::max_element(m_schedulers.begin(), m_schedulers.end(), cmp);
 }
 
 [[nodiscard]] uint32_t Schedulers::workers_count() const noexcept
@@ -161,14 +172,16 @@ bool Scheduler::has_pending_io_workers() const noexcept
     return !m_pending_io_queue.empty();
 }
 
-void Scheduler::save_runnable(Worker* worker)
+void Scheduler::park_runnable(Worker* worker)
 {
     m_runnable_queue.push_back(worker);
     worker->set_state(Worker::State::runnable);
 }
 
+// Parks worker to idle queue. If worker has completed task, notify user and release task.
+//
 template<bool back>
-void Scheduler::save_idle(Worker* worker)
+void Scheduler::park_idle(Worker* worker)
 {
     if constexpr (back)
         m_idle_queue.push_back(worker);
@@ -176,15 +189,20 @@ void Scheduler::save_idle(Worker* worker)
         m_idle_queue.push_front(worker);
 
     worker->set_state(Worker::State::idle);
+
+    if (worker->m_task) [[likely]] {
+        worker->m_task->notify();
+        worker->m_task.reset();
+    }
 }
 
-void Scheduler::save_waiting(Worker* worker)
+void Scheduler::park_waiting(Worker* worker)
 {
     m_waiting_queue.push_back(worker);
     worker->set_state(Worker::State::waiting);
 }
 
-void Scheduler::save_pending_io(Worker* worker)
+void Scheduler::park_pending_io(Worker* worker)
 {
     m_pending_io_queue.push_back(worker);
     worker->set_state(Worker::State::pending_io);
@@ -198,9 +216,9 @@ void Scheduler::prepare_next_worker() noexcept
     m_worker->set_state(Worker::State::running);
 }
 
-void Scheduler::enqueue_task(const std::shared_ptr<Task>& task)
+void Scheduler::enqueue_task(std::shared_ptr<Task> task)
 {
-    m_tasks.enque(task);
+    m_tasks.enque(std::move(task));
     notify();
 }
 
@@ -214,13 +232,22 @@ bool Scheduler::has_tasks() const noexcept
     return !m_tasks.empty();
 }
 
-void Scheduler::schedule_idle_worker()
+// Schedules idle worker with provided task or with next task from tasks queue if task is empty.
+// We must check whether task exists even if we are getting task from our queue, because someone
+// might have stolen our task in the meantime.
+//
+void Scheduler::schedule_idle_worker(std::shared_ptr<Task> task)
 {
-    Worker* worker = m_idle_queue.front();
-    m_idle_queue.pop_front();
+    if (!task)
+        task = next_task();
 
-    worker->m_task = next_task();
-    save_runnable(worker);
+    if (task) {
+        Worker* worker = m_idle_queue.front();
+        m_idle_queue.pop_front();
+
+        worker->m_task = std::move(task);
+        park_runnable(worker);
+    }
 }
 
 // Moves workers from pending_io to runnable queue if worker's I/O is completed.
@@ -237,7 +264,7 @@ void Scheduler::schedule_io_workers()
 
     for (auto it = std::find_if(begin, end, io_completed); it != end;
          it = std::find_if(it, end, io_completed)) {
-        save_runnable(*it);
+        park_runnable(*it);
         it = m_pending_io_queue.erase(it);
     }
 }
@@ -253,7 +280,7 @@ void Scheduler::schedule_waiting_workers()
 
     for (auto it = std::find_if(begin, end, checker); it != end;
          it = std::find_if(it, end, checker)) {
-        save_runnable(*it);
+        park_runnable(*it);
         it = m_waiting_queue.erase(it);
     }
 }
@@ -270,19 +297,43 @@ void Scheduler::schedule_idle_workers()
         schedule_idle_worker();
 }
 
+// Steals work (single task) from other scheduler if there are no runnable workers on this
+// scheduler.
+//
+void Scheduler::steal_work()
+{
+    if (has_runnable_workers() || !has_idle_workers())
+        return;
+
+    auto other_with_tasks = [&](auto& other) { return other->id() != id() && other->has_tasks(); };
+
+    for (const auto& other : m_schedulers.filter(other_with_tasks)) {
+        if (auto task = other->next_task()) {
+            schedule_idle_worker(std::move(task));
+            return;
+        }
+    }
+}
+
 void Scheduler::schedule_workers()
 {
     schedule_io_workers();
     schedule_waiting_workers();
     schedule_idle_workers();
+
+    steal_work();
 }
 
 void Scheduler::schedule()
 {
     schedule_workers();
 
-    while (!has_runnable_workers() && !should_exit()) {
+    while (!has_runnable_workers()) {
         sleep();
+
+        if (should_exit())
+            break;
+
         schedule_workers();
     }
 
@@ -331,24 +382,23 @@ auto Scheduler::waiters_info() const noexcept
 }
 
 // Sleep if there is no work.
-// Our sleep is determined by waiting workers. We have to wait until any waiting worker's condition
-// is signaled or earlies sleep time expires for all waiting workers. This function is called after
-// initial workers scheduling when there are no runnable workers.
+// Our sleep is determined by waiting workers. We have to wait until any waiting worker's
+// condition is signaled or earlies sleep time expires for all waiting workers. This function is
+// called after initial workers scheduling when there are no runnable workers.
 //
 // NOTE:
 // Since scheduler is going to sleep, we need to signal it every time new task arrives,
 // earlies sleep time expires, any condition variable or exit is signaled.
-// At any moment new task can come, condition might me signaled etc., so we need to check
-// everything under lock before going to sleep and all scheduler notifications must be done under
-// lock to avoid race conditions.
-// In order to allow precise sleep time (15ms or less) we must include idle_sleep_threshold.
-// Since windows clock is not that precise (clock cycle is ~15ms) and OS scheduler can delay
-// wake up of any sleeping thread, we choose arbitrary value for idle_sleep_threshold of 20ms.
-// Note that all functions trying to notify scheduler are blocked until all of our checks
-// are done under lock.
-// One potential problem is that OS scheduler might schedule worker out if
-// mutex is locked in this function and we are, for example, trying to add new task from another
-// worker which must notify scheduler.
+// At any moment new task can come, condition might be signaled etc., so we need to check
+// everything under lock before going to sleep and all scheduler notifications must be done
+// under lock to avoid race conditions. In order to allow precise sleep time (15ms or less) we
+// must include idle_sleep_threshold. Since windows clock is not that precise (clock cycle is
+// ~15ms) and OS scheduler can delay wakeup of any sleeping thread, we choose arbitrary value
+// for idle_sleep_threshold of 20ms. Note that all functions trying to notify scheduler are
+// blocked until all of our checks are done under lock. One potential problem is that OS
+// scheduler might schedule worker out if mutex is locked in this function and we are, for
+// example, trying to add new task from another worker which must notify scheduler.
+// This can be solved with global run queue.
 //
 void Scheduler::sleep() noexcept
 {
@@ -363,8 +413,8 @@ void Scheduler::sleep() noexcept
     if (has_tasks() && has_idle_workers())
         return;
 
-    // TODO: It should be enough to just check waiting workers, since if there are tasks and there
-    // are no waiting workers, I don't know where they are.
+    // TODO: It should be enough to just check waiting workers, since if there are tasks and
+    // there are no waiting workers, I don't know where they are.
     //
     if (exit_signaled() && !has_waiting_workers() && !has_tasks())
         return;
@@ -444,14 +494,14 @@ uint64_t Scheduler::load() const noexcept
 // Switches thread execution context from previous worker to current.
 //
 // Notes:
-// There is a single mutex on scheduler used for workers synchronization and every worker has it's
-// own condition variable. In order to atomically suspend single worker thread (go to sleep by
-// calling wait) and wake up next, we will take lock on mutex before notifying another thread to
-// wake up. Condition_variable::wait function guarantees that it will unlock mutex and go to sleep
-// atomically and it also guarantees that it will take lock on mutex when wait is done. So when we
-// notify another thread to wake up we are already holding lock on mutex (and notified thread can
-// not wake up until we release lock) so mutex will be unlocked only when we call wait on this
-// thread, which will release lock and wake another thread.
+// There is a single mutex on scheduler used for workers synchronization and every worker has
+// it's own condition variable. In order to atomically suspend single worker thread (go to sleep
+// by calling wait) and wake up next, we will take lock on mutex before notifying another thread
+// to wake up. Condition_variable::wait function guarantees that it will unlock mutex and go to
+// sleep atomically and it also guarantees that it will take lock on mutex when wait is done. So
+// when we notify another thread to wake up we are already holding lock on mutex (and notified
+// thread can not wake up until we release lock) so mutex will be unlocked only when we call
+// wait on this thread, which will release lock and wake up another thread.
 //
 void Scheduler::context_switch(Worker* prev_worker)
 {
@@ -465,11 +515,12 @@ void Scheduler::context_switch(Worker* prev_worker)
 //
 // Notes:
 // When worker is started for the first time, it will be parked in this function
-// waiting on condition variable. We will later decide whether to proceed with scheduling based on
-// return value. Since only first started worker on scheduler should enter scheduling code (other
-// workers will already be scheduled when it's their turn to run), we will use flag
-// m_workers_started to help us do this. Also, we are going to notify scheduler thread to continue
-// when we are safely parked, since it is blocked on a condition variable waiting for us.
+// waiting on condition variable. We will later decide whether to proceed with scheduling based
+// on return value. Since only first started worker on scheduler should enter scheduling code
+// (other workers will already be scheduled when it's their turn to run), we will use flag
+// m_workers_started to help us do this. Also, we are going to notify scheduler thread to
+// continue when we are safely parked, since it is blocked on a condition variable waiting for
+// us.
 //
 bool Scheduler::sync_init(Worker* worker)
 {
@@ -483,32 +534,32 @@ bool Scheduler::sync_init(Worker* worker)
     return m_workers_started ? false : (m_workers_started = true);
 }
 
-// Save worker to proper queue based on synchronization context.
+// Parks worker to proper queue based on synchronization context.
 //
 template<Sync_context ctx>
-void Scheduler::save_worker(Worker* worker)
+void Scheduler::park_worker(Worker* worker)
 {
     if constexpr (ctx == Sync_context::main)
         if (initializing()) [[unlikely]]
-            save_idle<true>(worker);
+            park_idle<true>(worker);
         else [[likely]]
-            save_idle<false>(worker);
+            park_idle<false>(worker);
     else if constexpr (ctx == Sync_context::yield)
-        save_runnable(worker);
-    else if constexpr (ctx == Sync_context::wait_cond_or_sleep)
-        save_waiting(worker);
+        park_runnable(worker);
+    else if constexpr (ctx == Sync_context::wait)
+        park_waiting(worker);
     else if constexpr (ctx == Sync_context::io)
-        save_pending_io(worker);
+        park_pending_io(worker);
 }
 
 // Synchronization point for the workers.
-// We will save current worker to proper queue, schedule workers and context switch to
+// We will park current worker to proper queue, schedule workers and context switch to
 // next worker if needed. For workers initialization, we will enter sync_init function.
 //
 template<Sync_context ctx>
 void Scheduler::sync(Worker* worker)
 {
-    save_worker<ctx>(worker);
+    park_worker<ctx>(worker);
 
     if (!sync_init(worker)) [[unlikely]]
         return;
@@ -541,5 +592,5 @@ bool Scheduler::should_exit() const noexcept
 
 template void Scheduler::sync<Sync_context::main>(Worker* worker);
 template void Scheduler::sync<Sync_context::yield>(Worker* worker);
-template void Scheduler::sync<Sync_context::wait_cond_or_sleep>(Worker* worker);
+template void Scheduler::sync<Sync_context::wait>(Worker* worker);
 template void Scheduler::sync<Sync_context::io>(Worker* worker);

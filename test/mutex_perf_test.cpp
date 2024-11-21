@@ -39,7 +39,7 @@ void run_lock_perf_test(const std::string& test_name, int num_threads)
     ss << std::setw(10) << std::left << test_name << " with " << std::setw(4) << std::right
        << num_threads << " thread(s)";
 
-    Stopwatch<std::chrono::microseconds> sw{ss.str()};
+    Stopwatch<true, std::chrono::microseconds> sw{ss.str()};
 
     for (int i = 0; i < num_threads; ++i)
         threads.emplace_back(lock_fn);

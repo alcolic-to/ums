@@ -293,7 +293,7 @@ TEST(IO, io_random_writes_and_reads)
     init_ums(test);
 }
 
-#define RUN_BENCHMARK
+// #define RUN_BENCHMARK
 #ifdef RUN_BENCHMARK
 
 TEST(IO_benchmark, single_thread)

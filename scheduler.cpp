@@ -242,12 +242,6 @@ void Scheduler::schedule_io_workers()
     }
 }
 
-void Scheduler::schedule_idle_workers()
-{
-    while (has_tasks() && has_idle_workers())
-        schedule_idle_worker();
-}
-
 // Moves workers from waiting to runnable queue if worker's wait is done.
 //
 void Scheduler::schedule_waiting_workers()
@@ -264,22 +258,16 @@ void Scheduler::schedule_waiting_workers()
     }
 }
 
-// Returns struct which holds info about workers in a waiting queue (whether any condition is
-// signaled and earliest wait time point for all waiters).
+// Schedules single idle worker with the earliest enqued task.
+// This is done only if there is no work to do (no previous tasks that got scheduled out due to I/O,
+// yield, wait on mutex or condition_variable etc. and are now ready to continue). This way we are
+// prioritizing execution of old unfinished tasks, instead of beeing "fair" and giving all new tasks
+// the same priority as for the old ones.
 //
-auto Scheduler::waiters_info() const noexcept
+void Scheduler::schedule_idle_workers()
 {
-    struct waiters_info {
-        bool m_cond{false};
-        Time_point m_earliest_wait{Time_point::max()};
-    } result;
-
-    for (const auto& worker : m_waiting_queue) {
-        result.m_cond |= worker->check_cond();
-        result.m_earliest_wait = std::min(result.m_earliest_wait, worker->sleep_time_point());
-    }
-
-    return result;
+    if (!has_runnable_workers() && has_idle_workers() && has_tasks())
+        schedule_idle_worker();
 }
 
 void Scheduler::schedule_workers()
@@ -322,6 +310,24 @@ void Scheduler::notify()
 {
     const std::unique_lock<std::mutex> lock{m_mtx};
     notify(lock);
+}
+
+// Returns struct which holds info about workers in a waiting queue (whether any condition is
+// signaled and earliest wait time point for all waiters).
+//
+auto Scheduler::waiters_info() const noexcept
+{
+    struct waiters_info {
+        bool m_cond{false};
+        Time_point m_earliest_wait{Time_point::max()};
+    } result;
+
+    for (const auto& worker : m_waiting_queue) {
+        result.m_cond |= worker->check_cond();
+        result.m_earliest_wait = std::min(result.m_earliest_wait, worker->sleep_time_point());
+    }
+
+    return result;
 }
 
 // Sleep if there is no work.
@@ -428,6 +434,8 @@ void Scheduler::manage_load(Worker::State prev_state, Worker::State new_state) n
     m_load += Loads[new_state] - Loads[prev_state];
 }
 
+// TODO: Make m_load atomic, to avoid race conditions.
+//
 uint64_t Scheduler::load() const noexcept
 {
     return m_load + m_tasks.size() * Loads[Worker::State::runnable];

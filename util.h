@@ -24,7 +24,7 @@ inline Time_point now() noexcept
 }
 
 // RAII stopwatch that uses steady_clock for time measurement.
-// You can pass Duration typename that you want to measure in. Default is milliseconds.
+// You can pass time Unit for default formatting if print is specified. Default is milliseconds.
 // To measure specific part of code, just put it in a scope and create Stopwatch
 // at the beggining. For example:
 //
@@ -39,7 +39,7 @@ inline Time_point now() noexcept
 //
 // ... Code not measured ...
 //
-template<typename Duration = milliseconds>
+template<bool print = true, typename Unit = milliseconds>
 class Stopwatch {
 public:
     explicit Stopwatch(std::string name = "Stopwatch") noexcept
@@ -50,8 +50,10 @@ public:
 
     ~Stopwatch() noexcept
     {
-        stop();
-        std::cout << m_name << " elapsed time: " << elapsed().count() << " " << unit_name() << "\n";
+        if constexpr (print) {
+            auto out = duration_cast<Unit>(elapsed()).count();
+            std::cout << m_name << " elapsed time: " << out << " " << unit_name() << "\n";
+        }
     }
 
     Stopwatch(const Stopwatch& rhs) = delete;
@@ -61,27 +63,24 @@ public:
 
     void restart() noexcept { m_start = now(); }
 
-    void stop() noexcept { m_end = now(); }
-
-    [[nodiscard]] auto elapsed() const noexcept { return duration_cast<Duration>(m_end - m_start); }
+    [[nodiscard]] auto elapsed() const noexcept { return now() - m_start; }
 
     [[nodiscard]] std::string unit_name() const noexcept
     {
         // clang-format off
-        if      constexpr (std::is_same_v<Duration, hours>)        return "hour(s)";
-        else if constexpr (std::is_same_v<Duration, minutes>)      return "minute(s)";
-        else if constexpr (std::is_same_v<Duration, seconds>)      return "second(s)";
-        else if constexpr (std::is_same_v<Duration, milliseconds>) return "millisecond(s)";
-        else if constexpr (std::is_same_v<Duration, microseconds>) return "microsecond(s)";
-        else if constexpr (std::is_same_v<Duration, nanoseconds>)  return "nanosecond(s)";
-        else                                                       return "unknown unit";
+        if      constexpr (std::is_same_v<Unit, hours>)        return "hour(s)";
+        else if constexpr (std::is_same_v<Unit, minutes>)      return "minute(s)";
+        else if constexpr (std::is_same_v<Unit, seconds>)      return "second(s)";
+        else if constexpr (std::is_same_v<Unit, milliseconds>) return "millisecond(s)";
+        else if constexpr (std::is_same_v<Unit, microseconds>) return "microsecond(s)";
+        else if constexpr (std::is_same_v<Unit, nanoseconds>)  return "nanosecond(s)";
+        else                                                   return "unknown unit";
         // clang-format on
     }
 
 private:
     std::string m_name;
     Clock::time_point m_start;
-    Clock::time_point m_end;
 };
 
 // Random number generator.

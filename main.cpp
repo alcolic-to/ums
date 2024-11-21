@@ -12,7 +12,6 @@
 #include "util.h"
 #include "worker.h"
 
-
 using namespace std::chrono_literals;
 
 void f1()
@@ -93,7 +92,7 @@ void ms3_function()
 // int ums_main(int argc, char* argv[])
 void ums_main()
 {
-    Stopwatch<std::chrono::microseconds> s;
+    Stopwatch<true, std::chrono::microseconds> s;
 
     for (int i = 0; i < 1000; ++i) {
         auto task{task_manager->execute_task<true>(f4)};

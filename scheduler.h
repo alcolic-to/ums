@@ -66,12 +66,13 @@ public:
     void schedule_idle_worker();
 
     void schedule_io_workers();
-    void schedule_idle_workers();
     void schedule_waiting_workers();
-    void schedule_sleeping_workers();
+    void schedule_idle_workers();
     void schedule_workers();
 
     void schedule();
+
+    auto waiters_info() const noexcept;
 
     void sleep() noexcept;
     void notify();
@@ -90,8 +91,6 @@ public:
 
     void manage_load(Worker::State prev_state, Worker::State new_state) noexcept;
     uint64_t load() const noexcept;
-
-    auto waiters_info() const noexcept;
 
     void context_switch(Worker* prev_worker);
 
@@ -176,6 +175,9 @@ private:
     State m_state{State::initializing};
     bool m_running{true}; // Flag used for spurious wakeup check.
     bool m_workers_started{false};
+
+    // TODO: Make m_load atomic, to avoid race conditions.
+    //
     uint64_t m_load{0};
     std::atomic<bool> m_exit{false};
 

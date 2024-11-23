@@ -69,6 +69,22 @@ TEST(Scheduler_tests, evenly_scheduled_tasks)
     init_ums(test);
 }
 
+TEST(Scheduler_tests, sequential_task_execution)
+{
+    auto test = [&] {
+        Stopwatch<false> s;
+
+        task_manager->execute_task<false>([] { hard_work(1s); });
+        task_manager->execute_task<false>([] { hard_work(1s); });
+        task_manager->execute_task<false>([] { hard_work(1s); });
+        task_manager->execute_task<false>([] { hard_work(1s); });
+
+        ASSERT_LE(s.elapsed(), 4s + 1ms);
+    };
+
+    init_ums(test);
+}
+
 TEST(Scheduler_tests, parallel_execution)
 {
     auto test = [&] {
@@ -90,12 +106,8 @@ TEST(Scheduler_tests, parallel_execution)
     init_ums(test);
 }
 
-// When work steeling is implemeneted, this should pass.
-//
-TEST(Scheduler_tests, work_steeling)
+TEST(Scheduler_tests, work_stealing)
 {
-    // GTEST_SKIP() << "Work steeling not implemented.";
-
     auto test = [&] {
         std::vector<std::shared_ptr<Task>> tasks;
 
@@ -122,7 +134,8 @@ TEST(Scheduler_tests, work_steeling)
         for (auto task : tasks)
             task->wait();
 
-        ASSERT_LE(s.elapsed(), 1s + 20ms);
+        auto shortest = 1000ms / std::pow<uint32_t>(2, schedulers->cpus_count() - 1);
+        ASSERT_LE(s.elapsed(), 1000ms + (2 * shortest) + 20ms);
     };
 
     init_ums(test);

@@ -15,6 +15,9 @@ Checks: "*,
         -readability-else-after-return,
         -readability-identifier-length,
 "
+CheckOptions:
+  - key: readability-avoid-return-with-void-value.StrictMode
+    value: 'false'
 
 WarningsAsErrors: ''
 HeaderFilterRegex: ''

@@ -120,6 +120,8 @@ public:
 
     auto waiters_info() const noexcept;
 
+    bool should_idle_spin() const noexcept;
+
     void sleep() noexcept;
     void notify();
 
@@ -185,6 +187,8 @@ private:
     //
     uint64_t m_load{0};
     std::atomic<bool> m_exit{false};
+
+    Time_point m_idle_start_time{Time_point::min()};
 
     // TODO: Create workers in place next to each other.
     //

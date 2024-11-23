@@ -194,6 +194,8 @@ void Scheduler::park_idle(Worker* worker)
         worker->m_task->notify();
         worker->m_task.reset();
     }
+
+    m_idle_start_time = now();
 }
 
 void Scheduler::park_waiting(Worker* worker)
@@ -302,6 +304,9 @@ void Scheduler::schedule_idle_workers()
 //
 void Scheduler::steal_work()
 {
+    if constexpr (!FS_work_stealing_allowed)
+        return;
+
     if (has_runnable_workers() || !has_idle_workers())
         return;
 
@@ -326,21 +331,17 @@ void Scheduler::schedule_workers()
 
 void Scheduler::schedule()
 {
-    schedule_workers();
+    while (true) {
+        schedule_workers();
 
-    while (!has_runnable_workers()) {
+        if (has_runnable_workers())
+            return prepare_next_worker();
+
         sleep();
 
-        if (should_exit())
-            break;
-
-        schedule_workers();
+        if (should_exit()) [[unlikely]]
+            return exit();
     }
-
-    if (should_exit()) [[unlikely]]
-        exit();
-    else [[likely]]
-        prepare_next_worker();
 }
 
 void Scheduler::wait(std::unique_lock<std::mutex>& lock, Time_point abs_time)
@@ -381,6 +382,22 @@ auto Scheduler::waiters_info() const noexcept
     return result;
 }
 
+// Checks whether scheduler should idle spin.
+// Idle spin is necessary for eficient use of scheduler. After task is done, if we go to sleep
+// immediately, we will miss the oportinity to execute next user task which might come right after
+// the previous task is done.
+//
+bool Scheduler::should_idle_spin() const noexcept
+{
+    if constexpr (!FS_idle_spin_allowed)
+        return false;
+
+    if (initializing()) [[unlikely]]
+        return false;
+
+    return now() <= m_idle_start_time + CFG_idle_spin_threshold;
+}
+
 // Sleep if there is no work.
 // Our sleep is determined by waiting workers. We have to wait until any waiting worker's
 // condition is signaled or earlies sleep time expires for all waiting workers. This function is
@@ -406,6 +423,9 @@ void Scheduler::sleep() noexcept
     // TODO: Check whether we can aford to sleep for I/O operations.
     //
     if (has_pending_io_workers())
+        return;
+
+    if (should_idle_spin())
         return;
 
     std::unique_lock<std::mutex> lock{m_mtx};

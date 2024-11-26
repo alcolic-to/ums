@@ -88,4 +88,6 @@ private:
     std::vector<Worker*> m_waiters;
 };
 
+// TODO: Create condition variable any.
+
 #endif // COS_CONDITION_VARIABLE_H

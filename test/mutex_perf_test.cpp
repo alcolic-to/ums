@@ -11,7 +11,7 @@
 #include "ums.h"
 #include "util.h"
 
-#define RUN_PERF_TESTS
+// #define RUN_PERF_TESTS
 #ifdef RUN_PERF_TESTS
 
 template<class Lockable>

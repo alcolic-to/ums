@@ -1,6 +1,7 @@
 // NOLINTBEGIN
 
 #include <atomic>
+#include <functional>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <mutex>
@@ -747,6 +748,70 @@ void test_vso_1253916()
     do_shared_locked_things(std::shared_lock<std::shared_mutex>{mtx});
 }
 
+// Helper class used for different tests.
+// STL uses plain atomics and spins while atomic reaches some value, which we can not affort,
+// because we are operating in non-preemptive mode. Instead of spinning, we will call wait and
+// notify CV on every operation.
+// TODO: Extend as other operations are needed like --, -= etc.
+//
+class Atomic_wrapper {
+public:
+    using mo = std::memory_order;
+
+    Atomic_wrapper(int v) : m_atom{v} {}
+
+    int op(int (std::atomic<int>::*atomic_op)(int, std::memory_order), int v)
+    {
+        std::unique_lock<Mutex> lock{m_mtx};
+        int res = (m_atom.*atomic_op)(v, mo::relaxed);
+
+        lock.unlock();
+        m_cv.notify_all();
+
+        return res;
+    }
+
+    operator int() { return m_atom.load(mo::relaxed); }
+
+    int operator+=(int v) { return op(&std::atomic<int>::fetch_add, v) + v; }
+
+    int operator++() { return op(&std::atomic<int>::fetch_add, 1) + 1; }
+
+    int exchange(int v) { return op(&std::atomic<int>::exchange, v); }
+
+    template<class Predicate>
+    void wait(Predicate pred)
+    {
+        std::unique_lock<Mutex> lock{m_mtx};
+        m_cv.wait(lock, [&] { return pred(); });
+    }
+
+    void wait_while_eq(int v)
+    {
+        wait([&] { return m_atom.load(mo::relaxed) != v; });
+    }
+
+    void wait_while_ne(int v)
+    {
+        wait([&] { return m_atom.load(mo::relaxed) == v; });
+    }
+
+    void wait_while_lt(int v)
+    {
+        wait([&] { return m_atom.load(mo::relaxed) >= v; });
+    }
+
+    void wait_while_gt(int v)
+    {
+        wait([&] { return m_atom.load(mo::relaxed) <= v; });
+    }
+
+private:
+    Mutex m_mtx;
+    Condition_variable m_cv;
+    std::atomic<int> m_atom;
+};
+
 template<typename _Mutex>
 void test_one_writer()
 {
@@ -754,12 +819,11 @@ void test_one_writer()
         GTEST_SKIP() << "At least 4 workers needed for this test.";
 
     // One simultaneous writer.
-    std::atomic<int> atom(-1);
+    Atomic_wrapper atom{-1};
     _Mutex mut;
 
     auto f = [&] {
-        while (atom == -1) {
-        }
+        atom.wait_while_eq(-1);
 
         std::lock_guard<_Mutex> ExclusiveLock(mut);
         const int val = ++atom;
@@ -779,16 +843,14 @@ void test_multiple_readers()
         GTEST_SKIP() << "At least 4 workers needed for this test.";
 
     // Many simultaneous readers.
-    std::atomic<int> atom(-1);
+    Atomic_wrapper atom{-1};
     _Mutex mut;
 
     auto f = [&] {
-        while (atom == -1) {
-        }
+        atom.wait_while_eq(-1);
         std::shared_lock<_Mutex> SharedLock(mut);
         ++atom;
-        while (atom < 4) {
-        }
+        atom.wait_while_lt(4);
     };
 
     ASSERT_TRUE(atom.exchange(0) == -1);
@@ -799,16 +861,13 @@ void test_multiple_readers()
 template<typename _Mutex>
 void test_writer_blocking_readers()
 {
-    if (schedulers->workers_count() < 5 || schedulers->cpus_count() < 5)
-        GTEST_SKIP() << "At least 5 workers and 5 CPUs needed for this test.";
-
     // One writer blocking many readers.
-    std::atomic<int> atom(-4);
+    Atomic_wrapper atom{-4};
     _Mutex mut;
 
     auto f1 = [&] {
-        while (atom < 0) {
-        }
+        atom.wait_while_lt(0);
+
         std::lock_guard<_Mutex> ExclusiveLock(mut);
         ASSERT_TRUE(atom.exchange(1000) == 0);
         tls_worker->sleep_for(50ms); // Not a timing assumption.
@@ -817,8 +876,8 @@ void test_writer_blocking_readers()
 
     auto f2 = [&] {
         ++atom;
-        while (atom < 1000) {
-        }
+        atom.wait_while_lt(1000);
+
         std::shared_lock<_Mutex> SharedLock(mut);
         ASSERT_TRUE(atom == 1729);
     };
@@ -830,25 +889,23 @@ void test_writer_blocking_readers()
 template<typename _Mutex>
 void test_readers_blocking_writer()
 {
-    if (schedulers->workers_count() < 5 || schedulers->cpus_count() < 5)
-        GTEST_SKIP() << "At least 5 workers and 5 CPUs needed for this test.";
     // Many readers blocking one writer.
-    std::atomic<int> atom(-5);
+    Atomic_wrapper atom{-5};
     _Mutex mut;
 
     auto f1 = [&] {
         std::shared_lock<_Mutex> SharedLock(mut);
         ++atom;
-        while (atom < 0) {
-        }
+        atom.wait_while_lt(0);
+
         std::this_thread::sleep_for(50ms); // Not a timing assumption.
         atom += 10;
     };
 
     auto f2 = [&] {
         ++atom;
-        while (atom < 0) {
-        }
+        atom.wait_while_lt(0);
+
         std::lock_guard<_Mutex> ExclusiveLock(mut);
         ASSERT_TRUE(atom == 40);
     };
@@ -899,10 +956,6 @@ void test_try_lock_and_try_lock_shared()
     }
 }
 
-// BIG TODO: Mutex tests are written with possibly blocking threads which is not sutable for
-// non-preemptive scheduler that we are developing, so they should be refactored.
-// BIG TODO
-//
 void test_timed_behavior()
 {
     { // Test try_lock_for() and try_lock_shared_for(). No timing assumptions.
@@ -946,15 +999,15 @@ void test_timed_behavior()
     // Test delayed try_lock_for() success. GENEROUS timing assumptions.
     //
     if (schedulers->cpus_count() >= 5 && schedulers->workers_count() >= 5) {
-        std::atomic<int> atom(-5);
+        Atomic_wrapper atom{-5};
         Shared_timed_mutex stm;
 
         auto f1 = [&] {
             std::shared_lock<Shared_timed_mutex> MainShared(stm);
 
             ++atom;
-            while (atom < 0) {
-            }
+            atom.wait_while_lt(0);
+
             tls_worker->sleep_for(50ms);
             MainShared.unlock();
         };
@@ -963,8 +1016,8 @@ void test_timed_behavior()
             tls_worker->sleep_for(50ms);
 
             ++atom;
-            while (atom < 0) {
-            }
+            atom.wait_while_lt(0);
+
             std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 1min);
             ASSERT_TRUE(ExclusiveLock.owns_lock());
             const int val = (atom += 100);
@@ -979,15 +1032,15 @@ void test_timed_behavior()
     // Test delayed try_lock_shared_for() success. GENEROUS timing assumptions.
     //
     if (schedulers->cpus_count() >= 5 && schedulers->workers_count() >= 5) {
-        std::atomic<int> atom(-5);
+        Atomic_wrapper atom{-5};
         Shared_timed_mutex stm;
 
         auto f1 = [&] {
             std::unique_lock<Shared_timed_mutex> MainExclusive(stm);
 
             ++atom;
-            while (atom < 0) {
-            }
+            atom.wait_while_lt(0);
+
             tls_worker->sleep_for(50ms);
             MainExclusive.unlock();
         };
@@ -996,13 +1049,12 @@ void test_timed_behavior()
             tls_worker->sleep_for(50ms);
 
             ++atom;
-            while (atom < 0) {
-            }
+            atom.wait_while_lt(0);
+
             std::shared_lock<Shared_timed_mutex> SharedLock(stm, 1min);
             ASSERT_TRUE(SharedLock.owns_lock());
             atom += 11;
-            while (atom < 44) {
-            }
+            atom.wait_while_lt(44);
         };
 
         task_manager->execute_tasks<false>(f1, f2, f2, f2, f2);
@@ -1013,19 +1065,16 @@ void test_timed_behavior()
     // it needs to deliver notifications. No timing assumptions.
     //
     if (schedulers->cpus_count() >= 3 && schedulers->workers_count() >= 3) {
-        std::atomic<bool> launch_readers(false);
+        Atomic_wrapper launch_readers{0};
         Shared_timed_mutex stm;
 
-        auto f1 = [&] {
-            while (!launch_readers) {
-            }
-        };
+        auto f1 = [&] { launch_readers.wait_while_eq(0); };
 
         auto f2 = [&] {
             tls_worker->sleep_for(50ms);
             std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 100ms);
             ASSERT_TRUE(!ExclusiveLock.owns_lock());
-            launch_readers = true;
+            launch_readers.exchange(1);
         };
 
         auto f3 = [&] {
@@ -1034,7 +1083,7 @@ void test_timed_behavior()
                 std::shared_lock<Shared_timed_mutex> SharedLock(stm, std::try_to_lock);
 
                 if (!SharedLock.owns_lock())
-                    launch_readers = true;
+                    launch_readers.exchange(1);
             }
         };
 
@@ -1042,18 +1091,15 @@ void test_timed_behavior()
 
         task_manager->execute_tasks<false>(f1, f2, f3);
 
-        std::atomic<int> readers(0);
+        Atomic_wrapper readers{0};
 
         auto f4 = [&] {
             std::shared_lock<Shared_timed_mutex> SharedLock(stm);
             ++readers;
-            while (readers < 4) {
-            }
+            readers.wait_while_lt(4);
         };
 
         task_manager->execute_tasks<false>(f4, f4, f4, f4);
-
-        // join_and_clear(threads);
         ASSERT_TRUE(readers == 4);
     }
 }
@@ -1121,6 +1167,11 @@ TEST(Mutex, mutex_sanity_test_3)
 TEST(Mutex, mutex_sanity_test_4)
 {
     auto test = [] {
+        if (schedulers->cpus_count() < 2)
+            GTEST_SKIP() << "At least 2 CPUs needed for this test.";
+
+        // TODO: Replace with our condition_variable_any when implemented.
+        //
         std::condition_variable_any cv;
         Mutex mut;
         std::vector<int> vec = {5};
@@ -1158,9 +1209,6 @@ TEST(Mutex, mutex_sanity_test_4)
 
 TEST(Mutex, mutex_test_fixture)
 {
-    // if (schedulers->workers_count() < 3)
-    //     GTEST_SKIP() << "At least 3 CPUs needed for this test.";
-
     auto test = [] {
         mutex_test_fixture<Mutex> fixture;
         fixture.test_lockable();
@@ -1235,6 +1283,11 @@ TEST(Shared_mutex, mutex_sanity_test_3)
 TEST(Shared_mutex, sanity_test_4)
 {
     auto test = [] {
+        if (schedulers->cpus_count() < 2)
+            GTEST_SKIP() << "At least 2 CPUs needed for this test.";
+
+        // TODO: Replace with our condition_variable_any when implemented.
+        //
         std::condition_variable_any cv;
         Shared_mutex mut;
         std::vector<int> vec = {5};
@@ -1283,10 +1336,6 @@ TEST(Shared_mutex, mutex_test_fixture)
     init_ums(test);
 }
 
-// BIG TODO: Mutex tests are written with possibly blocking threads which is not sutable for
-// non-preemptive scheduler that we are developing, so they should be refactored.
-// BIG TODO
-//
 TEST(Shared_mutex, complex_tests)
 {
     auto test = [] {
@@ -1457,6 +1506,11 @@ TEST(Timed_mutex, mutex_sanity_test_3)
 TEST(Timed_mutex, mutex_sanity_test_4)
 {
     auto test = [] {
+        if (schedulers->cpus_count() < 2)
+            GTEST_SKIP() << "At least 2 CPUs needed for this test.";
+
+        // TODO: Replace with our condition_variable_any when implemented.
+        //
         std::condition_variable_any cv;
         Timed_mutex mut;
         std::vector<int> vec = {5};
@@ -1506,10 +1560,6 @@ TEST(Timed_mutex, timed_mutex_test_fixture)
     init_ums(test);
 }
 
-// BIG TODO: Mutex tests are written with possibly blocking threads which is not sutable for
-// non-preemptive scheduler that we are developing, so they should be refactored.
-// BIG TODO
-//
 TEST(Timed_mutex, timed_mutex_complex_test)
 {
     auto test = [] {
@@ -1530,15 +1580,15 @@ TEST(Timed_mutex, timed_mutex_complex_test)
         // Test delayed try_lock_for() success. GENEROUS timing assumptions.
         //
         if (schedulers->cpus_count() >= 4 && schedulers->workers_count() >= 4) {
-            std::atomic<int> atom(-4);
+            Atomic_wrapper atom{-4};
             Timed_mutex timed_mutex;
 
             auto f = [&] {
                 tls_worker->sleep_for(50ms);
 
                 ++atom;
-                while (atom < 0) {
-                }
+                atom.wait_while_lt(0);
+
                 std::unique_lock<Timed_mutex> TryExclusiveLock(timed_mutex, std::try_to_lock);
                 ASSERT_TRUE(!TryExclusiveLock.owns_lock());
 
@@ -1557,8 +1607,7 @@ TEST(Timed_mutex, timed_mutex_complex_test)
                 tls_worker->sleep_for(50ms);
 
                 ++atom;
-                while (atom < 0) {
-                }
+                atom.wait_while_lt(0);
 
                 tls_worker->sleep_for(50ms);
                 MainUnique.unlock();
@@ -1731,6 +1780,11 @@ TEST(Shared_timed_mutex, mutex_sanity_test_3)
 TEST(Shared_timed_mutex, sanity_test_4)
 {
     auto test = [] {
+        if (schedulers->cpus_count() < 2)
+            GTEST_SKIP() << "At least 2 CPUs needed for this test.";
+
+        // TODO: Replace with our condition_variable_any when implemented.
+        //
         std::condition_variable_any cv;
         Shared_timed_mutex mut;
         std::vector<int> vec = {5};

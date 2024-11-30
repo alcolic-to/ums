@@ -15,6 +15,9 @@
 // The PAUSE instruction does not modify the architectural state. For dynamic scheduling, the PAUSE
 // instruction reduces the penalty of exiting from the spin-loop.
 //
+
+namespace {
+
 void cpu_pause() noexcept
 {
 #if defined(__x86_64__) || defined(__i386__)
@@ -31,6 +34,8 @@ void cpu_pause() noexcept
     std::this_thread::yield();
 #endif
 }
+
+} // anonymous namespace
 
 using mo = std::memory_order;
 

@@ -6,7 +6,6 @@
 #include <thread>
 #include <vector>
 
-#include "condition_variable.h"
 #include "mutex.h"
 #include "ums.h"
 #include "util.h"
@@ -31,15 +30,8 @@ void run_lock_perf_test(const std::string& test_name, int num_threads)
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
 
-    // Disabling next line since it causes clang-tidy dump with AV.
-    // Stopwatch<std::chrono::microseconds> sw{
-    //     std::format("{:8} with {:4} threads", test_name, num_threads)};
-
-    std::stringstream ss;
-    ss << std::setw(10) << std::left << test_name << " with " << std::setw(4) << std::right
-       << num_threads << " thread(s)";
-
-    Stopwatch<true, std::chrono::microseconds> sw{ss.str()};
+    Stopwatch<true, microseconds> sw{
+        std::format("{:10} with {:3} thread(s)", test_name, num_threads)};
 
     for (int i = 0; i < num_threads; ++i)
         threads.emplace_back(lock_fn);

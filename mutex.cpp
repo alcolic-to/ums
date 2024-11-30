@@ -34,7 +34,7 @@ void Mutex::lock()
     const auto this_tid{std::this_thread::get_id()};
 
     if (m_tid.load(std::memory_order_relaxed) == this_tid)
-        throw std::system_error(std::make_error_code(std::errc::resource_deadlock_would_occur));
+        throw std::system_error{std::make_error_code(std::errc::resource_deadlock_would_occur)};
 
     m_mtx.lock();
 
@@ -65,8 +65,8 @@ bool rmtx_inc_lc(uint32_t& locks_count)
         --locks_count;
 
         if constexpr (throws)
-            throw std::system_error(
-                std::make_error_code(std::errc::resource_unavailable_try_again));
+            throw std::system_error{
+                std::make_error_code(std::errc::resource_unavailable_try_again)};
 
         return false;
     }
@@ -123,7 +123,7 @@ void Recursive_mutex::unlock() noexcept
     }
 };
 
-// I am too lazy to implement deadlock detection here.
+// TODO: I am too lazy to implement deadlock detection here.
 // To implement it just save thread id of the thread holding mutex,
 // and check it every time lock is called.
 //

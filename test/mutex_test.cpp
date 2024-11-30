@@ -1170,9 +1170,7 @@ TEST(Mutex, mutex_sanity_test_4)
         if (schedulers->cpus_count() < 2)
             GTEST_SKIP() << "At least 2 CPUs needed for this test.";
 
-        // TODO: Replace with our condition_variable_any when implemented.
-        //
-        std::condition_variable_any cv;
+        Condition_variable_any cv;
         Mutex mut;
         std::vector<int> vec = {5};
 
@@ -1286,9 +1284,7 @@ TEST(Shared_mutex, sanity_test_4)
         if (schedulers->cpus_count() < 2)
             GTEST_SKIP() << "At least 2 CPUs needed for this test.";
 
-        // TODO: Replace with our condition_variable_any when implemented.
-        //
-        std::condition_variable_any cv;
+        Condition_variable_any cv;
         Shared_mutex mut;
         std::vector<int> vec = {5};
 
@@ -1509,9 +1505,7 @@ TEST(Timed_mutex, mutex_sanity_test_4)
         if (schedulers->cpus_count() < 2)
             GTEST_SKIP() << "At least 2 CPUs needed for this test.";
 
-        // TODO: Replace with our condition_variable_any when implemented.
-        //
-        std::condition_variable_any cv;
+        Condition_variable_any cv;
         Timed_mutex mut;
         std::vector<int> vec = {5};
 
@@ -1783,9 +1777,7 @@ TEST(Shared_timed_mutex, sanity_test_4)
         if (schedulers->cpus_count() < 2)
             GTEST_SKIP() << "At least 2 CPUs needed for this test.";
 
-        // TODO: Replace with our condition_variable_any when implemented.
-        //
-        std::condition_variable_any cv;
+        Condition_variable_any cv;
         Shared_timed_mutex mut;
         std::vector<int> vec = {5};
 

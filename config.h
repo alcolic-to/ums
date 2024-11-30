@@ -19,7 +19,7 @@ constexpr bool FS_idle_spin_allowed = true;
 // Config section.
 
 constexpr uint32_t                       CFG_max_cpu_count        = 64;
-constexpr std::bitset<CFG_max_cpu_count> CFG_allowed_cpus         = 0b01111111;
+constexpr std::bitset<CFG_max_cpu_count> CFG_allowed_cpus         = 0b00000000'00000000'00000000'00000000'00000000'00000000'00000000'01111111;
 constexpr uint32_t                       CFG_workers_per_cpu      = 64;
 constexpr auto                           CFG_idle_sleep_threshold = 20ms;
 constexpr auto                           CFG_idle_spin_threshold  = 20ms;

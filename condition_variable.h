@@ -5,89 +5,73 @@
 
 #include <condition_variable>
 #include <mutex>
-#include <vector>
 
-#include "spinlock.h"
-#include "util.h"
+#include "mutex.h"
 
-class Worker;
-class Mutex;
-
-class Condition_variable {
+class Condition_variable_any {
 public:
-    Condition_variable() noexcept = default;
-    ~Condition_variable() noexcept;
+    Condition_variable_any();
 
-    Condition_variable(const Condition_variable&) = delete;
-    Condition_variable& operator=(const Condition_variable&) = delete;
+    template<class Lock>
+    void wait(Lock& lock)
+    {
+        const std::shared_ptr<Mutex> ptr{m_mtx};
+        std::unique_lock<Mutex> unique_lock{*ptr};
+        Scoped_unlock<Lock> unlock{lock};
+        std::lock_guard<std::unique_lock<Mutex>> adopted_lock{unique_lock, std::adopt_lock};
+        m_cv.wait(unique_lock);
+    }
 
-    Condition_variable(Condition_variable&&) noexcept = delete;
-    Condition_variable& operator=(Condition_variable&&) = delete;
-
-    void wait(std::unique_lock<Mutex>& lock);
-
-    // TODO: Check whether predicate should be perfectly forwarded.
-    //
-    template<class Predicate>
-    void wait(std::unique_lock<Mutex>& lock, Predicate pred)
+    template<class Lock, class Predicate>
+    void wait(Lock& lock, Predicate pred)
     {
         while (!pred())
             wait(lock);
     }
 
-    template<class Rep, class Period>
-    std::cv_status wait_for(std::unique_lock<Mutex>& lock,
-                            const std::chrono::duration<Rep, Period>& time)
+    template<class Lock, class Clock, class Duration>
+    std::cv_status wait_until(Lock& lock, const std::chrono::time_point<Clock, Duration>& abs_time)
     {
-        return wait_until(lock, now() + time);
+        std::shared_ptr<Mutex> ptr{m_mtx};
+        std::unique_lock<Mutex> unique_lock{*ptr};
+        Scoped_unlock<Lock> unlock{lock};
+        std::lock_guard<std::unique_lock<Mutex>> adopted_lock{unique_lock, std::adopt_lock};
+        return m_cv.wait_until(unique_lock, abs_time);
     }
 
-    // TODO: Check whether predicate should be perfectly forwarded.
-    //
-    template<class Rep, class Period, class Predicate>
-    bool wait_for(std::unique_lock<Mutex>& lock, const std::chrono::duration<Rep, Period>& time,
-                  Predicate pred)
-    {
-        return wait_until(lock, now() + time, std::forward<Predicate>(pred)); // or just std::move?
-    }
-
-    template<class Clock, class Duration>
-    std::cv_status wait_until(std::unique_lock<Mutex>& lock,
-                              const std::chrono::time_point<Clock, Duration>& time_point)
-    {
-        if (now() >= time_point)
-            return std::cv_status::timeout;
-        else
-            return wait_until_internal(lock, time_point);
-    }
-
-    // TODO: Check whether predicate should be perfectly forwarded.
-    //
-    template<class Clock, class Duration, class Predicate>
-    bool wait_until(std::unique_lock<Mutex>& lock,
-                    const std::chrono::time_point<Clock, Duration>& time_point, Predicate pred)
+    template<class Lock, class Clock, class Duration, class Predicate>
+    bool wait_until(Lock& lock, const std::chrono::time_point<Clock, Duration>& abs_time,
+                    Predicate pred)
     {
         while (!pred())
-            if (wait_until(lock, time_point) == std::cv_status::timeout)
+            if (wait_until(lock, abs_time) == std::cv_status::timeout)
                 return pred();
 
         return true;
+    }
+
+    template<class Lock, class Rep, class Period>
+    std::cv_status wait_for(Lock& lock, const std::chrono::duration<Rep, Period>& rel_time)
+    {
+        return wait_until(lock, std::chrono::steady_clock::now() + rel_time);
+    }
+
+    template<class Lock, class Rep, class Period, class Predicate>
+    bool wait_for(Lock& lock, const std::chrono::duration<Rep, Period>& rel_time, Predicate pred)
+    {
+        return wait_until(lock, std::chrono::steady_clock::now() + rel_time, std::move(pred));
     }
 
     void notify_one() noexcept;
     void notify_all() noexcept;
 
 private:
-    void wait_internal(std::unique_lock<Mutex>& lock, const Time_point& time_point);
-    std::cv_status wait_until_internal(std::unique_lock<Mutex>& lock, const Time_point& time_point);
-
-    void add_waiter();
-    void remove_waiter();
-
-    Spinlock m_waiters_lock;
-    std::vector<Worker*> m_waiters;
+    Condition_variable m_cv;
+    std::shared_ptr<Mutex> m_mtx;
 };
 
-// TODO: Create condition variable any.
+// TODO: Implement notify_all_at_thread_exit.
+//
+void notify_all_at_thread_exit(Condition_variable& cv, std::unique_lock<Mutex> lock);
 
 #endif // COS_CONDITION_VARIABLE_H

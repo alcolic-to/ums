@@ -1,6 +1,7 @@
 #include "condition_variable.h"
 
 #include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -49,13 +50,13 @@ void Condition_variable::remove_waiter()
     std::erase(m_waiters, tls_worker);
 }
 
-void Condition_variable::wait_internal(std::unique_lock<Mutex>& lock, const Time_point& time_point)
+void Condition_variable::wait_internal(std::unique_lock<Mutex>& lock, const Time_point& abs_time)
 {
     add_waiter();
 
     {
-        tls_worker->set_wait_info(false, time_point);
-        const scoped_unlock<std::unique_lock<Mutex>> unlock{lock};
+        tls_worker->set_wait_info(false, abs_time);
+        const Scoped_unlock<std::unique_lock<Mutex>> unlock{lock};
         tls_worker->wait_cond_or_sleep();
     }
 
@@ -63,8 +64,28 @@ void Condition_variable::wait_internal(std::unique_lock<Mutex>& lock, const Time
 }
 
 std::cv_status Condition_variable::wait_until_internal(std::unique_lock<Mutex>& lock,
-                                                       const Time_point& time_point)
+                                                       const Time_point& abs_time)
 {
-    wait_internal(lock, time_point);
-    return now() >= time_point ? std::cv_status::timeout : std::cv_status::no_timeout;
+    wait_internal(lock, abs_time);
+    return now() >= abs_time ? std::cv_status::timeout : std::cv_status::no_timeout;
+}
+
+Condition_variable_any::Condition_variable_any() : m_mtx{std::make_shared<Mutex>()} {}
+
+void Condition_variable_any::notify_one() noexcept
+{
+    {
+        const std::lock_guard<Mutex> lock{*m_mtx};
+    }
+
+    m_cv.notify_one();
+}
+
+void Condition_variable_any::notify_all() noexcept
+{
+    {
+        const std::lock_guard<Mutex> lock{*m_mtx};
+    }
+
+    m_cv.notify_all();
 }

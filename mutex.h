@@ -4,15 +4,86 @@
 #define COS_MUTEX_H
 
 #include <mutex>
-#include <new>
 #include <thread>
 
-#include "condition_variable.h"
 #include "spinlock.h"
 #include "util.h"
 
 class Mutex;
-class Recursive_mutex;
+class Worker;
+
+// Similar to all c++ libs, this one is also based on Hinnant's implementation:
+// https://github.com/llvm-mirror/libcxx/blob/master/include/condition_variable
+// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2406.html
+//
+class Condition_variable {
+public:
+    Condition_variable() noexcept = default;
+    ~Condition_variable() noexcept;
+
+    Condition_variable(const Condition_variable&) = delete;
+    Condition_variable& operator=(const Condition_variable&) = delete;
+
+    Condition_variable(Condition_variable&&) noexcept = delete;
+    Condition_variable& operator=(Condition_variable&&) = delete;
+
+    void wait(std::unique_lock<Mutex>& lock);
+
+    template<class Predicate>
+    void wait(std::unique_lock<Mutex>& lock, Predicate pred)
+    {
+        while (!pred())
+            wait(lock);
+    }
+
+    template<class Rep, class Period>
+    std::cv_status wait_for(std::unique_lock<Mutex>& lock,
+                            const std::chrono::duration<Rep, Period>& rel_time)
+    {
+        return wait_until(lock, now() + rel_time);
+    }
+
+    template<class Rep, class Period, class Predicate>
+    bool wait_for(std::unique_lock<Mutex>& lock, const std::chrono::duration<Rep, Period>& rel_time,
+                  Predicate pred)
+    {
+        return wait_until(lock, now() + rel_time, std::move(pred));
+    }
+
+    template<class Clock, class Duration>
+    std::cv_status wait_until(std::unique_lock<Mutex>& lock,
+                              const std::chrono::time_point<Clock, Duration>& abs_time)
+    {
+        if (now() >= abs_time)
+            return std::cv_status::timeout;
+        else
+            return wait_until_internal(lock, abs_time);
+    }
+
+    template<class Clock, class Duration, class Predicate>
+    bool wait_until(std::unique_lock<Mutex>& lock,
+                    const std::chrono::time_point<Clock, Duration>& abs_time, Predicate pred)
+    {
+        while (!pred())
+            if (wait_until(lock, abs_time) == std::cv_status::timeout)
+                return pred();
+
+        return true;
+    }
+
+    void notify_one() noexcept;
+    void notify_all() noexcept;
+
+private:
+    void wait_internal(std::unique_lock<Mutex>& lock, const Time_point& abs_time);
+    std::cv_status wait_until_internal(std::unique_lock<Mutex>& lock, const Time_point& abs_time);
+
+    void add_waiter();
+    void remove_waiter();
+
+    Spinlock m_waiters_lock;
+    std::vector<Worker*> m_waiters;
+};
 
 class Plain_mutex {
     friend class Mutex;
@@ -202,21 +273,21 @@ private:
 // }
 
 template<class Lockable>
-class [[nodiscard]] scoped_unlock {
+class [[nodiscard]] Scoped_unlock {
 public:
-    explicit scoped_unlock(Lockable& lockable) : m_lockable{lockable} { lockable.unlock(); }
+    explicit Scoped_unlock(Lockable& lockable) : m_lockable{lockable} { lockable.unlock(); }
 
-    explicit scoped_unlock([[maybe_unused]] std::adopt_lock_t adopt, Lockable& lockable) noexcept
+    explicit Scoped_unlock([[maybe_unused]] std::adopt_lock_t adopt, Lockable& lockable) noexcept
         : m_lockable{lockable}
     {
     }
 
-    ~scoped_unlock() noexcept { m_lockable.lock(); }
+    ~Scoped_unlock() noexcept { m_lockable.lock(); }
 
-    scoped_unlock(const scoped_unlock&) = delete;
-    scoped_unlock& operator=(const scoped_unlock&) = delete;
-    scoped_unlock(scoped_unlock&&) noexcept = delete;
-    scoped_unlock& operator=(scoped_unlock&&) = delete;
+    Scoped_unlock(const Scoped_unlock&) = delete;
+    Scoped_unlock& operator=(const Scoped_unlock&) = delete;
+    Scoped_unlock(Scoped_unlock&&) noexcept = delete;
+    Scoped_unlock& operator=(Scoped_unlock&&) = delete;
 
 private:
     Lockable& m_lockable;

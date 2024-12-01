@@ -4,6 +4,8 @@
 #define COS_SCHEDULER_H
 
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <list>
 #include <memory>
@@ -54,10 +56,7 @@ public:
         return t;
     }
 
-    [[nodiscard]] std::size_t size() const noexcept
-    {
-        return m_size.load(std::memory_order_relaxed);
-    }
+    [[nodiscard]] size_t size() const noexcept { return m_size.load(std::memory_order_relaxed); }
 
     [[nodiscard]] bool empty() const noexcept { return size() == 0; }
 
@@ -103,6 +102,8 @@ public:
     void park_worker(Worker* worker);
 
     void prepare_next_worker() noexcept;
+
+    void set_worker_state(Worker* worker, Worker::State state) noexcept;
 
     void enqueue_task(std::shared_ptr<Task> task);
     std::shared_ptr<Task> next_task() noexcept;
@@ -183,9 +184,7 @@ private:
     bool m_running{true}; // Flag used for spurious wakeup check.
     bool m_workers_started{false};
 
-    // TODO: Make m_load atomic, to avoid race conditions.
-    //
-    uint64_t m_load{0};
+    std::atomic<uint64_t> m_load{0};
     std::atomic<bool> m_exit{false};
 
     Time_point m_idle_start_time{Time_point::min()};

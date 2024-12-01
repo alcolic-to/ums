@@ -35,9 +35,8 @@ Worker::~Worker()
         m_thread.join();
 }
 
-void Worker::set_state(Worker::State state) noexcept
+void Worker::set_state(State state) noexcept
 {
-    m_scheduler.manage_load(m_state, state);
     m_state = state;
 }
 

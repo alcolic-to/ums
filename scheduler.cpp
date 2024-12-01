@@ -175,7 +175,7 @@ bool Scheduler::has_pending_io_workers() const noexcept
 void Scheduler::park_runnable(Worker* worker)
 {
     m_runnable_queue.push_back(worker);
-    worker->set_state(Worker::State::runnable);
+    set_worker_state(worker, Worker::State::runnable);
 }
 
 // Parks worker to idle queue. If worker has completed task, notify user and release task.
@@ -188,7 +188,7 @@ void Scheduler::park_idle(Worker* worker)
     else
         m_idle_queue.push_front(worker);
 
-    worker->set_state(Worker::State::idle);
+    set_worker_state(worker, Worker::State::idle);
 
     if (worker->m_task) [[likely]] {
         worker->m_task->notify();
@@ -201,13 +201,13 @@ void Scheduler::park_idle(Worker* worker)
 void Scheduler::park_waiting(Worker* worker)
 {
     m_waiting_queue.push_back(worker);
-    worker->set_state(Worker::State::waiting);
+    set_worker_state(worker, Worker::State::waiting);
 }
 
 void Scheduler::park_pending_io(Worker* worker)
 {
     m_pending_io_queue.push_back(worker);
-    worker->set_state(Worker::State::pending_io);
+    set_worker_state(worker, Worker::State::pending_io);
 }
 
 void Scheduler::prepare_next_worker() noexcept
@@ -215,7 +215,13 @@ void Scheduler::prepare_next_worker() noexcept
     m_worker = m_runnable_queue.front();
     m_runnable_queue.pop_front();
 
-    m_worker->set_state(Worker::State::running);
+    set_worker_state(m_worker, Worker::State::running);
+}
+
+void Scheduler::set_worker_state(Worker* worker, Worker::State state) noexcept
+{
+    manage_load(worker->state(), state);
+    worker->set_state(state);
 }
 
 void Scheduler::enqueue_task(std::shared_ptr<Task> task)
@@ -471,11 +477,11 @@ void Scheduler::set_state(State state) noexcept
 
 // NOLINTBEGIN
 // clang-format off
-class Scheduler_Loads {
+class Scheduler_loads {
 public:
     static constexpr int loads_size = int(Worker::State::exiting) + 1;
 
-    constexpr inline Scheduler_Loads()
+    constexpr inline Scheduler_loads()
     {
         m_loads[int(Worker::State::initializing)] =  0;
         m_loads[int(Worker::State::idle)]         =  0;
@@ -495,20 +501,19 @@ private:
 // clang-format on
 // NOLINTEND
 
-static constexpr Scheduler_Loads Loads;
+static constexpr Scheduler_loads Loads;
 
 // Sets new scheduler load based on previous and new worker state.
 //
 void Scheduler::manage_load(Worker::State prev_state, Worker::State new_state) noexcept
 {
-    m_load += Loads[new_state] - Loads[prev_state];
+    m_load.fetch_add(Loads[new_state] - Loads[prev_state], std::memory_order_relaxed);
 }
 
-// TODO: Make m_load atomic, to avoid race conditions.
-//
 uint64_t Scheduler::load() const noexcept
 {
-    return m_load + m_tasks.size() * Loads[Worker::State::runnable];
+    const uint64_t tasks_load = m_tasks.size() * Loads[Worker::State::runnable];
+    return m_load.load(std::memory_order_relaxed) + tasks_load;
 }
 
 // Switches thread execution context from previous worker to current.
@@ -595,8 +600,8 @@ void Scheduler::sync(Worker* worker)
 //
 void Scheduler::exit()
 {
+    set_worker_state(m_worker, Worker::State::exiting);
     set_state(State::exiting);
-    m_worker->set_state(Worker::State::exiting);
 }
 
 bool Scheduler::has_work() const noexcept

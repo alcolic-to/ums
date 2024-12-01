@@ -33,12 +33,21 @@ namespace os {
 #undef min
 #undef max
 
+namespace {
+
 // Helper function for getting result from win32 API.
 //
 DWORD bool_to_error(BOOL b) noexcept // NOLINT
 {
     return b != 0 ? ERROR_SUCCESS : GetLastError();
 }
+
+OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl) noexcept
+{
+    return std::bit_cast<OVERLAPPED*>(&io_ctrl.m_ol);
+}
+
+} // anonymous namespace
 
 // Returns number of CPUs in the system.
 //
@@ -68,11 +77,6 @@ uint64_t cpus_avail_mask() noexcept
 void bind_thread(uint64_t cpu_mask) noexcept
 {
     SetThreadAffinityMask(GetCurrentThread(), cpu_mask);
-}
-
-OVERLAPPED* to_ol_ptr(IO_Control& io_ctrl) noexcept
-{
-    return std::bit_cast<OVERLAPPED*>(&io_ctrl.m_ol);
 }
 
 void read_file(IO_Request& io) noexcept
@@ -174,13 +178,11 @@ uint64_t cpus_avail_mask() noexcept
     }
 
     int num_cores = CPU_COUNT(&mask);
-    std::cout << "Process is allowed to run on " << num_cores << " cores."
-              << "\n";
+    std::cout << "Process is allowed to run on " << num_cores << " cores.\n";
 
     for (std::size_t i = 0; i < cpus_count(); ++i) {
         if (CPU_ISSET(i, &mask)) {
-            std::cout << "CPU " << i << " is available."
-                      << "\n";
+            std::cout << "CPU " << i << " is available.\n";
             cpu_mask |= (1 << i);
         }
     }

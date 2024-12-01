@@ -52,6 +52,8 @@ void Mutex::unlock() noexcept
     m_mtx.unlock();
 }
 
+namespace {
+
 // Helper function that increases locks count for recursive mutexes.
 // If max_rec_locks is reched and throws is provided, throws resource_unavailable_try_again.
 // Otherwise, returns whether number is incresed successfully.
@@ -80,6 +82,8 @@ bool rmtx_inc_lc(uint32_t& locks_count)
 {
     return --locks_count;
 }
+
+} // anonymous namespace
 
 void Recursive_mutex::lock()
 {

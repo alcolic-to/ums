@@ -36,22 +36,20 @@ catch (...) {
 
 Scheduler& Schedulers::min_load_scheduler() const noexcept
 {
-    // NOLINTNEXTLINE(readability-suspicious-call-argument)
     const auto cmp = [](const auto& left, const auto& right) {
         return left->load() < right->load();
     };
 
-    return **std::min_element(m_schedulers.begin(), m_schedulers.end(), cmp);
+    return **std::ranges::min_element(m_schedulers, cmp);
 }
 
 Scheduler& Schedulers::max_load_scheduler() const noexcept
 {
-    // NOLINTNEXTLINE(readability-suspicious-call-argument)
     const auto cmp = [](const auto& left, const auto& right) {
         return left->load() > right->load();
     };
 
-    return **std::max_element(m_schedulers.begin(), m_schedulers.end(), cmp);
+    return **std::ranges::max_element(m_schedulers, cmp);
 }
 
 [[nodiscard]] uint32_t Schedulers::workers_count() const noexcept

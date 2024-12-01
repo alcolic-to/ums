@@ -17,16 +17,19 @@
 #include "util.h"
 #include "worker.h"
 
-// Creates new Scheduler for each bit available in available CPUs mask.
+// Creates new Scheduler for each bit available in CPUs availability mask.
 //
 // clang-format off
 Schedulers::Schedulers() noexcept try
-    : m_system_cpus_count{os::cpus_count()}
-    , m_avail_cpus_mask{Cpu_Mask{os::cpus_avail_mask()} & CFG_allowed_cpus}
+    : m_system_cpus_count{std::min(os::cpus_count(), CFG_max_supported_cpus)}
+    , m_cpus_avail_mask{Cpu_Mask{os::cpus_avail_mask()} & Cpu_Mask{CFG_allowed_cpus_mask}}
 {
-    for (uint64_t cpu_id = 0; cpu_id < m_avail_cpus_mask.size(); ++cpu_id)
-        if (m_avail_cpus_mask.test(cpu_id))
+    for (uint64_t cpu_id = 0, sch_created = 0; cpu_id < m_cpus_avail_mask.size(); ++cpu_id) {
+        if (m_cpus_avail_mask.test(cpu_id) && sch_created < CFG_max_schedulers_count) {
             m_schedulers.emplace_back(std::make_unique<Scheduler>(*this, cpu_id));
+            ++sch_created;
+        }
+    }
 }
 catch (...) {
     std::terminate();
@@ -131,7 +134,7 @@ Scheduler::Scheduler(Schedulers& schedulers, uint64_t cpu_id)
     : m_schedulers{schedulers}
     , m_cpu{cpu_id}
 {
-    for (uint32_t i = 0; i < CFG_workers_per_cpu; ++i)
+    for (uint32_t i = 0; i < CFG_workers_per_scheduler; ++i)
         m_workers.push_back(std::make_unique<Worker>(i, *this));
 
     {
@@ -393,7 +396,7 @@ auto Scheduler::waiters_info() const noexcept
 //
 bool Scheduler::should_idle_spin() const noexcept
 {
-    if constexpr (!FS_idle_spin_allowed)
+    if constexpr (!FS_idle_spinning_allowed)
         return false;
 
     if (initializing()) [[unlikely]]

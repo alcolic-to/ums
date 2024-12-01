@@ -53,16 +53,18 @@ TEST(Scheduler_tests, evenly_scheduled_tasks)
 {
     auto test = [&] {
         for (uint32_t cpus = 1; cpus <= schedulers->cpus_count(); ++cpus) {
-            Stopwatch<false> s;
-            std::vector<std::shared_ptr<Task>> tasks;
+            for (auto task_dur = 1ms; task_dur <= 1024ms; task_dur *= 2) {
+                Stopwatch<false> s;
+                std::vector<std::shared_ptr<Task>> tasks;
 
-            for (uint32_t c = 1; c <= cpus; ++c)
-                tasks.push_back(task_manager->execute_task([] { hard_work(1s); }));
+                for (uint32_t c = 1; c <= cpus; ++c)
+                    tasks.push_back(task_manager->execute_task([=] { hard_work(task_dur); }));
 
-            for (auto task : tasks)
-                task->wait();
+                for (auto task : tasks)
+                    task->wait();
 
-            ASSERT_LE(s.elapsed(), 1s + 1ms);
+                ASSERT_LE(s.elapsed(), task_dur + 1ms);
+            }
         }
     };
 

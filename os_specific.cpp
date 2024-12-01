@@ -2,6 +2,7 @@
 
 #include <bit>
 #include <cstdint>
+#include <format>   // NOLINT
 #include <iostream> // NOLINT
 
 #include "io_api.h"
@@ -61,15 +62,16 @@ uint32_t cpus_count() noexcept
 //
 uint64_t cpus_avail_mask() noexcept
 {
-    uint64_t procCpuMask = 0; // Available CPUs for this process.
-    uint64_t allCpusMask = 0; // All available CPUs in the system.
+    uint64_t proc_cpu_mask = 0; // Available CPUs for this process.
+    uint64_t all_cpus_mask = 0; // All available CPUs in the system.
 
-    GetProcessAffinityMask(GetCurrentProcess(), PDWORD_PTR(&procCpuMask), PDWORD_PTR(&allCpusMask));
+    GetProcessAffinityMask(GetCurrentProcess(), PDWORD_PTR(&proc_cpu_mask),
+                           PDWORD_PTR(&all_cpus_mask));
 
-    // std::cout << "Available CPUs mask: " << procCpuMask << " System CPUs mask: " << allCpusMask
-    //           << "\n";
+    // std::cout << std::format("Available CPUs mask: {:b}, System CPUs mask: {:b}\n",
+    // proc_cpu_mask, all_cpus_mask);
 
-    return procCpuMask;
+    return proc_cpu_mask;
 }
 
 // Binds current thread to the provided CPU.

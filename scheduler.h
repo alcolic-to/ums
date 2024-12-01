@@ -16,9 +16,9 @@
 #include "config.h"
 #include "spinlock.h"
 #include "task_manager.h"
-#include "worker.h" // This can be moved and class Worker can be forward declared if we dispose Worker::State.
+#include "worker.h"
 
-using Cpu_Mask = std::bitset<CFG_max_cpu_count>;
+using Cpu_Mask = std::bitset<CFG_max_supported_cpus>;
 
 class CPU final {
 public:
@@ -215,7 +215,7 @@ public:
     template<typename Predicate>
     [[nodiscard]] auto filter(Predicate pred) const noexcept
     {
-        return m_schedulers | std::ranges::views::filter(std::forward<Predicate>(pred));
+        return m_schedulers | std::ranges::views::filter(std::move(pred));
     }
 
     bool all_idle() noexcept;
@@ -225,7 +225,7 @@ public:
 
 private:
     uint32_t m_system_cpus_count;
-    Cpu_Mask m_avail_cpus_mask;
+    Cpu_Mask m_cpus_avail_mask;
     std::mutex m_mtx;
     std::condition_variable m_cv;
     std::atomic<uint32_t> m_idle_schedulers{0};

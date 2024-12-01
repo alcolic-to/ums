@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 
+#include "config.h"
 #include "io_api.h"
 #include "os_specific.h"
 #include "scheduler.h"
@@ -105,7 +106,9 @@ void Worker::notify_waiter() noexcept
 void Worker::entry_point()
 {
     tls_worker = this;
-    os::bind_thread(m_scheduler.m_cpu.m_mask.to_ullong());
+
+    if constexpr (FS_thread_binding_allowed)
+        os::bind_thread(m_scheduler.m_cpu.m_mask.to_ullong());
 
     // std::cout << "Started thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
 

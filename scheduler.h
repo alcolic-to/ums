@@ -90,10 +90,12 @@ public:
     bool has_runnable_workers() const noexcept;
     bool has_waiting_workers() const noexcept;
     bool has_pending_io_workers() const noexcept;
+    bool has_yielded_workers() const noexcept;
 
     void park_runnable(Worker* worker);
     void park_waiting(Worker* worker);
     void park_pending_io(Worker* worker);
+    void park_yielded(Worker* worker);
 
     template<bool back>
     void park_idle(Worker* worker);
@@ -114,6 +116,7 @@ public:
     void schedule_io_workers();
     void schedule_waiting_workers();
     void schedule_idle_workers();
+    void schedule_yielded_workers();
     void steal_work();
     void schedule_workers();
 
@@ -175,6 +178,7 @@ private:
     std::deque<Worker*> m_idle_queue;
     std::list<Worker*> m_waiting_queue;
     std::list<Worker*> m_pending_io_queue;
+    Worker* m_yielded_worker{nullptr};
 
     std::mutex m_workers_mtx;
     std::mutex m_mtx;

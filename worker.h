@@ -20,7 +20,16 @@ class Worker final {
     friend class Scheduler;
 
 public:
-    enum class State : int { initializing, idle, waiting, pending_io, runnable, running, exiting };
+    enum class State : int {
+        initializing,
+        idle,
+        waiting,
+        pending_io,
+        yielded,
+        runnable,
+        running,
+        exiting
+    };
 
     Worker(uint64_t id, Scheduler& scheduler);
 

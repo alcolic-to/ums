@@ -173,6 +173,11 @@ bool Scheduler::has_pending_io_workers() const noexcept
     return !m_pending_io_queue.empty();
 }
 
+bool Scheduler::has_yielded_workers() const noexcept
+{
+    return m_yielded_worker != nullptr;
+}
+
 void Scheduler::park_runnable(Worker* worker)
 {
     m_runnable_queue.push_back(worker);
@@ -209,6 +214,12 @@ void Scheduler::park_pending_io(Worker* worker)
 {
     m_pending_io_queue.push_back(worker);
     set_worker_state(worker, Worker::State::pending_io);
+}
+
+void Scheduler::park_yielded(Worker* worker)
+{
+    m_yielded_worker = worker;
+    set_worker_state(worker, Worker::State::yielded);
 }
 
 void Scheduler::prepare_next_worker() noexcept
@@ -306,6 +317,16 @@ void Scheduler::schedule_idle_workers()
         schedule_idle_worker();
 }
 
+// Schedules yielded worker by moving it to the runnable queue.
+//
+void Scheduler::schedule_yielded_workers()
+{
+    if (m_yielded_worker != nullptr) {
+        park_runnable(m_yielded_worker);
+        m_yielded_worker = nullptr;
+    }
+}
+
 // Steals work (single task) from other scheduler if there are no runnable workers on this
 // scheduler.
 //
@@ -320,7 +341,7 @@ void Scheduler::steal_work()
     auto other_with_tasks = [&](auto& other) { return other->id() != id() && other->has_tasks(); };
 
     for (const auto& other : m_schedulers.filter(other_with_tasks)) {
-        if (auto task = other->next_task()) {
+        if (auto task{other->next_task()}) {
             schedule_idle_worker(std::move(task));
             return;
         }
@@ -332,6 +353,7 @@ void Scheduler::schedule_workers()
     schedule_io_workers();
     schedule_waiting_workers();
     schedule_idle_workers();
+    schedule_yielded_workers();
 
     steal_work();
 }
@@ -488,6 +510,7 @@ public:
         m_loads[int(Worker::State::idle)]         =  0;
         m_loads[int(Worker::State::waiting)]      =  1;
         m_loads[int(Worker::State::pending_io)]   =  2;
+        m_loads[int(Worker::State::yielded)]      = 10;
         m_loads[int(Worker::State::runnable)]     = 10;
         m_loads[int(Worker::State::running)]      = 10;
         m_loads[int(Worker::State::exiting)]      =  0;
@@ -571,7 +594,7 @@ void Scheduler::park_worker(Worker* worker)
         else [[likely]]
             park_idle<false>(worker);
     else if constexpr (ctx == Sync_context::yield)
-        park_runnable(worker);
+        park_yielded(worker);
     else if constexpr (ctx == Sync_context::wait)
         park_waiting(worker);
     else if constexpr (ctx == Sync_context::io)

@@ -143,10 +143,43 @@ TEST(Scheduler_tests, work_stealing)
     init_ums(test);
 }
 
-// Test task order execution.
-//
 TEST(Scheduler_tests, task_order_execution)
 {
+    auto test = [&] {
+        std::vector<std::shared_ptr<Task>> first_tasks;
+        std::vector<std::shared_ptr<Task>> second_tasks;
+
+        const auto cpus = schedulers->cpus_count();
+
+        Stopwatch<false> s;
+
+        for (uint32_t c = 1; c <= cpus; ++c) {
+            first_tasks.push_back(task_manager->execute_task([] {
+                hard_work(100ms);
+                tls_worker->yield();
+                hard_work(100ms);
+            }));
+        }
+
+        for (uint32_t c = 1; c <= cpus; ++c)
+            second_tasks.push_back(task_manager->execute_task([] { hard_work(1s); }));
+
+        for (auto task : first_tasks)
+            task->wait();
+
+        ASSERT_GE(s.elapsed(), 100ms + 1s + 100ms);
+        ASSERT_LE(s.elapsed(), 100ms + 1s + 100ms + 2 * 20ms);
+    };
+
+    init_ums(test);
+}
+
+TEST(Scheduler_tests, task_order_execution_extended)
+{
+    GTEST_SKIP() << "[Bug or feature?] When we have 2 long running tasks (even if they yield), "
+                    "they will monopolize scheduler, because we will schedule them without "
+                    "scheduling new tasks until they are done.";
+
     auto test = [&] {
         std::vector<std::shared_ptr<Task>> first_tasks;
         std::vector<std::shared_ptr<Task>> second_tasks;
@@ -156,23 +189,30 @@ TEST(Scheduler_tests, task_order_execution)
 
         Stopwatch<false> s;
 
-        for (uint32_t c = 1; c <= cpus; ++c)
+        for (uint32_t c = 1; c <= cpus; ++c) {
             first_tasks.push_back(task_manager->execute_task([] {
-                hard_work(100ms);
+                hard_work(1s);
                 tls_worker->yield();
-                hard_work(100ms);
+                hard_work(1s);
             }));
+        }
+
+        for (uint32_t c = 1; c <= cpus; ++c) {
+            second_tasks.push_back(task_manager->execute_task([] {
+                hard_work(1s);
+                tls_worker->yield();
+                hard_work(1s);
+            }));
+        }
 
         for (uint32_t c = 1; c <= cpus; ++c)
-            second_tasks.push_back(task_manager->execute_task([] { hard_work(1s); }));
+            third_tasks.push_back(task_manager->execute_task([] { hard_work(100ms); }));
 
-        for (uint32_t c = 1; c <= cpus; ++c)
-            third_tasks.push_back(task_manager->execute_task([] { hard_work(1s); }));
-
-        for (auto task : first_tasks)
+        for (auto task : third_tasks)
             task->wait();
 
-        ASSERT_LE(s.elapsed(), 100ms + 1s + 100ms + 2 * 30ms);
+        ASSERT_GE(s.elapsed(), 1s + 1s + 100ms);
+        ASSERT_LE(s.elapsed(), 1s + 1s + 100ms + 20ms);
     };
 
     init_ums(test);

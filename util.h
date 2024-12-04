@@ -71,6 +71,8 @@ public:
 
     [[nodiscard]] auto elapsed() const noexcept { return now() - m_start; }
 
+    [[nodiscard]] auto elapsed_units() const noexcept { return duration_cast<Unit>(elapsed()); }
+
     [[nodiscard]] std::string unit_name() const noexcept
     {
         // clang-format off

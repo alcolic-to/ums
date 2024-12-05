@@ -74,3 +74,8 @@ set_target_properties(gmock PROPERTIES CXX_CLANG_TIDY "")
 set_target_properties(gmock_main PROPERTIES CXX_CLANG_TIDY "")
 set_target_properties(gtest PROPERTIES CXX_CLANG_TIDY "")
 set_target_properties(gtest_main PROPERTIES CXX_CLANG_TIDY "")
+
+add_subdirectory(benchmark)
+
+message("Disabling clang-tidy for google benchmark.")
+set_property(TARGET benchmark PROPERTY CXX_CLANG_TIDY "")

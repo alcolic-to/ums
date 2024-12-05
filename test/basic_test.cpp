@@ -1,3 +1,5 @@
+// NOLINTBEGIN
+
 #include <chrono>
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -7,8 +9,6 @@
 #include "worker.h"
 
 using namespace std::chrono_literals;
-
-// NOLINTBEGIN
 
 // Simulates work with specified duration.
 //

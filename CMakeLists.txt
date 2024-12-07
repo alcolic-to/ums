@@ -79,3 +79,4 @@ add_subdirectory(benchmark)
 
 message("Disabling clang-tidy for google benchmark.")
 set_property(TARGET benchmark PROPERTY CXX_CLANG_TIDY "")
+set_property(TARGET benchmark_main PROPERTY CXX_CLANG_TIDY "")

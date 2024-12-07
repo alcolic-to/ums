@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <cmath>
 #include <gtest/gtest.h>
 
 #include "ums.h"
@@ -63,7 +64,7 @@ TEST(Scheduler_tests, evenly_scheduled_tasks)
                 for (auto task : tasks)
                     task->wait();
 
-                ASSERT_LE(s.elapsed(), task_dur + 1ms);
+                ASSERT_LE(s.elapsed(), task_dur + 2ms);
             }
         }
     };

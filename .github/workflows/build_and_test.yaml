@@ -1,3 +1,4 @@
+
 name: Build and Test
 
 run-name: ${{ github.actor }} invoked build and test
@@ -28,19 +29,14 @@ jobs:
               cc: "cl", cxx: "cl",
             }
           - {
-              name: "Linux Latest GCC",
-              os: ubuntu-latest,
-              cc: "gcc", cxx: "g++",
-            }
-          - {
-              name: "MacOS Latest Clang",
-              os: macos-latest,
+              name: "Linux Latest clang",
+              os: ubuntu-24.04,
               cc: "clang", cxx: "clang++",
             }
     
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Configure
       run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
 

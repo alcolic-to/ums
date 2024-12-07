@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <cmath>
 #include <gtest/gtest.h>
 
 #include "ums.h"

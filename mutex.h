@@ -5,6 +5,7 @@
 
 #include <mutex>
 #include <thread>
+#include <condition_variable>
 
 #include "spinlock.h"
 #include "util.h"

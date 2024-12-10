@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <vector>
@@ -10,47 +9,9 @@
 #include "io_api.h"
 #include "ums.h"
 #include "util.h"
+#include "file.h"
 
 using namespace std::chrono_literals;
-namespace fs = std::filesystem;
-
-#if defined _WIN32
-
-#include <windows.h>
-#undef min
-#undef max
-
-constexpr auto file_access = GENERIC_READ | GENERIC_WRITE;
-constexpr auto file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS |
-                                 FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING |
-                                 FILE_FLAG_WRITE_THROUGH;
-
-class File_handle {
-public:
-    File_handle(const fs::path& file_path)
-        : m_file_path{file_path}
-        , m_handle{CreateFile(file_path.string().c_str(), file_access, 0, 0, OPEN_ALWAYS,
-                              file_attributes, 0)}
-    {
-        if (m_handle == INVALID_HANDLE_VALUE) {
-            std::string error{std::format("Create file failed with error: {}", GetLastError())};
-            std::cout << error << "\n";
-            throw std::exception{error.c_str()};
-        }
-    }
-
-    ~File_handle() { CloseHandle(m_handle); }
-
-    operator void*() { return m_handle; }
-
-    const fs::path& path() const noexcept { return m_file_path; }
-
-    void* handle() const noexcept { return m_handle; }
-
-private:
-    const fs::path m_file_path;
-    void* m_handle;
-};
 
 void test_write_read_file(uint64_t io_size)
 {
@@ -392,9 +353,5 @@ TEST(IO_benchmark, multiple_threads)
 }
 
 #endif // RUN_BENCHMARK
-
-#else
-
-#endif // _WIN32
 
 // NOLINTEND

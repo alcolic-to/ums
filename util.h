@@ -29,7 +29,7 @@ inline Time_point now() noexcept
     return Clock::now();
 }
 
-// RAII stopwatch that uses steady_clock for time measurement.
+// Stopwatch that uses steady_clock for time measurement.
 // You can pass time Unit for default formatting if print is specified. Default is milliseconds.
 // To measure specific part of code, just put it in a scope and create Stopwatch
 // at the beggining. For example:
@@ -57,7 +57,7 @@ public:
     ~Stopwatch() noexcept
     {
         if constexpr (print) {
-            auto out = duration_cast<Unit>(elapsed()).count();
+            auto out = elapsed_units().count();
             std::cout << m_name << " elapsed time: " << out << " " << unit_name() << "\n";
         }
     }

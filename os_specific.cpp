@@ -177,7 +177,7 @@ void* open_file(const char* path, int flags, int mode)
     HANDLE handle = CreateFileW((LPCWSTR) wpath.c_str(), flags, 0, nullptr, OPEN_ALWAYS, mode, nullptr);
     if (handle == INVALID_HANDLE_VALUE)
         throw std::runtime_error("Failed to open file: " + std::string(path));
-    return reinterpet_cast<void*>(handle);
+    return reinterpret_cast<void*>(handle);
 }
 
 void close_file(void* file_handle)

@@ -213,8 +213,7 @@ void update_io_state(IO_Request& io) noexcept
 
 void* open_file(const char* path, int flags, int mode)
 {
-    std::wstring wpath(path, path + std::strlen(path));
-    HANDLE handle = CreateFileW((LPCWSTR) wpath.c_str(), flags, 0, nullptr, OPEN_ALWAYS, mode, nullptr);
+    HANDLE handle = CreateFile(path, flags, 0, nullptr, OPEN_ALWAYS, mode, nullptr);
     if (handle == INVALID_HANDLE_VALUE)
         throw std::runtime_error("Failed to open file: " + std::string(path));
     return reinterpret_cast<void*>(handle);
@@ -367,7 +366,7 @@ void uring_update(IO_Request& io) noexcept
         else
             io.m_state = IO_Request::State::completed;
         
-        assert(io_uring_cqe_get_data64(cqe) == get_io_request_id(io) && "Missmatch between req_id and cqe data64!");
+        assert(io_uring_cqe_get_data64(cqe) == io_handle->m_id && "Missmatch between req_id and cqe data64!");
         
         io_uring_cqe_seen(io_handle->m_uring, cqe);
     }

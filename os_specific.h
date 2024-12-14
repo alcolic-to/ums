@@ -41,15 +41,15 @@ struct IO_handle {
     uint64_t m_id;
 };
 
-class IO_uring_raii
+class IO_uring
 {
 public:
-    IO_uring_raii() noexcept
+    IO_uring() noexcept
     {
         io_uring_queue_init(1, &m_ring, 0 /* flags */);
     }
 
-    ~IO_uring_raii() noexcept
+    ~IO_uring() noexcept
     {
         io_uring_queue_exit(&m_ring);
     }
@@ -57,7 +57,7 @@ public:
     io_uring m_ring{};
 };
 
-extern thread_local IO_uring_raii tls_uring; // NOLINT
+extern thread_local IO_uring tls_uring; // NOLINT
 
 #endif // __linux__
 

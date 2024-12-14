@@ -375,7 +375,7 @@ void update_io_state(IO_Request& io) noexcept
     uring_update(io);
 }
 
-thread_local IO_uring_raii tls_uring; // NOLINT
+thread_local IO_uring tls_uring; // NOLINT
 
 // NOLINTEND(misc-include-cleaner)
 

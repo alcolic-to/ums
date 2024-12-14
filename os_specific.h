@@ -5,12 +5,22 @@
 
 #include <cstdint>
 
-#ifdef __linux__
-#include <liburing.h>
-#endif
-
 class IO_Request;
-struct IO_Control;
+
+#if defined _WIN32
+
+#elif defined __linux__
+
+// Forward declaration.
+struct io_uring;
+
+struct IO_handle {
+    explicit IO_handle(uint64_t offset);
+    io_uring* m_uring;
+    uint64_t m_id;
+};
+
+#endif
 
 namespace os {
 
@@ -26,40 +36,11 @@ void print_thread_affinity() noexcept;
 void read_file(IO_Request& io) noexcept;
 void write_file(IO_Request& io) noexcept;
 void update_io_state(IO_Request& io) noexcept;
-void* alloc_io_handle(uint64_t offset);
-void free_io_handle(IO_Request& io) noexcept;
 
 // File functions.
 //
 void* open_file(const char* file_path, int flags, int mode);
 void close_file(void* file_handle);
-
-#ifdef __linux__
-
-struct IO_handle {
-    io_uring* m_uring;
-    uint64_t m_id;
-};
-
-class IO_uring
-{
-public:
-    IO_uring() noexcept
-    {
-        io_uring_queue_init(1, &m_ring, 0 /* flags */);
-    }
-
-    ~IO_uring() noexcept
-    {
-        io_uring_queue_exit(&m_ring);
-    }
-
-    io_uring m_ring{};
-};
-
-extern thread_local IO_uring tls_uring; // NOLINT
-
-#endif // __linux__
 
 } // namespace os
 

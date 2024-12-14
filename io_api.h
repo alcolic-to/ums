@@ -4,6 +4,10 @@
 #define COS_IO_API_H
 
 #include <cstdint>
+#include <memory>
+
+// Forward declaration.
+struct IO_handle;
 
 struct IO_Buffer {
     void* m_buffer;
@@ -16,7 +20,6 @@ public:
     enum class State : int { init, error, pending, completed };
 
     IO_Request(void* file_handle, IO_Buffer buffer, uint64_t offset, Type type) noexcept;
-    ~IO_Request() noexcept;
 
     [[nodiscard]] bool completed() const noexcept { return m_state == State::completed; }
 
@@ -29,7 +32,7 @@ public:
     void* m_file_handle;
     IO_Buffer m_io_buffer;
     uint64_t m_offset;
-    void* m_io_handle;
+    std::unique_ptr<IO_handle> m_io_handle;
     Type m_type;
     State m_state;
 };

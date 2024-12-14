@@ -1,8 +1,10 @@
 #include "os_specific.h"
 
 #include <iostream> // NOLINT
+#include <filesystem>
 
 #include "io_api.h"
+#include "file.h"
 
 // OS specific preprocessor definitions.
 //
@@ -28,7 +30,46 @@
 #include <cassert>
 #include <sched.h>
 #include <unistd.h>
+#include <liburing.h>
+#include <fcntl.h>
+
+class IO_uring
+{
+public:
+    IO_uring()
+    {
+        io_uring_queue_init(1, &m_ring, 0 /* flags */);
+    }
+
+    ~IO_uring() noexcept
+    {
+        io_uring_queue_exit(&m_ring);
+    }
+
+    io_uring m_ring{};
+};
+
+thread_local IO_uring tls_uring;
+
+IO_handle::IO_handle(uint64_t offset) : m_uring(&tls_uring.m_ring)
+{
+    (void) offset;
+    static std::atomic<uint64_t> io_cnt { 0 };
+    m_id = io_cnt++;
+}
+
+constexpr int64_t x_file_access = O_CREAT | O_RDWR | O_DIRECT;
+constexpr int64_t x_file_attributes = 0666;
+
 #endif
+
+File_handle::File_handle(const fs::path& file_path)
+        : m_handle{os::open_file(file_path.string().c_str(), x_file_access, x_file_attributes)}
+{
+}
+
+// Destructor closes file handle
+File_handle::~File_handle() { os::close_file(m_handle); }
 
 namespace os {
 
@@ -280,34 +321,9 @@ void close_file(void* file_handle)
     delete fd;
 }
 
-void* alloc_io_handle(uint64_t offset)
-{
-    (void) offset;
-    static std::atomic<uint64_t> io_cnt { 0 };
-    IO_handle* io_req = new IO_handle{.m_uring = &tls_uring.m_ring, .m_id = io_cnt++};
-    return reinterpret_cast<void*>(io_req);
-}
-
-void free_io_handle(IO_Request& io) noexcept
-{
-    IO_handle* io_handle = reinterpret_cast<IO_handle*>(io.m_io_handle);
-    delete io_handle; // NOLINT
-}
-
-
-IO_handle* get_io_handle(IO_Request& io) noexcept
-{
-    return reinterpret_cast<IO_handle*>(io.m_io_handle);
-}
-
-uint64_t get_io_request_id(IO_Request& io) noexcept
-{
-    return get_io_handle(io)->m_id;
-}
-
 void uring_submit(IO_Request& io) noexcept
 {
-    const IO_handle* io_handle = get_io_handle(io);
+    const IO_handle* io_handle = io.m_io_handle.get();
 
     io_uring_sqe* sqe = io_uring_get_sqe(io_handle->m_uring);
     if (sqe == nullptr)
@@ -323,7 +339,7 @@ void uring_submit(IO_Request& io) noexcept
         io_uring_prep_writev(sqe, fd, &io_vec, 1, offset);
     else
         io_uring_prep_readv(sqe, fd, &io_vec, 1, offset);
-    io_uring_sqe_set_data64(sqe, get_io_request_id(io));
+    io_uring_sqe_set_data64(sqe, io_handle->m_id);
     
     const int ret = io_uring_submit(io_handle->m_uring);
     if (ret != 1)
@@ -332,13 +348,12 @@ void uring_submit(IO_Request& io) noexcept
     io.m_state = IO_Request::State::pending;
 }
 
-
 void uring_update(IO_Request& io) noexcept
 {
     if (io.m_state != IO_Request::State::pending)
         return;
 
-    const IO_handle* io_handle = get_io_handle(io);
+    const IO_handle* io_handle = io.m_io_handle.get();
 
     io_uring_cqe* cqe = nullptr;
     const int ret = io_uring_peek_cqe(io_handle->m_uring, &cqe);
@@ -375,7 +390,6 @@ void update_io_state(IO_Request& io) noexcept
     uring_update(io);
 }
 
-thread_local IO_uring tls_uring; // NOLINT
 
 // NOLINTEND(misc-include-cleaner)
 

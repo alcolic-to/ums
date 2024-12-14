@@ -20,11 +20,23 @@
 // Reduce size of windows.h includes and include windows.
 //
 #define WIN32_LEAN_AND_MEAN
+
 #include <bit>
 #include <format>   // NOLINT
 #include <windows.h>
 #undef min
 #undef max
+constexpr int64_t x_file_access = GENERIC_READ | GENERIC_WRITE;
+constexpr int64_t x_file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS |
+                                 FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING |
+                                 FILE_FLAG_WRITE_THROUGH;
+
+IO_handle::IO_handle(uint64_t offset) : m_ol{}
+{
+    m_ol.m_offset = DWORD(offset & 0xFFFFFFFF);
+    m_ol.m_offset_high = DWORD(offset >> 32);
+}
+
 #elif defined(OS_LINUX)
 #include <cstring>
 #include <cassert>
@@ -88,9 +100,9 @@ DWORD bool_to_error(BOOL b) noexcept // NOLINT
     return b != 0 ? ERROR_SUCCESS : GetLastError();
 }
 
-OVERLAPPED* to_ol_ptr(void* io_handle) noexcept
+OVERLAPPED* to_windows_ol_ptr(IO_Request& io) noexcept
 {
-    return reinterpret_cast<OVERLAPPED*>(io_handle);
+    return reinterpret_cast<OVERLAPPED*>(io.m_io_handle->get_ol_ptr());
 }
 
 } // anonymous namespace
@@ -130,7 +142,7 @@ void read_file(IO_Request& io) noexcept
 {
     const DWORD read_res =
         bool_to_error(ReadFile(io.m_file_handle, io.m_io_buffer.m_buffer,
-                               DWORD(io.m_io_buffer.m_size), nullptr, to_ol_ptr(io.m_io_handle)));
+                               DWORD(io.m_io_buffer.m_size), nullptr, to_windows_ol_ptr(io)));
 
     // std::cout << "ReadFile: " << read_res << "\n";
 
@@ -151,7 +163,7 @@ void write_file(IO_Request& io) noexcept
 {
     const DWORD write_res =
         bool_to_error(WriteFile(io.m_file_handle, io.m_io_buffer.m_buffer,
-                                DWORD(io.m_io_buffer.m_size), nullptr, to_ol_ptr(io.m_io_handle)));
+                                DWORD(io.m_io_buffer.m_size), nullptr, to_windows_ol_ptr(io)));
 
     // std::cout << "WriteFile: " << write_res << "\n";
 
@@ -170,7 +182,7 @@ void write_file(IO_Request& io) noexcept
 
 bool io_completed(IO_Request& io) noexcept
 {
-    return HasOverlappedIoCompleted(to_ol_ptr(io.m_io_handle));
+    return HasOverlappedIoCompleted(to_windows_ol_ptr(io));
 }
 
 void update_io_state(IO_Request& io) noexcept
@@ -182,7 +194,7 @@ void update_io_state(IO_Request& io) noexcept
 
     DWORD bytes = 0;
     const DWORD ol_res =
-        bool_to_error(GetOverlappedResult(io.m_file_handle, to_ol_ptr(io.m_io_handle), &bytes, 0));
+        bool_to_error(GetOverlappedResult(io.m_file_handle, to_windows_ol_ptr(io), &bytes, 0));
 
     // std::cout << "GetOverlappedResult: " << ol_res << ", bytes : " << bytes << "\n";
 
@@ -197,19 +209,6 @@ void update_io_state(IO_Request& io) noexcept
         io.m_state = IO_Request::State::error;
         break;
     }
-}
-
-void* alloc_io_handle(uint64_t offset)
-{
-    OVERLAPPED* ol = new OVERLAPPED{};
-    ol->Offset = DWORD(offset & 0xFFFFFFFF);
-    ol->OffsetHigh = DWORD(offset >> 32);
-    return ol;
-}
-
-void free_io_handle(IO_Request& io) noexcept
-{
-    delete to_ol_ptr(io.m_io_handle);
 }
 
 void* open_file(const char* path, int flags, int mode)

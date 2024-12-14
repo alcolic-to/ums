@@ -9,12 +9,32 @@ class IO_Request;
 
 #if defined _WIN32
 
+struct Overlapped final {
+    unsigned long long m_internal, m_internal_high;
+
+    union {
+        struct {
+            unsigned long m_offset, m_offset_high;
+        };
+
+        void* m_ptr;
+    };
+
+    void* m_event;
+};
+
+struct IO_handle final {
+    explicit IO_handle(uint64_t offset);
+    Overlapped* get_ol_ptr() { return &m_ol; }
+    Overlapped m_ol;
+};
+
 #elif defined __linux__
 
 // Forward declaration.
 struct io_uring;
 
-struct IO_handle {
+struct IO_handle final {
     explicit IO_handle(uint64_t offset);
     io_uring* m_uring;
     uint64_t m_id;

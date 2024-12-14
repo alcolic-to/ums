@@ -7,17 +7,6 @@
 
 namespace fs = std::filesystem;
 
-#ifdef _WIN32
-#include <windows.h>
-#undef min
-#undef max
-
-constexpr int64_t x_file_access = GENERIC_READ | GENERIC_WRITE;
-constexpr int64_t x_file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS |
-                                 FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING |
-                                 FILE_FLAG_WRITE_THROUGH;
-#endif
-
 // RAII file handle wrapper
 class File_handle {
 public:

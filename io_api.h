@@ -4,38 +4,14 @@
 #define COS_IO_API_H
 
 #include <cstdint>
+#include <memory>
+
+// Forward declaration.
+struct IO_handle;
 
 struct IO_Buffer {
     void* m_buffer;
     uint64_t m_size;
-};
-
-struct Overlapped final {
-    unsigned long long m_internal, m_internal_high;
-
-    union {
-        struct {
-            unsigned long m_offset, m_offset_high;
-        };
-
-        void* m_ptr;
-    };
-
-    void* m_event;
-};
-
-struct IO_Control final {
-public:
-    explicit IO_Control(uint64_t offset) noexcept : m_ol{}
-    {
-        constexpr uint32_t ON_BITS_32 = 0xFFFFFFFF;
-        constexpr uint8_t HIGH_BITS_OFFSET = 32;
-
-        m_ol.m_offset = offset & ON_BITS_32;                            // NOLINT
-        m_ol.m_offset_high = (offset >> HIGH_BITS_OFFSET) & ON_BITS_32; // NOLINT
-    }
-
-    Overlapped m_ol;
 };
 
 class IO_Request final {
@@ -56,7 +32,7 @@ public:
     void* m_file_handle;
     IO_Buffer m_io_buffer;
     uint64_t m_offset;
-    IO_Control m_control;
+    std::unique_ptr<IO_handle> m_io_handle;
     Type m_type;
     State m_state;
 };

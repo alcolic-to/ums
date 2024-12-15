@@ -8,7 +8,7 @@ IO_Request::IO_Request(void* file_handle, IO_Buffer buffer, uint64_t offset, Typ
     : m_file_handle{file_handle}
     , m_io_buffer{buffer}
     , m_offset{offset}
-    , m_control{offset}
+    , m_io_handle{std::make_unique<IO_handle>(offset)}
     , m_type{type}
     , m_state{State::init}
 {

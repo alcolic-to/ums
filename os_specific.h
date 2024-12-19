@@ -61,10 +61,7 @@ void update_io_state(IO_Request& io) noexcept;
 
 // File functions.
 //
-<<<<<<< HEAD
 void* open_file(const char* file_path, uint64_t flags, uint64_t mode);
-== == == = void * open_file(const char* file_path, int flags, int mode);
->>>>>>> master
 void close_file(void* file_handle);
 
 } // namespace os

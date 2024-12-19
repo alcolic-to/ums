@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 
 #include "io_api.h"
 #include "os_specific.h"

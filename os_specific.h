@@ -25,7 +25,9 @@ struct Overlapped final {
 
 struct IO_handle final {
     explicit IO_handle(uint64_t offset);
+
     Overlapped* get_ol_ptr() { return &m_ol; }
+
     Overlapped m_ol;
 };
 
@@ -59,7 +61,7 @@ void update_io_state(IO_Request& io) noexcept;
 
 // File functions.
 //
-void* open_file(const char* file_path, int flags, int mode);
+void* open_file(const char* file_path, uint64_t flags, uint64_t mode);
 void close_file(void* file_handle);
 
 } // namespace os

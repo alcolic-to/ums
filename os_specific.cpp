@@ -1,10 +1,13 @@
 #include "os_specific.h"
 
-#include <iostream> // NOLINT
+#include <bit>
+#include <cstdint>
 #include <filesystem>
+#include <format>   // NOLINT
+#include <iostream> // NOLINT
 
-#include "io_api.h"
 #include "file.h"
+#include "io_api.h"
 
 // OS specific preprocessor definitions.
 //
@@ -17,19 +20,19 @@
 #endif
 
 #if defined(OS_WINDOWS)
-// Reduce size of windows.h includes and include windows.
-//
-#define WIN32_LEAN_AND_MEAN
 
-#include <bit>
-#include <format>   // NOLINT
+// Reduce size of windows.h includes and include windows.
+// NOLINTBEGIN
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #undef min
 #undef max
+// NOLINTEND
+
 constexpr int64_t x_file_access = GENERIC_READ | GENERIC_WRITE;
 constexpr int64_t x_file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS |
-                                 FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING |
-                                 FILE_FLAG_WRITE_THROUGH;
+                                      FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING |
+                                      FILE_FLAG_WRITE_THROUGH;
 
 IO_handle::IO_handle(uint64_t offset) : m_ol{}
 {
@@ -38,25 +41,18 @@ IO_handle::IO_handle(uint64_t offset) : m_ol{}
 }
 
 #elif defined(OS_LINUX)
-#include <cstring>
 #include <cassert>
+#include <cstring>
+#include <fcntl.h>
+#include <liburing.h>
 #include <sched.h>
 #include <unistd.h>
-#include <liburing.h>
-#include <fcntl.h>
 
-class IO_uring
-{
+class IO_uring {
 public:
-    IO_uring()
-    {
-        io_uring_queue_init(1, &m_ring, 0 /* flags */);
-    }
+    IO_uring() { io_uring_queue_init(1, &m_ring, 0 /* flags */); }
 
-    ~IO_uring() noexcept
-    {
-        io_uring_queue_exit(&m_ring);
-    }
+    ~IO_uring() noexcept { io_uring_queue_exit(&m_ring); }
 
     io_uring m_ring{};
 };
@@ -65,8 +61,8 @@ thread_local IO_uring tls_uring;
 
 IO_handle::IO_handle(uint64_t offset) : m_uring(&tls_uring.m_ring)
 {
-    (void) offset;
-    static std::atomic<uint64_t> io_cnt { 0 };
+    (void)offset;
+    static std::atomic<uint64_t> io_cnt{0};
     m_id = io_cnt++;
 }
 
@@ -76,12 +72,15 @@ constexpr int64_t x_file_attributes = 0666;
 #endif
 
 File_handle::File_handle(const fs::path& file_path)
-        : m_handle{os::open_file(file_path.string().c_str(), x_file_access, x_file_attributes)}
+    : m_handle{os::open_file(file_path.string().c_str(), x_file_access, x_file_attributes)}
 {
 }
 
 // Destructor closes file handle
-File_handle::~File_handle() { os::close_file(m_handle); }
+File_handle::~File_handle()
+{
+    os::close_file(m_handle);
+}
 
 namespace os {
 
@@ -211,7 +210,7 @@ void update_io_state(IO_Request& io) noexcept
     }
 }
 
-void* open_file(const char* path, int flags, int mode)
+void* open_file(const char* path, uint64_t flags, uint64_t mode)
 {
     HANDLE handle = CreateFile(path, flags, 0, nullptr, OPEN_ALWAYS, mode, nullptr);
     if (handle == INVALID_HANDLE_VALUE)
@@ -294,7 +293,7 @@ void print_thread_affinity() noexcept
     std::cout << "\n";
 }
 
-void* open_file(const char* file_path, int flags, int mode)
+void* open_file(const char* file_path, uint64_t flags, uint64_t mode)
 {
     int* fd = new int(0);
     *fd = open(file_path, flags, mode);
@@ -311,8 +310,7 @@ void close_file(void* file_handle)
 {
     int* fd = reinterpret_cast<int*>(file_handle);
     int ret = close(*fd);
-    if (ret == -1)
-    {
+    if (ret == -1) {
         std::cerr << "Failed to close file descriptor: " << std::strerror(errno) << "\n";
         throw std::runtime_error("Failed to close file descriptor.");
     }
@@ -338,7 +336,6 @@ void uring_submit(IO_Request& io) noexcept
     else
         io_uring_prep_readv(sqe, fd, &io_vec, 1, offset);
     io_uring_sqe_set_data64(sqe, io_handle->m_id);
-    
     const int ret = io_uring_submit(io_handle->m_uring);
     if (ret != 1)
         assert(!"io_uring_submit should return 1!");
@@ -355,19 +352,19 @@ void uring_update(IO_Request& io) noexcept
 
     io_uring_cqe* cqe = nullptr;
     const int ret = io_uring_peek_cqe(io_handle->m_uring, &cqe);
-    if (ret == 0)
-    {
+    if (ret == 0) {
         // Not sure what we do if ret is 0 but cqe is nullptr
         // Fail request?
         assert(cqe != nullptr && "cqe must not be nullptr");
-        
+
         if (cqe->res != io.m_io_buffer.m_size)
             io.m_state = IO_Request::State::error;
         else
             io.m_state = IO_Request::State::completed;
-        
-        assert(io_uring_cqe_get_data64(cqe) == io_handle->m_id && "Missmatch between req_id and cqe data64!");
-        
+
+        assert(io_uring_cqe_get_data64(cqe) == io_handle->m_id &&
+               "Missmatch between req_id and cqe data64!");
+
         io_uring_cqe_seen(io_handle->m_uring, cqe);
     }
     // TODO milant: HANDLE POSSIBLE RETURN VALUES
@@ -387,7 +384,6 @@ void update_io_state(IO_Request& io) noexcept
 {
     uring_update(io);
 }
-
 
 // NOLINTEND(misc-include-cleaner)
 

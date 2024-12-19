@@ -10,7 +10,7 @@
 #include "io_api.h"
 #include "ums.h"
 #include "util.h"
-#include "file.h"
+
 
 using namespace std::chrono_literals;
 
@@ -226,105 +226,5 @@ TEST(IO, io_random_writes_and_reads)
 
     init_ums(test);
 }
-
-// #define RUN_BENCHMARK
-#ifdef RUN_BENCHMARK
-
-TEST(IO_benchmark, single_thread)
-{
-    auto test = [] {
-        constexpr uint64_t total_bytes = 128 * 1024 * 1024; // 100MB
-
-        for (uint64_t io_size = 512; io_size <= 1024 * 1024; io_size <<= 1U) {
-            Stopwatch s{std::format("Write benchmark. Size: Total bytes: {}MB, I/O size: {}KB",
-                                    total_bytes / 1024 / 1024, io_size / 1024)};
-            multiple_ios(true, total_bytes, io_size);
-        }
-
-        for (uint64_t io_size = 512; io_size <= 1024 * 1024; io_size <<= 1U) {
-            Stopwatch s{std::format("Read benchmark. Size: Total bytes: {}MB, I/O size: {}KB",
-                                    total_bytes / 1024 / 1024, io_size / 1024)};
-            multiple_ios(false, total_bytes, io_size);
-        }
-    };
-
-    init_ums(test);
-}
-
-TEST(IO_benchmark, multiple_threads)
-{
-    auto test = [] {
-        const fs::path file_path{"io_file"};
-
-        {
-            File_handle file{file_path};
-
-            constexpr uint64_t min_bytes = 10ULL * 1024 * 1024;       // 10MB
-            constexpr uint64_t max_bytes = 4ULL * 1024 * 1024 * 1024; // 4GB
-
-            // Write benchmark.
-            //
-            for (uint32_t threads = 2; threads <= 32; threads <<= 1U) {
-                for (uint64_t io_size = 512; io_size <= 1024 * 1024; io_size <<= 1U) {
-                    uint64_t total_bytes =
-                        std::clamp(io_size * threads * 1024, min_bytes, max_bytes);
-
-                    Stopwatch s{std::format("Write benchmark ({} thread(s)). Size: Total "
-                                            "bytes: {}MB, I/O size: {}KB",
-                                            threads, total_bytes / 1024 / 1024, io_size / 1024)};
-
-                    std::vector<std::shared_ptr<Task>> tasks;
-                    tasks.reserve(threads);
-
-                    for (uint32_t i = 0; i < threads; ++i) {
-                        auto task = task_manager->execute_task([&] {
-                            multiple_ios(file, true, total_bytes / threads, io_size,
-                                         i * (total_bytes / threads));
-                        });
-
-                        tasks.emplace_back(task);
-                    }
-
-                    for (auto& task : tasks)
-                        task->wait();
-                }
-            }
-
-            // Read benchmark.
-            //
-            for (uint32_t threads = 2; threads <= 32; threads <<= 1U) {
-                for (uint64_t io_size = 512; io_size <= 1024 * 1024; io_size <<= 1U) {
-                    uint64_t total_bytes =
-                        std::clamp(io_size * threads * 1024, min_bytes, max_bytes);
-
-                    Stopwatch s{std::format("Read benchmark ({} thread(s)). Size: Total "
-                                            "bytes: {}MB, I/O size: {}KB",
-                                            threads, total_bytes / 1024 / 1024, io_size / 1024)};
-
-                    std::vector<std::shared_ptr<Task>> tasks;
-                    tasks.reserve(threads);
-
-                    for (uint32_t i = 0; i < threads; ++i) {
-                        auto task = task_manager->execute_task([&] {
-                            multiple_ios(file, false, total_bytes / threads, io_size,
-                                         i * (total_bytes / threads));
-                        });
-
-                        tasks.emplace_back(task);
-                    }
-
-                    for (auto& task : tasks)
-                        task->wait();
-                }
-            }
-        }
-
-        fs::remove(file_path);
-    };
-
-    init_ums(test);
-}
-
-#endif // RUN_BENCHMARK
 
 // NOLINTEND

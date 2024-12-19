@@ -11,13 +11,24 @@ Supported OS:
 * `cmake` - minimum version 3.10
 * `clang` and `clang++`
 * `Ninja` - for faster build times
+* For linux 'liburing-dev' library is required
 
 ## Usage
 
 ```bash
 git clone https://github.com/aleksandarcolic22414/cos-cooperative-scheduling
 cd cos-cooperative-scheduling
+```
+
+Build on `Linux`:
+```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ 
+cmake --build build
+```
+
+Build on `Windows`:
+```bash
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
 cmake --build build
 ```
 

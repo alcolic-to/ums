@@ -41,6 +41,11 @@ set(HPP_FILES os_specific.h scheduler.h task_manager.h worker.h io_api.h  util.h
 set(ALL_FILES ${CPP_FILES} ${HPP_FILES})
 
 add_library(user_mode_scheduler_lib STATIC ${CPP_FILES})
+if (UNIX)
+    add_subdirectory(third_party)
+    target_link_libraries(user_mode_scheduler_lib PRIVATE uring)
+    add_dependencies(user_mode_scheduler_lib uring_project)
+endif()
 set(COS_LIBRARIES user_mode_scheduler_lib)
 
 # Create an executable.

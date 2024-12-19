@@ -10,6 +10,7 @@
 #include "io_api.h"
 #include "ums.h"
 #include "util.h"
+#include "file.h"
 
 using namespace std::chrono_literals;
 

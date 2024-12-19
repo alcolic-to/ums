@@ -336,7 +336,6 @@ void uring_submit(IO_Request& io) noexcept
     else
         io_uring_prep_readv(sqe, fd, &io_vec, 1, offset);
     io_uring_sqe_set_data64(sqe, io_handle->m_id);
-
     const int ret = io_uring_submit(io_handle->m_uring);
     if (ret != 1)
         assert(!"io_uring_submit should return 1!");

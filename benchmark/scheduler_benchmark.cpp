@@ -51,7 +51,6 @@ static void BM_task_exec_all_cpus(benchmark::State& state)
 {
     init_ums([&] {
         std::vector<std::shared_ptr<Task>> tasks;
-        tasks.reserve(state.range(0));
 
         for (auto _ : state) {
             for (int i = 0; i < schedulers->cpus_count(); ++i)
@@ -100,7 +99,6 @@ static void BM_task_exec_long_tasks(benchmark::State& state)
 {
     init_ums([&] {
         std::vector<std::shared_ptr<Task>> tasks;
-        tasks.reserve(state.range(0));
 
         for (auto _ : state) {
             for (int i = 0; i < schedulers->cpus_count(); ++i)
@@ -122,7 +120,6 @@ static void BM_task_exec_short_tasks(benchmark::State& state)
 {
     init_ums([&] {
         std::vector<std::shared_ptr<Task>> tasks;
-        tasks.reserve(state.range(0));
 
         for (auto _ : state) {
             for (int i = 0; i < schedulers->cpus_count(); ++i)
@@ -141,11 +138,32 @@ BENCHMARK(BM_task_exec_short_tasks)
     ->RangeMultiplier(2)
     ->Range(1, 1024);
 
+static void BM_task_exec_stress(benchmark::State& state)
+{
+    init_ums([&] {
+        std::vector<std::shared_ptr<Task>> tasks;
+
+        for (auto _ : state) {
+            for (int i = 0; i < state.range(0); ++i)
+                tasks.push_back(task_manager->execute_task([&] { return; }));
+
+            for (auto task : tasks)
+                task->wait();
+        }
+    });
+}
+
+BENCHMARK(BM_task_exec_stress)
+    ->Unit(benchmark::kMillisecond)
+    ->MeasureProcessCPUTime()
+    ->RangeMultiplier(4)
+    ->Range(1024, 1024 * 1024)
+    ->Repetitions(50);
+
 static void BM_real_work_simulation(benchmark::State& state)
 {
     init_ums([&] {
         std::vector<std::shared_ptr<Task>> tasks;
-        tasks.reserve(state.range(0));
 
         for (auto _ : state) {
             auto dur = 20ms;

@@ -20,7 +20,7 @@ void sleep_test(const uint32_t iterations, const auto sleep_time)
         auto duration = now() - start;
         auto expected_duration = iterations * sleep_time;
 
-        ASSERT_LE(std::chrono::abs(expected_duration - duration), 20ms);
+        ASSERT_LE(std::chrono::abs(expected_duration - duration), 1ms);
     };
 
     init_ums(test);

@@ -200,8 +200,6 @@ void Scheduler::park_idle(Worker* worker)
         worker->m_task->notify();
         worker->m_task.reset();
     }
-
-    m_idle_start_time = now();
 }
 
 void Scheduler::park_waiting(Worker* worker)
@@ -358,13 +356,19 @@ void Scheduler::schedule_workers()
     steal_work();
 }
 
+void Scheduler::prepare_exec() noexcept
+{
+    invalidate_idle_timer();
+    prepare_next_worker();
+}
+
 void Scheduler::schedule()
 {
     while (true) {
         schedule_workers();
 
         if (has_runnable_workers())
-            return prepare_next_worker();
+            return prepare_exec();
 
         sleep();
 
@@ -414,15 +418,18 @@ auto Scheduler::waiters_info() const noexcept
 // Checks whether scheduler should idle spin.
 // Idle spin is necessary for eficient use of scheduler. After task is done, if we go to sleep
 // immediately, we will miss the oportinity to execute next user task which might come right after
-// the previous task is done.
+// the previous task is done if user executes tasks sequentially.
 //
-bool Scheduler::should_idle_spin() const noexcept
+bool Scheduler::should_idle_spin() noexcept
 {
     if constexpr (!FS_idle_spinning_allowed)
         return false;
 
     if (initializing()) [[unlikely]]
         return false;
+
+    if (m_idle_start_time == Time_point::max())
+        m_idle_start_time = now();
 
     return now() <= m_idle_start_time + CFG_idle_spin_threshold;
 }
@@ -444,7 +451,7 @@ bool Scheduler::should_idle_spin() const noexcept
 // blocked until all of our checks are done under lock. One potential problem is that OS
 // scheduler might schedule worker out if mutex is locked in this function and we are, for
 // example, trying to add new task from another worker which must notify scheduler.
-// This can be solved with global run queue.
+// This problem maybe can be solved with global run queue.
 //
 void Scheduler::sleep() noexcept
 {

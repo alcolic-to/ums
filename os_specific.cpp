@@ -245,15 +245,9 @@ uint64_t cpus_avail_mask() noexcept
         return -1;
     }
 
-    const int num_cores = CPU_COUNT(&mask);
-    std::cout << "Process is allowed to run on " << num_cores << " cores.\n";
-
-    for (std::size_t i = 0; i < cpus_count(); ++i) {
-        if (CPU_ISSET(i, &mask)) {
-            std::cout << "CPU " << i << " is available.\n";
+    for (std::size_t i = 0; i < cpus_count(); ++i)
+        if (CPU_ISSET(i, &mask))
             cpu_mask |= (1U << i);
-        }
-    }
 
     return cpu_mask;
 }
@@ -272,25 +266,6 @@ void bind_thread(uint64_t cpu_mask) noexcept
     const pthread_t current_thread = pthread_self();
     if (pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
         std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << "\n";
-
-    print_thread_affinity();
-}
-
-void print_thread_affinity() noexcept
-{
-    cpu_set_t mask;
-    CPU_ZERO(&mask);
-
-    const pthread_t current_thread = pthread_self();
-    if (pthread_getaffinity_np(current_thread, sizeof(cpu_set_t), &mask) == -1)
-        std::cerr << "pthread_getaffinity_np failed: " << std::strerror(errno) << "\n";
-
-    std::cout << "Thread affinity: ";
-    for (std::size_t i = 0; i < CPU_SETSIZE; ++i)
-        if (CPU_ISSET(i, &mask))
-            std::cout << i << " ";
-
-    std::cout << "\n";
 }
 
 void* open_file(const char* file_path, uint64_t flags, uint64_t mode)

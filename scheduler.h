@@ -105,6 +105,8 @@ public:
 
     void prepare_next_worker() noexcept;
 
+    void prepare_exec() noexcept;
+
     void set_worker_state(Worker* worker, Worker::State state) noexcept;
 
     void enqueue_task(std::shared_ptr<Task> task);
@@ -124,7 +126,9 @@ public:
 
     auto waiters_info() const noexcept;
 
-    bool should_idle_spin() const noexcept;
+    void invalidate_idle_timer() noexcept { m_idle_start_time = Time_point::max(); };
+
+    bool should_idle_spin() noexcept;
 
     void sleep() noexcept;
     void notify();
@@ -191,7 +195,7 @@ private:
     std::atomic<uint64_t> m_load{0};
     std::atomic<bool> m_exit{false};
 
-    Time_point m_idle_start_time{Time_point::min()};
+    Time_point m_idle_start_time{Time_point::max()};
 
     // TODO: Create workers in place next to each other.
     //

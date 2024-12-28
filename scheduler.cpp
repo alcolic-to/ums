@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <memory>
@@ -12,6 +13,7 @@
 
 #include "config.h"
 #include "io_api.h"
+#include "options.h"
 #include "os_specific.h"
 #include "task_manager.h"
 #include "util.h"
@@ -20,15 +22,20 @@
 // Creates new Scheduler for each bit available in CPUs availability mask.
 //
 // clang-format off
-Schedulers::Schedulers() noexcept try
+Schedulers::Schedulers(Options opt) noexcept try
     : m_system_cpus_count{std::min(os::cpus_count(), CFG_max_supported_cpus)}
     , m_cpus_avail_mask{Cpu_Mask{os::cpus_avail_mask()} & Cpu_Mask{CFG_allowed_cpus_mask}}
 {
-    for (uint64_t cpu_id = 0, sch_created = 0; cpu_id < m_cpus_avail_mask.size(); ++cpu_id) {
-        if (m_cpus_avail_mask.test(cpu_id) && sch_created < CFG_max_schedulers_count) {
-            m_schedulers.emplace_back(std::make_unique<Scheduler>(*this, cpu_id));
+    size_t cpu_id = 0;
+    uint64_t sch_created = 0;
+
+    while (cpu_id < m_cpus_avail_mask.size() && sch_created < opt.schedulers_count()) {
+        if (m_cpus_avail_mask.test(cpu_id)) {
+            m_schedulers.emplace_back(std::make_unique<Scheduler>(*this, cpu_id, opt.workers_per_scheduler()));
             ++sch_created;
         }
+
+        ++cpu_id;
     }
 }
 catch (...) {
@@ -130,11 +137,12 @@ void Schedulers::wait_exit()
 // After workers are created, starts single worker from idle queue
 // and waits until worker (scheduler) goes to sleep.
 //
-Scheduler::Scheduler(Schedulers& schedulers, uint64_t cpu_id)
+Scheduler::Scheduler(Schedulers& schedulers, uint64_t cpu_id,
+                     Options::Workers_per_scheduler workers_count)
     : m_schedulers{schedulers}
     , m_cpu{cpu_id}
 {
-    for (uint32_t i = 0; i < CFG_workers_per_scheduler; ++i)
+    for (uint32_t i = 0; i < workers_count; ++i)
         m_workers.push_back(std::make_unique<Worker>(i, *this));
 
     {

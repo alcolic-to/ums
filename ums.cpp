@@ -4,6 +4,7 @@
 #include <memory>
 #include <utility>
 
+#include "options.h"
 #include "scheduler.h"
 
 // Thread local worker.

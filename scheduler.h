@@ -3,7 +3,9 @@
 #ifndef COS_SCHEDULER_H
 #define COS_SCHEDULER_H
 
+#include <algorithm>
 #include <atomic>
+#include <bitset>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -14,6 +16,7 @@
 #include <vector>
 
 #include "config.h"
+#include "options.h"
 #include "spinlock.h"
 #include "task_manager.h"
 #include "worker.h"
@@ -77,7 +80,8 @@ class Scheduler final {
 public:
     enum class State : int { initializing, running, idle_wait, idle_sleep, exiting };
 
-    explicit Scheduler(Schedulers& schedulers, uint64_t cpu_id);
+    explicit Scheduler(Schedulers& schedulers, uint64_t cpu_id,
+                       Options::Workers_per_scheduler workers_count);
     ~Scheduler() noexcept;
 
     Scheduler(const Scheduler&) = delete;
@@ -206,7 +210,7 @@ class Schedulers final {
     friend class Scheduler;
 
 public:
-    Schedulers() noexcept;
+    explicit Schedulers(Options opt = Options{}) noexcept;
 
     [[nodiscard]] Scheduler& min_load_scheduler() const noexcept;
     [[nodiscard]] Scheduler& max_load_scheduler() const noexcept;

@@ -4,6 +4,13 @@
 #
 # Clean command: cmake --build .\build --target clean
 
+# If you want to play around with scheduler, you can just enable BUILD_MAIN which builds main.cpp file.
+
+# To enable tracy profiler, build project with ENABLE_TRACY=ON and make sure to have debug symbols (e.g. RelWithDebugInfo)
+# You will also need tracy server, GUI etc. installed, since we are not build it from scratch (I tried couple of times and it failed, so I gave up).
+# For windows, found needed binaries under releases https://github.com/wolfpld/tracy. Note that server (downloaded binaries) and client version (one compiled by UMS) needs to be the same.
+# Also, on windows, make sure to run program as administrator so tracy can collect stack traces.
+
 cmake_minimum_required(VERSION 3.10)
 project(user_mode_scheduler)
 
@@ -32,6 +39,11 @@ if (UNIX)
     add_subdirectory(third_party)
     target_link_libraries(ums_lib PRIVATE uring)
     add_dependencies(ums_lib uring_project)
+endif()
+
+include(cmake/profilers.cmake)
+if (ENABLE_TRACY)
+    add_tracy(ums_lib)
 endif()
 
 set(COS_LIBRARIES ums_lib)

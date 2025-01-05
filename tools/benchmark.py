@@ -1,4 +1,5 @@
 import os
+import platform
 import subprocess
 import sys
 import tempfile
@@ -27,7 +28,14 @@ def rm_dir(path):
     try:
         remove_tree(path)
     except:
-        print("Directory {path} does not exist.")
+        print(f"Directory {path} does not exist.")
+
+def execs_in_dir(directory):
+    return [
+        entry.name
+        for entry in os.scandir(directory)
+        if entry.is_file() and (entry.path.lower().endswith(".exe") if platform.system() == "Windows" else os.access(entry.path, os.X_OK))
+    ]
 
 # Main workflow
 if __name__ == "__main__":
@@ -68,7 +76,7 @@ if __name__ == "__main__":
         compare_py_script = find_file("compare.py", root + "/build")
 
         # Running benchmarks
-        for exe in os.listdir(bm_baseline_dir):
+        for exe in execs_in_dir(bm_baseline_dir):
             bm_baseline_exe = bm_baseline_dir + "/" + exe
             bm_test_exe = bm_test_dir + "/" + exe
             run_command("py " + compare_py_script + " benchmarks " + bm_baseline_exe + " " + bm_test_exe, cout=True)

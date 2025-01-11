@@ -31,20 +31,20 @@ constexpr uint64_t CFG_allowed_cpus_mask = 0b11111111'11111111'11111111'11111111
 // Number of schedulers that will be created.
 // TODO: schedulers does not operate on Low Power Efficient-cores, hence those should be excluded.
 //
-constexpr uint64_t CFG_default_schedulers_count = 7;
-constexpr uint64_t CFG_min_schedulers_count = 1;
-constexpr uint64_t CFG_max_schedulers_count = CFG_max_supported_cpus;
+constexpr uint64_t CFG_min_schedulers_count         = 1;
+constexpr uint64_t CFG_max_schedulers_count         = CFG_max_supported_cpus;
+constexpr     uint64_t CFG_default_schedulers_count = 7;
 
 // Number of workers per scheduler.
 //
+constexpr uint64_t CFG_min_workers_per_scheduler     = 1;
+constexpr uint64_t CFG_max_workers_per_scheduler     = 256;
 constexpr uint64_t CFG_default_workers_per_scheduler = 64;
-constexpr uint64_t CFG_min_workers_per_scheduler = 1;
-constexpr uint64_t CFG_max_workers_per_scheduler = 256;
 
 // Thresholds.
 //
 constexpr auto CFG_idle_sleep_threshold = 20ms;
-constexpr auto CFG_idle_spin_threshold = 20ms;
+constexpr auto CFG_idle_spin_threshold  = 20ms;
 
 // clang-format on
 

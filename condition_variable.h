@@ -8,6 +8,8 @@
 
 #include "mutex.h"
 
+class Condition_variable; // To suppress unused header warnings.
+
 class Condition_variable_any {
 public:
     Condition_variable_any();

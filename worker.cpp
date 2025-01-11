@@ -124,7 +124,7 @@ void Worker::main_loop()
     while (true) {
         m_scheduler.sync<Sync_context::main>(this);
 
-        if (exit())
+        if (exit()) [[unlikely]]
             return;
 
         try {

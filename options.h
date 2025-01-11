@@ -24,14 +24,14 @@ public:
     };
 
     struct Schedulers_count : Option {
-        explicit Schedulers_count(uint64_t value = CFG_default_schedulers_count)
+        explicit Schedulers_count(uint64_t value = CFG_default_schedulers_count) noexcept
             : Option{value, CFG_min_schedulers_count, CFG_max_schedulers_count}
         {
         }
     };
 
     struct Workers_per_scheduler : Option {
-        explicit Workers_per_scheduler(uint64_t value = CFG_default_workers_per_scheduler)
+        explicit Workers_per_scheduler(uint64_t value = CFG_default_workers_per_scheduler) noexcept
             : Option{value, CFG_min_workers_per_scheduler, CFG_max_workers_per_scheduler}
         {
         }

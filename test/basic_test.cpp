@@ -1,8 +1,8 @@
 // NOLINTBEGIN
 
 #include <chrono>
-#include <cstdint>
 #include <cmath>
+#include <cstdint>
 #include <gtest/gtest.h>
 
 #include "ums.h"

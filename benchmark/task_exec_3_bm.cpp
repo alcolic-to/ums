@@ -4,6 +4,7 @@
 #include <chrono>
 #include <memory>
 
+#include "async.h"
 #include "benchmark_util.h"
 #include "ums.h"
 
@@ -14,12 +15,9 @@ static void BM_task_exec_all_cpus_multiple_tasks(benchmark::State& state)
         tasks.reserve(state.range(1));
 
         for (auto _ : state) {
-            for (int i = 0; i < schedulers->cpus_count(); ++i) {
-                for (int i = 0; i < state.range(1); ++i) {
-                    tasks.push_back(task_manager->execute_task(
-                        [&] { hard_work(microseconds(state.range(0))); }));
-                }
-            }
+            for (int i = 0; i < schedulers->cpus_count(); ++i)
+                for (int i = 0; i < state.range(1); ++i)
+                    tasks.push_back(async([&] { hard_work(microseconds(state.range(0))); }));
 
             for (auto task : tasks)
                 task->wait();

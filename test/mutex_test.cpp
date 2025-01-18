@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 
+#include "async.h"
 #include "condition_variable.h"
 #include "mutex.h"
 #include "scheduler.h"
@@ -92,7 +93,7 @@ TEST(Condition_variable, cv_sanity_test_1)
             cv.notify_one();
         };
 
-        task_manager->execute_tasks<false>(waiter, notifier);
+        asyncs<true>(waiter, notifier);
     };
 
     init_ums(test);
@@ -140,7 +141,7 @@ TEST(Condition_variable, cv_sanity_test_2)
             tls_worker->sleep_for(100ms);
         };
 
-        task_manager->execute_tasks<false>(waiter_1, waiter_2, waiter_3, notifier);
+        asyncs<true>(waiter_1, waiter_2, waiter_3, notifier);
 
         ASSERT_TRUE(v.size() == 3);
         ASSERT_TRUE(v[0] == 2);
@@ -181,7 +182,7 @@ TEST(Condition_variable, cv_producer_consumer_test)
             ASSERT_TRUE(data == 42);
         };
 
-        task_manager->execute_tasks<false>(producer, consumer);
+        asyncs<true>(producer, consumer);
     };
 
     init_ums(test);
@@ -208,7 +209,7 @@ TEST(Condition_variable, cv_spurious_wakeup_test)
             cv.notify_one();
         };
 
-        task_manager->execute_tasks<false>(spurious_wakeup, notifier);
+        asyncs<true>(spurious_wakeup, notifier);
     };
 
     init_ums(test);
@@ -247,7 +248,7 @@ TEST(Condition_variable, cv_complex_test_1)
             }
         };
 
-        task_manager->execute_tasks<false>(odd, even);
+        asyncs<true>(odd, even);
 
         const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
         ASSERT_TRUE(vec == expected_val);
@@ -303,8 +304,8 @@ TEST(Condition_variable, cv_complex_test_2)
             increment_cv.notify_all();
         };
 
-        task_manager->execute_tasks<false>(increment, increment, increment, increment, increment,
-                                           increment, increment, increment, notifier);
+        asyncs<true>(increment, increment, increment, increment, increment, increment, increment,
+                     increment, notifier);
 
         ASSERT_TRUE(atomic_counter.load() == 2 * threads_count);
     };
@@ -349,7 +350,7 @@ public:
         , currentMessage(message::idle)
         , tryLockSuccess(false)
     {
-        task_manager->execute_task<true>([&] { thread_func(); });
+        async([&] { thread_func(); });
     }
 
     void join() { send_message(message::shutdown); }
@@ -832,7 +833,7 @@ void test_one_writer()
     };
 
     ASSERT_TRUE(atom.exchange(0) == -1);
-    task_manager->execute_tasks<false>(f, f, f, f);
+    asyncs<true>(f, f, f, f);
     ASSERT_TRUE(atom == 4);
 }
 
@@ -854,7 +855,7 @@ void test_multiple_readers()
     };
 
     ASSERT_TRUE(atom.exchange(0) == -1);
-    task_manager->execute_tasks<false>(f, f, f, f);
+    asyncs<true>(f, f, f, f);
     ASSERT_TRUE(atom == 4);
 }
 
@@ -882,7 +883,7 @@ void test_writer_blocking_readers()
         ASSERT_TRUE(atom == 1729);
     };
 
-    task_manager->execute_tasks<false>(f1, f2, f2, f2, f2);
+    asyncs<true>(f1, f2, f2, f2, f2);
     ASSERT_TRUE(atom == 1729);
 }
 
@@ -911,7 +912,7 @@ void test_readers_blocking_writer()
     };
 
     // join_and_clear(threads);
-    task_manager->execute_tasks<false>(f1, f1, f1, f1, f2);
+    asyncs<true>(f1, f1, f1, f1, f2);
     ASSERT_TRUE(atom == 40);
 }
 
@@ -925,7 +926,7 @@ void test_try_lock_and_try_lock_shared()
         std::unique_lock<_Mutex> MainExclusive(mut, std::try_to_lock);
         ASSERT_TRUE(MainExclusive.owns_lock());
 
-        task_manager->execute_task<false>([&] {
+        async<true>([&] {
             {
                 std::unique_lock<_Mutex> ExclusiveLock(mut, std::try_to_lock);
                 ASSERT_TRUE(!ExclusiveLock.owns_lock());
@@ -942,7 +943,7 @@ void test_try_lock_and_try_lock_shared()
         std::shared_lock<_Mutex> MainShared(mut, std::try_to_lock);
         ASSERT_TRUE(MainShared.owns_lock());
 
-        task_manager->execute_task<false>([&] {
+        async<true>([&] {
             {
                 std::unique_lock<_Mutex> ExclusiveLock(mut, std::try_to_lock);
                 ASSERT_TRUE(!ExclusiveLock.owns_lock());
@@ -965,7 +966,7 @@ void test_timed_behavior()
             std::unique_lock<Shared_timed_mutex> MainExclusive(stm, 25ms);
             ASSERT_TRUE(MainExclusive.owns_lock());
 
-            task_manager->execute_task<false>([&] {
+            async<true>([&] {
                 {
                     std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 25ms);
                     ASSERT_TRUE(!ExclusiveLock.owns_lock());
@@ -982,7 +983,7 @@ void test_timed_behavior()
             std::shared_lock<Shared_timed_mutex> MainShared(stm, 25ms);
             ASSERT_TRUE(MainShared.owns_lock());
 
-            task_manager->execute_task<false>([&] {
+            async<true>([&] {
                 {
                     std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 25ms);
                     ASSERT_TRUE(!ExclusiveLock.owns_lock());
@@ -1025,7 +1026,7 @@ void test_timed_behavior()
             ASSERT_TRUE(atom == val);
         };
 
-        task_manager->execute_tasks<false>(f1, f2, f2, f2, f2);
+        asyncs<true>(f1, f2, f2, f2, f2);
         ASSERT_TRUE(atom == 400);
     }
 
@@ -1057,7 +1058,7 @@ void test_timed_behavior()
             atom.wait_while_lt(44);
         };
 
-        task_manager->execute_tasks<false>(f1, f2, f2, f2, f2);
+        asyncs<true>(f1, f2, f2, f2, f2);
         ASSERT_TRUE(atom == 44);
     }
 
@@ -1089,7 +1090,7 @@ void test_timed_behavior()
 
         std::shared_lock<Shared_timed_mutex> MainShared(stm);
 
-        task_manager->execute_tasks<false>(f1, f2, f3);
+        asyncs<true>(f1, f2, f3);
 
         Atomic_wrapper readers{0};
 
@@ -1099,7 +1100,7 @@ void test_timed_behavior()
             readers.wait_while_lt(4);
         };
 
-        task_manager->execute_tasks<false>(f4, f4, f4, f4);
+        asyncs<true>(f4, f4, f4, f4);
         ASSERT_TRUE(readers == 4);
     }
 }
@@ -1116,7 +1117,7 @@ TEST(Mutex, mutex_sanity_test_1)
             mutex.unlock();
         };
 
-        task_manager->execute_tasks<false>(f, f);
+        asyncs<true>(f, f);
         ASSERT_TRUE(counter == 2);
     };
 
@@ -1139,7 +1140,7 @@ TEST(Mutex, mutex_sanity_test_2)
             }
         };
 
-        task_manager->execute_tasks<false>(f, f, f, f);
+        asyncs<true>(f, f, f, f);
         ASSERT_TRUE(counter == 4 * iterations);
     };
 
@@ -1196,7 +1197,7 @@ TEST(Mutex, mutex_sanity_test_4)
             }
         };
 
-        task_manager->execute_tasks<false>(odd, even);
+        asyncs<true>(odd, even);
 
         const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
         ASSERT_TRUE(vec == expected_val);
@@ -1227,7 +1228,7 @@ TEST(Shared_mutex, mutex_sanity_test_1)
             mutex.unlock();
         };
 
-        task_manager->execute_tasks<false>(f, f);
+        asyncs<true>(f, f);
         ASSERT_TRUE(counter == 2);
     };
 
@@ -1250,7 +1251,7 @@ TEST(Shared_mutex, mutex_sanity_test_2)
             }
         };
 
-        task_manager->execute_tasks<false>(f, f, f, f);
+        asyncs<true>(f, f, f, f);
         ASSERT_TRUE(counter == 4 * iterations);
     };
 
@@ -1310,7 +1311,7 @@ TEST(Shared_mutex, sanity_test_4)
             }
         };
 
-        task_manager->execute_tasks<false>(odd, even);
+        asyncs<true>(odd, even);
 
         const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
         ASSERT_TRUE(vec == expected_val);
@@ -1357,7 +1358,7 @@ TEST(Recursive_mutex, mutex_sanity_test_1)
             mutex.unlock();
         };
 
-        task_manager->execute_tasks<false>(f, f);
+        asyncs<true>(f, f);
         ASSERT_TRUE(counter == 2);
     };
 
@@ -1380,7 +1381,7 @@ TEST(Recursive_mutex, mutex_sanity_test_2)
             }
         };
 
-        task_manager->execute_tasks<false>(f, f, f, f);
+        asyncs<true>(f, f, f, f);
         ASSERT_TRUE(counter == 4 * iterations);
     };
 
@@ -1449,7 +1450,7 @@ TEST(Timed_mutex, mutex_sanity_test_1)
             mutex.unlock();
         };
 
-        task_manager->execute_tasks<false>(f, f);
+        asyncs<true>(f, f);
         ASSERT_TRUE(counter == 2);
     };
 
@@ -1472,7 +1473,7 @@ TEST(Timed_mutex, mutex_sanity_test_2)
             }
         };
 
-        task_manager->execute_tasks<false>(f, f, f, f);
+        asyncs<true>(f, f, f, f);
         ASSERT_TRUE(counter == 4 * iterations);
     };
 
@@ -1531,7 +1532,7 @@ TEST(Timed_mutex, mutex_sanity_test_4)
             }
         };
 
-        task_manager->execute_tasks<false>(odd, even);
+        asyncs<true>(odd, even);
 
         const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
         ASSERT_TRUE(vec == expected_val);
@@ -1565,7 +1566,7 @@ TEST(Timed_mutex, timed_mutex_complex_test)
             std::unique_lock<Timed_mutex> MainExclusive(timed_mutex, 25ms);
             ASSERT_TRUE(MainExclusive.owns_lock());
 
-            task_manager->execute_task<false>([&] {
+            async<true>([&] {
                 std::unique_lock<Timed_mutex> ExclusiveLock(timed_mutex, 25ms);
                 ASSERT_TRUE(!ExclusiveLock.owns_lock());
             });
@@ -1607,7 +1608,7 @@ TEST(Timed_mutex, timed_mutex_complex_test)
                 MainUnique.unlock();
             };
 
-            task_manager->execute_tasks<false>(f, f, f, f2);
+            asyncs<true>(f, f, f, f2);
             ASSERT_TRUE(atom == 300);
         }
     };
@@ -1627,7 +1628,7 @@ TEST(Recursive_timed_mutex, mutex_sanity_test_1)
             mutex.unlock();
         };
 
-        task_manager->execute_tasks<false>(f, f);
+        asyncs<true>(f, f);
         ASSERT_TRUE(counter == 2);
     };
 
@@ -1650,7 +1651,7 @@ TEST(Recursive_timed_mutex, mutex_sanity_test_2)
             }
         };
 
-        task_manager->execute_tasks<false>(f, f, f, f);
+        asyncs<true>(f, f, f, f);
         ASSERT_TRUE(counter == 4 * iterations);
     };
 
@@ -1720,7 +1721,7 @@ TEST(Shared_timed_mutex, mutex_sanity_test_1)
             mutex.unlock();
         };
 
-        task_manager->execute_tasks<false>(f, f);
+        asyncs<true>(f, f);
         ASSERT_TRUE(counter == 2);
     };
 
@@ -1743,7 +1744,7 @@ TEST(Shared_timed_mutex, mutex_sanity_test_2)
             }
         };
 
-        task_manager->execute_tasks<false>(f, f, f, f);
+        asyncs<true>(f, f, f, f);
         ASSERT_TRUE(counter == 4 * iterations);
     };
 
@@ -1803,7 +1804,7 @@ TEST(Shared_timed_mutex, sanity_test_4)
             }
         };
 
-        task_manager->execute_tasks<false>(odd, even);
+        asyncs<true>(odd, even);
 
         const std::vector<int> expected_val = {5, 51, 512, 5121, 51212, 512121, 5121212};
         ASSERT_TRUE(vec == expected_val);

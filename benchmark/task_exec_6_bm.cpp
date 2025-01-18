@@ -4,6 +4,7 @@
 #include <chrono>
 #include <memory>
 
+#include "async.h"
 #include "benchmark_util.h"
 #include "ums.h"
 
@@ -14,7 +15,7 @@ static void BM_task_exec_stress(benchmark::State& state)
 
         for (auto _ : state) {
             for (int i = 0; i < 1024 * 1024; ++i)
-                tasks.push_back(task_manager->execute_task([&] { return; }));
+                tasks.push_back(async([&] { return; }));
 
             for (auto task : tasks)
                 task->wait();

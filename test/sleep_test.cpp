@@ -1,6 +1,7 @@
 #include <chrono>
 #include <gtest/gtest.h>
 
+#include "async.h"
 #include "ums.h"
 #include "util.h"
 #include "worker.h"
@@ -15,7 +16,7 @@ void sleep_test(const uint32_t iterations, const auto sleep_time)
         auto start = now();
 
         for (uint32_t i = 0; i < iterations; ++i)
-            task_manager->execute_task<false>([&] { tls_worker->sleep_for(sleep_time); });
+            async<true>([&] { tls_worker->sleep_for(sleep_time); });
 
         auto duration = now() - start;
         auto expected_duration = iterations * sleep_time;

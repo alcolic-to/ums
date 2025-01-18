@@ -11,10 +11,11 @@
 #include <thread>
 #include <vector>
 
+#include "async.h"
 #include "benchmark_util.h"
 #include "mutex.h"
-#include "task_manager.h"
 #include "ums.h"
+
 
 static void BM_spinlock_plain(benchmark::State& state)
 {
@@ -102,7 +103,7 @@ static void BM_spinlock(benchmark::State& state)
 
         for (auto _ : state) {
             for (int i = 0; i < state.range(0); ++i)
-                tasks.emplace_back(task_manager->execute_task(f));
+                tasks.emplace_back(async(f));
 
             for (auto& task : tasks)
                 task->wait();
@@ -130,7 +131,7 @@ static void BM_mutex(benchmark::State& state)
 
         for (auto _ : state) {
             for (int i = 0; i < state.range(0); ++i)
-                tasks.emplace_back(task_manager->execute_task(f));
+                tasks.emplace_back(async(f));
 
             for (auto& task : tasks)
                 task->wait();
@@ -185,7 +186,7 @@ static void BM_spinlock_with_work(benchmark::State& state)
 
         for (auto _ : state) {
             for (int i = 0; i < state.range(0); ++i)
-                tasks.emplace_back(task_manager->execute_task(f));
+                tasks.emplace_back(async(f));
 
             for (auto& task : tasks)
                 task->wait();
@@ -212,7 +213,7 @@ static void BM_mutex_with_work(benchmark::State& state)
 
         for (auto _ : state) {
             for (int i = 0; i < state.range(0); ++i)
-                tasks.emplace_back(task_manager->execute_task(f));
+                tasks.emplace_back(async(f));
 
             for (auto& task : tasks)
                 task->wait();

@@ -32,7 +32,7 @@ void sequential_ios(File_handle& file, std::vector<std::vector<char>>& io_v, boo
         };
 
         if (async)
-            tasks.push_back(task_manager->execute_task(io_func));
+            tasks.push_back(async(io_func));
         else
             io_func();
 

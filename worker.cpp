@@ -10,6 +10,7 @@
 #include "io_api.h"
 #include "os_specific.h"
 #include "scheduler.h"
+#include "task.h"
 #include "util.h"
 
 // Creates worker object and starts worker thread on a provided CPU.

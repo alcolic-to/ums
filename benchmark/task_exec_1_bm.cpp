@@ -4,6 +4,7 @@
 #include <chrono>
 #include <memory>
 
+#include "async.h"
 #include "benchmark_util.h"
 #include "ums.h"
 
@@ -11,7 +12,7 @@ static void BM_task_exec_single_cpu(benchmark::State& state)
 {
     init_ums([&] {
         for (auto _ : state)
-            task_manager->execute_task<false>([&] { hard_work(microseconds(state.range())); });
+            async<true>([&] { hard_work(microseconds(state.range())); });
     });
 }
 

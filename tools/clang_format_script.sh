@@ -1,15 +1,16 @@
 #!/bin/bash
 
 # Script that formats all changed/new/renamed C++ files that are tracked by git.
-# It usses clang-format for formatting.
+# It uses clang-format for formatting.
 
 # Clang format setup.
 # clang-format args:
 # -i                         -> Change inplace all files.
 # --style=file:.clang-format -> use .clang-format file for formatting.
+# --verbose                  -> Verbose output
 CLANG_FORMAT_EXE=""
 CLANG_FORMAT_FILE=".clang-format"
-CLANG_FORMAT_ARGS="-i --style=file:$CLANG_FORMAT_FILE"
+CLANG_FORMAT_ARGS="-i --style=file:$CLANG_FORMAT_FILE --verbose"
 
 # Detect if running on Windows or Unix-based system
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
@@ -35,7 +36,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 cd "$REPO_ROOT" || exit
 
 # Getting all cpp files except deleted ones.
-FILES=$(git status -uall --porcelain | grep -E "^[^D].*\.(cpp|hpp|h|c|cc)$" | cut -c 4- | tr '\n' ' ')
+FILES=$(git status -uall --porcelain | grep -E "^[^D].*\.(cpp|hpp|h|c|cc)$" | cut -c 4-)
 
 # Check if there are any changed or new C++ files
 if [[ -z "$FILES" ]]; then
@@ -43,8 +44,16 @@ if [[ -z "$FILES" ]]; then
   exit 0
 fi
 
-COMMAND="$CLANG_FORMAT_EXE $CLANG_FORMAT_ARGS $FILES"
-echo "Formatting command: ${COMMAND}"
-$COMMAND
+# Construct the command using an array
+CMD=("$CLANG_FORMAT_EXE" $CLANG_FORMAT_ARGS)
+for FILE in $FILES; do
+  CMD+=("$FILE")
+done
+
+# Display the constructed command for debugging
+echo "Formatting command: ${CMD[*]}"
+
+# Execute the command
+"${CMD[@]}"
 
 echo "Formatting completed!"

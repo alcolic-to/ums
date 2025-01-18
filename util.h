@@ -33,8 +33,8 @@ constexpr std::size_t cache_line_size = std::hardware_destructive_interference_s
 constexpr std::size_t cache_line_size = 64;
 #endif
 
-#define stringify2(x) #x
-#define stringify(x) stringify2(x)
+#define stringify2(x) #x           // NOLINT
+#define stringify(x) stringify2(x) // NOLINT
 
 using namespace std::chrono;
 using namespace std::chrono_literals;

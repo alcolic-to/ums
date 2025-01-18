@@ -10,7 +10,6 @@
 #include "spinlock.h"
 #include "util.h"
 
-
 class Mutex;
 class Worker;
 

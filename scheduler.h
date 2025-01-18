@@ -19,7 +19,6 @@
 #include "task.h"
 #include "worker.h"
 
-
 using Cpu_Mask = std::bitset<CFG_max_supported_cpus>;
 
 class CPU final {
@@ -33,6 +32,8 @@ public:
 // Synchronization context for scheduler.
 //
 enum class Sync_context : int { main, yield, wait, io };
+
+class Schedulers;
 
 class Scheduler final {
     friend class Schedulers;

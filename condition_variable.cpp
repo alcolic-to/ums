@@ -37,7 +37,7 @@ void Condition_variable::notify_all() noexcept
 void Condition_variable::add_waiter()
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
-    m_waiters.push_back(tls_worker);
+    m_waiters.push_back(this_worker);
 }
 
 // Since notify_all wakes up all waiters, we don't know
@@ -47,7 +47,7 @@ void Condition_variable::add_waiter()
 void Condition_variable::remove_waiter()
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
-    std::erase(m_waiters, tls_worker);
+    std::erase(m_waiters, this_worker);
 }
 
 void Condition_variable::wait_internal(std::unique_lock<Mutex>& lock, const Time_point& abs_time)
@@ -55,9 +55,9 @@ void Condition_variable::wait_internal(std::unique_lock<Mutex>& lock, const Time
     add_waiter();
 
     {
-        tls_worker->set_wait_info(false, abs_time);
+        this_worker->set_wait_info(false, abs_time);
         const Scoped_unlock<std::unique_lock<Mutex>> unlock{lock};
-        tls_worker->wait_cond_or_sleep();
+        this_worker->wait_cond_or_sleep();
     }
 
     remove_waiter();

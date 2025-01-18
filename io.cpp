@@ -26,10 +26,10 @@ void IO_Request::update() noexcept
 
 void cos_read_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
 {
-    tls_worker->read_file(file_handle, buffer, offset);
+    this_worker->read_file(file_handle, buffer, offset);
 }
 
 void cos_write_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
 {
-    tls_worker->write_file(file_handle, buffer, offset);
+    this_worker->write_file(file_handle, buffer, offset);
 }

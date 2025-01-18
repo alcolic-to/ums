@@ -158,7 +158,7 @@ TEST(Scheduler_tests, task_order_execution)
         for (uint32_t c = 1; c <= cpus; ++c) {
             first_tasks.push_back(async([] {
                 hard_work(100ms);
-                tls_worker->yield();
+                this_worker->yield();
                 hard_work(100ms);
             }));
         }
@@ -194,7 +194,7 @@ TEST(Scheduler_tests, task_order_execution_extended)
         for (uint32_t c = 1; c <= cpus; ++c) {
             first_tasks.push_back(async([] {
                 hard_work(1s);
-                tls_worker->yield();
+                this_worker->yield();
                 hard_work(1s);
             }));
         }
@@ -202,7 +202,7 @@ TEST(Scheduler_tests, task_order_execution_extended)
         for (uint32_t c = 1; c <= cpus; ++c) {
             second_tasks.push_back(async([] {
                 hard_work(1s);
-                tls_worker->yield();
+                this_worker->yield();
                 hard_work(1s);
             }));
         }

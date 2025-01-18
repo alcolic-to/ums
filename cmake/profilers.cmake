@@ -18,6 +18,8 @@ target_compile_options(TracyClient PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/w>         # Disable all warnings in MSVC
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>) # Disable all warnings for other compilers
 
+set_property(TARGET TracyClient PROPERTY CXX_CLANG_TIDY "") # Disable clang tidy for tracy.
+
 function(add_tracy PROJECT)
     target_include_directories(${PROJECT} PRIVATE ${tracy_SOURCE_DIR}/public)
     target_sources(${PROJECT} PRIVATE ${tracy_SOURCE_DIR}/public/TracyClient.cpp)

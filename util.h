@@ -5,10 +5,27 @@
 
 #include <chrono>
 #include <cstdint>
-#include <fstream>
 #include <iostream>
 #include <type_traits>
 #include <utility>
+
+// clang-format off
+#define NO_OP do {} while (0) // NOLINT
+// clang-format on
+
+// Defining all tracy macros with T prefix, to avoid checking every time if TRACY_ENABLE is
+// defined and including Tracy.hpp in every file that needs instrumentation. Just put T prefix
+// (TZoneScoped for example) and profile...
+// Please define all other macros that you wish to use and are not defined here.
+//
+#ifdef TRACY_ENABLE
+#include "tracy/Tracy.hpp"
+#define TZoneScoped ZoneScoped
+#define TTracyMessageL(x) TracyMessageL(x)
+#else
+#define TZoneScoped NO_OP
+#define TTracyMessageL(x) NO_OP
+#endif
 
 #ifdef __cpp_lib_hardware_interference_size
 constexpr std::size_t cache_line_size = std::hardware_destructive_interference_size;

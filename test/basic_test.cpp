@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <gtest/gtest.h>
 
+#include "async.h"
 #include "ums.h"
 #include "util.h"
 #include "worker.h"
@@ -25,21 +26,21 @@ TEST(Scheduler_tests, sanity_test)
     auto test = [&] {
         int a = 0;
 
-        task_manager->execute_task<false>([&] { a = 1; });
+        async<true>([&] { a = 1; });
         ASSERT_TRUE(a == 1);
 
-        auto task{task_manager->execute_task<true>([&] { a = 0; })};
+        auto task{async([&] { a = 0; })};
         task->wait();
         ASSERT_TRUE(a == 0);
 
         std::atomic<int> b{0};
 
-        task_manager->execute_tasks<false>([&] { ++b; }, [&] { ++b; }, [&] { ++b; }, [&] { ++b; });
+        asyncs<true>([&] { ++b; }, [&] { ++b; }, [&] { ++b; }, [&] { ++b; });
         ASSERT_TRUE(b == 4);
 
         const auto f = [&] { --b; };
 
-        auto tasks{task_manager->execute_tasks(f, f, f, f)};
+        auto tasks{asyncs(f, f, f, f)};
 
         for (auto task : tasks)
             task->wait();
@@ -59,7 +60,7 @@ TEST(Scheduler_tests, evenly_scheduled_tasks)
                 std::vector<std::shared_ptr<Task>> tasks;
 
                 for (uint32_t c = 1; c <= cpus; ++c)
-                    tasks.push_back(task_manager->execute_task([=] { hard_work(task_dur); }));
+                    tasks.push_back(async([=] { hard_work(task_dur); }));
 
                 for (auto task : tasks)
                     task->wait();
@@ -77,10 +78,10 @@ TEST(Scheduler_tests, sequential_task_execution)
     auto test = [&] {
         Stopwatch<false> s;
 
-        task_manager->execute_task<false>([] { hard_work(1s); });
-        task_manager->execute_task<false>([] { hard_work(1s); });
-        task_manager->execute_task<false>([] { hard_work(1s); });
-        task_manager->execute_task<false>([] { hard_work(1s); });
+        async<true>([] { hard_work(1s); });
+        async<true>([] { hard_work(1s); });
+        async<true>([] { hard_work(1s); });
+        async<true>([] { hard_work(1s); });
 
         ASSERT_LE(s.elapsed(), 4s + 1ms);
     };
@@ -98,7 +99,7 @@ TEST(Scheduler_tests, parallel_execution)
         Stopwatch<false> s;
 
         for (uint32_t tasks_count = 0; tasks_count <= 100; ++tasks_count)
-            tasks.emplace_back(task_manager->execute_task(f));
+            tasks.emplace_back(async(f));
 
         for (auto task : tasks)
             task->wait();
@@ -122,7 +123,7 @@ TEST(Scheduler_tests, work_stealing)
                 hard_work(1000ms / div);
             };
 
-            tasks.push_back(task_manager->execute_task(f));
+            tasks.push_back(async(f));
         }
 
         for (uint32_t cpus = 1; cpus <= schedulers->cpus_count(); ++cpus) {
@@ -131,7 +132,7 @@ TEST(Scheduler_tests, work_stealing)
                 hard_work(1000ms / div);
             };
 
-            tasks.push_back(task_manager->execute_task(f));
+            tasks.push_back(async(f));
         }
 
         for (auto task : tasks)
@@ -155,7 +156,7 @@ TEST(Scheduler_tests, task_order_execution)
         Stopwatch<false> s;
 
         for (uint32_t c = 1; c <= cpus; ++c) {
-            first_tasks.push_back(task_manager->execute_task([] {
+            first_tasks.push_back(async([] {
                 hard_work(100ms);
                 tls_worker->yield();
                 hard_work(100ms);
@@ -163,7 +164,7 @@ TEST(Scheduler_tests, task_order_execution)
         }
 
         for (uint32_t c = 1; c <= cpus; ++c)
-            second_tasks.push_back(task_manager->execute_task([] { hard_work(1s); }));
+            second_tasks.push_back(async([] { hard_work(1s); }));
 
         for (auto task : first_tasks)
             task->wait();
@@ -191,7 +192,7 @@ TEST(Scheduler_tests, task_order_execution_extended)
         Stopwatch<false> s;
 
         for (uint32_t c = 1; c <= cpus; ++c) {
-            first_tasks.push_back(task_manager->execute_task([] {
+            first_tasks.push_back(async([] {
                 hard_work(1s);
                 tls_worker->yield();
                 hard_work(1s);
@@ -199,7 +200,7 @@ TEST(Scheduler_tests, task_order_execution_extended)
         }
 
         for (uint32_t c = 1; c <= cpus; ++c) {
-            second_tasks.push_back(task_manager->execute_task([] {
+            second_tasks.push_back(async([] {
                 hard_work(1s);
                 tls_worker->yield();
                 hard_work(1s);
@@ -207,7 +208,7 @@ TEST(Scheduler_tests, task_order_execution_extended)
         }
 
         for (uint32_t c = 1; c <= cpus; ++c)
-            third_tasks.push_back(task_manager->execute_task([] { hard_work(100ms); }));
+            third_tasks.push_back(async([] { hard_work(100ms); }));
 
         for (auto task : third_tasks)
             task->wait();

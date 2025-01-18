@@ -4,6 +4,7 @@
 #include <chrono>
 #include <memory>
 
+#include "async.h"
 #include "benchmark_util.h"
 #include "ums.h"
 
@@ -14,8 +15,7 @@ static void BM_task_exec_short_tasks(benchmark::State& state)
 
         for (auto _ : state) {
             for (int i = 0; i < schedulers->cpus_count(); ++i)
-                tasks.push_back(
-                    task_manager->execute_task([&] { hard_work(microseconds(state.range())); }));
+                tasks.push_back(async([&] { hard_work(microseconds(state.range())); }));
 
             for (auto task : tasks)
                 task->wait();

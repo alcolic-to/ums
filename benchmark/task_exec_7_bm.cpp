@@ -4,6 +4,7 @@
 #include <chrono>
 #include <memory>
 
+#include "async.h"
 #include "benchmark_util.h"
 #include "ums.h"
 
@@ -17,7 +18,7 @@ static void BM_real_work_simulation(benchmark::State& state)
             for (int i = 0; i < schedulers->cpus_count(); ++i) {
                 for (int i = 0; i < state.range(0); ++i) {
                     dur = std::max(1ms, dur - 1ms);
-                    tasks.push_back(task_manager->execute_task([&] { hard_work(dur, true); }));
+                    tasks.push_back(async([&] { hard_work(dur, true); }));
                 }
             }
 

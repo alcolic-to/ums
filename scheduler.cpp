@@ -15,9 +15,10 @@
 #include "io_api.h"
 #include "options.h"
 #include "os_specific.h"
-#include "task_manager.h"
+#include "task.h"
 #include "util.h"
 #include "worker.h"
+
 
 // Creates new Scheduler for each bit available in CPUs availability mask.
 //

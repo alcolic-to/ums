@@ -11,8 +11,9 @@
 
 #include "io_api.h"
 #include "os_specific.h"
-#include "task_manager.h"
+#include "task.h"
 #include "util.h"
+
 
 class Scheduler;
 

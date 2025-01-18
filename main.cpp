@@ -3,13 +3,13 @@
 #include <chrono>
 #include <cstdint>
 #include <iostream>
-#include <memory>
 #include <vector>
 
-#include "task_manager.h"
+#include "async.h"
 #include "ums.h"
 #include "util.h"
 #include "worker.h"
+
 
 using namespace std::chrono_literals;
 
@@ -60,7 +60,7 @@ uint64_t f3()
 void thread_function()
 {
     for (int i = 0; i < 1000; ++i)
-        task_manager->execute_task<false>(f3);
+        async<true>(f3);
 }
 
 // Duration of ~4ms when plugged in.
@@ -85,7 +85,7 @@ void ms3_function()
     Stopwatch s;
 
     for (int i = 0; i < 1000; ++i)
-        task_manager->execute_task<true>(f4);
+        async(f4);
 }
 
 // int ums_main(int argc, char* argv[])
@@ -94,7 +94,7 @@ void ums_main()
     Stopwatch<true, std::chrono::microseconds> s;
 
     for (int i = 0; i < 1000; ++i) {
-        auto task{task_manager->execute_task<true>(f4)};
+        auto task{async(f4)};
         task->wait();
     }
 }

@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <atomic>
 #include <bitset>
-#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <list>
@@ -17,8 +16,7 @@
 
 #include "config.h"
 #include "options.h"
-#include "spinlock.h"
-#include "task_manager.h"
+#include "task.h"
 #include "worker.h"
 
 using Cpu_Mask = std::bitset<CFG_max_supported_cpus>;
@@ -31,47 +29,11 @@ public:
     Cpu_Mask m_mask;
 };
 
-// Tasks queue which allows concurrent access.
-// Note that all memory operations can be relaxed, because Spinlock has acquire-release memory
-// order.
-//
-class alignas(cache_line_size) Tasks {
-public:
-    void enque(std::shared_ptr<Task> task)
-    {
-        const std::scoped_lock<Spinlock> l{m_lock};
-
-        m_tasks.push_back(std::move(task));
-        m_size.fetch_add(1, std::memory_order_relaxed);
-    }
-
-    std::shared_ptr<Task> deque() noexcept
-    {
-        const std::scoped_lock<Spinlock> l{m_lock};
-
-        if (m_tasks.empty())
-            return nullptr;
-
-        std::shared_ptr<Task> t{std::move(m_tasks.front())};
-        m_tasks.pop_front();
-
-        m_size.fetch_sub(1, std::memory_order_relaxed);
-        return t;
-    }
-
-    [[nodiscard]] size_t size() const noexcept { return m_size.load(std::memory_order_relaxed); }
-
-    [[nodiscard]] bool empty() const noexcept { return size() == 0; }
-
-private:
-    Spinlock m_lock;
-    std::deque<std::shared_ptr<Task>> m_tasks;
-    std::atomic<std::size_t> m_size{0};
-};
-
 // Synchronization context for scheduler.
 //
 enum class Sync_context : int { main, yield, wait, io };
+
+class Schedulers;
 
 class Scheduler final {
     friend class Schedulers;

@@ -10,7 +10,6 @@
 #include "util.h"
 #include "worker.h"
 
-
 using namespace std::chrono_literals;
 
 void f1()
@@ -34,7 +33,7 @@ void f1()
         }
 
         if (v[random() % v.size()] == random<uint8_t>() % v.size() && i++ % 100 == 0)
-            tls_worker->yield();
+            this_worker->yield();
     }
 
     return;

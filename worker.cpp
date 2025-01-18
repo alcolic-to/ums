@@ -106,7 +106,7 @@ void Worker::notify_waiter() noexcept
 
 void Worker::entry_point()
 {
-    tls_worker = this;
+    this_worker = this;
 
     if constexpr (FS_thread_binding_allowed)
         os::bind_thread(m_scheduler.m_cpu.m_mask.to_ullong());

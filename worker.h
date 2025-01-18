@@ -14,7 +14,6 @@
 #include "task.h"
 #include "util.h"
 
-
 class Scheduler;
 
 class Worker final {
@@ -148,6 +147,6 @@ private:
     std::thread m_thread;
 };
 
-extern thread_local Worker* tls_worker; // NOLINT
+extern thread_local Worker* this_worker; // NOLINT
 
 #endif // COS_WORKER_H

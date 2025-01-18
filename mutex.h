@@ -3,12 +3,13 @@
 #ifndef COS_MUTEX_H
 #define COS_MUTEX_H
 
+#include <condition_variable>
 #include <mutex>
 #include <thread>
-#include <condition_variable>
 
 #include "spinlock.h"
 #include "util.h"
+
 
 class Mutex;
 class Worker;
@@ -224,7 +225,7 @@ private:
 // **** std::vector<Worker*> m_waiters.
 //
 // Locks mutex.
-// Note: tls_worker::clear_cond must be called before add_waiter in order to be synchronized with
+// Note: this_worker::clear_cond must be called before add_waiter in order to be synchronized with
 // unlock.
 //
 // void Mutex::lock()
@@ -232,12 +233,12 @@ private:
 //     if (try_lock())
 //         return;
 
-//     tls_worker->clear_cond();
+//     this_worker->clear_cond();
 //     add_waiter();
 
 //     while (!m_lock.single_try_lock()) {
-//         tls_worker->wait_condition();
-//         tls_worker->clear_cond();
+//         this_worker->wait_condition();
+//         this_worker->clear_cond();
 //     }
 
 //     remove_waiter();
@@ -257,13 +258,13 @@ private:
 // void Mutex::add_waiter()
 // {
 //     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
-//     m_waiters.push_back(tls_worker);
+//     m_waiters.push_back(this_worker);
 // }
 
 // void Mutex::remove_waiter() noexcept
 // {
 //     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
-//     std::erase(m_waiters, tls_worker);
+//     std::erase(m_waiters, this_worker);
 // }
 
 // void Mutex::notify_waiter() noexcept

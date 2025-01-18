@@ -128,17 +128,17 @@ TEST(Condition_variable, cv_sanity_test_2)
         };
 
         auto notifier = [&] {
-            tls_worker->sleep_for(20ms);
+            this_worker->sleep_for(20ms);
             cv2.notify_one();
 
-            tls_worker->sleep_for(20ms);
+            this_worker->sleep_for(20ms);
             cv1.notify_one();
 
-            tls_worker->sleep_for(20ms);
+            this_worker->sleep_for(20ms);
             cv3.notify_one();
 
             // Wait for the threads to finish.
-            tls_worker->sleep_for(100ms);
+            this_worker->sleep_for(100ms);
         };
 
         asyncs<true>(waiter_1, waiter_2, waiter_3, notifier);
@@ -164,7 +164,7 @@ TEST(Condition_variable, cv_producer_consumer_test)
         bool ready = false;
 
         auto producer = [&] {
-            tls_worker->sleep_for(100ms); // Simulate work
+            this_worker->sleep_for(100ms); // Simulate work
 
             {
                 std::unique_lock<Mutex> lock(mutex);
@@ -205,7 +205,7 @@ TEST(Condition_variable, cv_spurious_wakeup_test)
         };
 
         auto notifier = [&] {
-            tls_worker->sleep_for(std::chrono::milliseconds(100)); // Simulate some wait
+            this_worker->sleep_for(std::chrono::milliseconds(100)); // Simulate some wait
             cv.notify_one();
         };
 
@@ -299,7 +299,7 @@ TEST(Condition_variable, cv_complex_test_2)
             std::unique_lock<Mutex> lock{mutex};
             notifier_cv.wait(lock, [&] { return atomic_counter.load() == threads_count; });
 
-            tls_worker->sleep_for(100ms);
+            this_worker->sleep_for(100ms);
             ready = true;
             increment_cv.notify_all();
         };
@@ -828,7 +828,7 @@ void test_one_writer()
 
         std::lock_guard<_Mutex> ExclusiveLock(mut);
         const int val = ++atom;
-        tls_worker->sleep_for(25ms); // Not a timing assumption.
+        this_worker->sleep_for(25ms); // Not a timing assumption.
         ASSERT_TRUE(atom == val);
     };
 
@@ -871,7 +871,7 @@ void test_writer_blocking_readers()
 
         std::lock_guard<_Mutex> ExclusiveLock(mut);
         ASSERT_TRUE(atom.exchange(1000) == 0);
-        tls_worker->sleep_for(50ms); // Not a timing assumption.
+        this_worker->sleep_for(50ms); // Not a timing assumption.
         ASSERT_TRUE(atom.exchange(1729) == 1000);
     };
 
@@ -1009,12 +1009,12 @@ void test_timed_behavior()
             ++atom;
             atom.wait_while_lt(0);
 
-            tls_worker->sleep_for(50ms);
+            this_worker->sleep_for(50ms);
             MainShared.unlock();
         };
 
         auto f2 = [&] {
-            tls_worker->sleep_for(50ms);
+            this_worker->sleep_for(50ms);
 
             ++atom;
             atom.wait_while_lt(0);
@@ -1022,7 +1022,7 @@ void test_timed_behavior()
             std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 1min);
             ASSERT_TRUE(ExclusiveLock.owns_lock());
             const int val = (atom += 100);
-            tls_worker->sleep_for(25ms);
+            this_worker->sleep_for(25ms);
             ASSERT_TRUE(atom == val);
         };
 
@@ -1042,12 +1042,12 @@ void test_timed_behavior()
             ++atom;
             atom.wait_while_lt(0);
 
-            tls_worker->sleep_for(50ms);
+            this_worker->sleep_for(50ms);
             MainExclusive.unlock();
         };
 
         auto f2 = [&] {
-            tls_worker->sleep_for(50ms);
+            this_worker->sleep_for(50ms);
 
             ++atom;
             atom.wait_while_lt(0);
@@ -1072,14 +1072,14 @@ void test_timed_behavior()
         auto f1 = [&] { launch_readers.wait_while_eq(0); };
 
         auto f2 = [&] {
-            tls_worker->sleep_for(50ms);
+            this_worker->sleep_for(50ms);
             std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 100ms);
             ASSERT_TRUE(!ExclusiveLock.owns_lock());
             launch_readers.exchange(1);
         };
 
         auto f3 = [&] {
-            tls_worker->sleep_for(50ms);
+            this_worker->sleep_for(50ms);
             while (!launch_readers) {
                 std::shared_lock<Shared_timed_mutex> SharedLock(stm, std::try_to_lock);
 
@@ -1579,7 +1579,7 @@ TEST(Timed_mutex, timed_mutex_complex_test)
             Timed_mutex timed_mutex;
 
             auto f = [&] {
-                tls_worker->sleep_for(50ms);
+                this_worker->sleep_for(50ms);
 
                 ++atom;
                 atom.wait_while_lt(0);
@@ -1593,18 +1593,18 @@ TEST(Timed_mutex, timed_mutex_complex_test)
                 std::unique_lock<Timed_mutex> ExclusiveLock(timed_mutex, 1min);
                 ASSERT_TRUE(ExclusiveLock.owns_lock());
                 const int val = (atom += 100);
-                tls_worker->sleep_for(25ms);
+                this_worker->sleep_for(25ms);
                 ASSERT_TRUE(atom == val);
             };
 
             auto f2 = [&] {
                 std::unique_lock<Timed_mutex> MainUnique(timed_mutex);
-                tls_worker->sleep_for(50ms);
+                this_worker->sleep_for(50ms);
 
                 ++atom;
                 atom.wait_while_lt(0);
 
-                tls_worker->sleep_for(50ms);
+                this_worker->sleep_for(50ms);
                 MainUnique.unlock();
             };
 

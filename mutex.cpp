@@ -14,7 +14,7 @@ void Plain_mutex::lock()
 {
     if (!m_spinlock.lock_with_timeout())
         while (!m_spinlock.try_lock())
-            tls_worker->yield();
+            this_worker->yield();
 }
 
 bool Plain_mutex::try_lock() noexcept

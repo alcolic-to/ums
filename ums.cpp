@@ -10,7 +10,7 @@
 
 // Thread local worker.
 //
-thread_local Worker* tls_worker; // NOLINT
+thread_local Worker* this_worker; // NOLINT
 
 // Global Schedulers.
 //

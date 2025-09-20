@@ -19,6 +19,8 @@
 
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 
+using namespace ums;
+
 // Condition_variable, shared mutex and timed mutex does not have standard layout because
 // they all have (explicitly or implicitly) std::vector inside.
 

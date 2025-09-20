@@ -6,6 +6,8 @@
 #include <atomic>
 #include <cstdint>
 
+namespace ums {
+
 class Spinlock {
 public:
     Spinlock() noexcept = default;
@@ -25,5 +27,7 @@ public:
 private:
     std::atomic<uint32_t> m_flag{0};
 };
+
+} // namespace ums
 
 #endif // COS_SPINLOCK_H

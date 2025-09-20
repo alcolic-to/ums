@@ -13,6 +13,8 @@
 #include "task.h"
 #include "util.h"
 
+namespace ums {
+
 // Creates worker object and starts worker thread on a provided CPU.
 // We will wait for a signal from created thread, so we can continue when it is ready.
 //
@@ -142,3 +144,5 @@ void Worker::main_loop()
         // ";
     }
 }
+
+} // namespace ums

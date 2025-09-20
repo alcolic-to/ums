@@ -8,6 +8,8 @@
 #include "task.h"
 #include "ums.h"
 
+namespace ums {
+
 // Enques task in best (minimum load) scheduler.
 //
 void enque_task(std::shared_ptr<Task> task)
@@ -31,3 +33,5 @@ std::shared_ptr<Task> async(std::function<void()> func)
 
 template std::shared_ptr<Task> async<true>(std::function<void()> func);
 template std::shared_ptr<Task> async<false>(std::function<void()> func);
+
+} // namespace ums

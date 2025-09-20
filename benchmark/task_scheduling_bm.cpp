@@ -8,6 +8,8 @@
 #include "benchmark_util.h"
 #include "ums.h"
 
+using namespace ums;
+
 static void BM_task_scheduling(benchmark::State& state)
 {
     init_ums([&] {

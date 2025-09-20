@@ -12,6 +12,8 @@
 #include "spinlock.h"
 #include "util.h"
 
+namespace ums {
+
 class Task {
 public:
     enum class State : int { not_started, running, done };
@@ -45,5 +47,7 @@ private:
     std::deque<std::shared_ptr<Task>> m_tasks;
     std::atomic<std::size_t> m_size{0};
 };
+
+} // namespace ums
 
 #endif // COS_TASK_H

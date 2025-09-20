@@ -16,6 +16,7 @@
 #include "mutex.h"
 #include "ums.h"
 
+using namespace ums;
 
 static void BM_spinlock_plain(benchmark::State& state)
 {

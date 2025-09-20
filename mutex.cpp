@@ -10,6 +10,8 @@
 #include "util.h"
 #include "worker.h"
 
+namespace ums {
+
 void Plain_mutex::lock()
 {
     if (!m_spinlock.lock_with_timeout())
@@ -224,3 +226,5 @@ void Recursive_timed_mutex::unlock()
         m_cv.notify_one();
     }
 }
+
+} // namespace ums

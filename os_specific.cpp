@@ -59,8 +59,12 @@ IO_handle::IO_handle(uint64_t offset) : m_ol{}
 #pragma clang diagnostic ignored "-Wexceptions"
 #pragma GCC diagnostic ignored "-Wexceptions"
 
+namespace ums {
 struct io_uring {};
+} // namespace ums
 #endif
+
+namespace ums {
 
 class IO_uring {
 public:
@@ -411,3 +415,5 @@ static_assert(!"Unknown OS.");
 #endif
 
 } // namespace os
+
+} // namespace ums

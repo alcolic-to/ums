@@ -6,6 +6,8 @@
 #include <deque>
 #include <memory>
 
+using namespace ums;
+
 static void BM_vector_push_back(benchmark::State& state)
 {
     std::vector<int> v;

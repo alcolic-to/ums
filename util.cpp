@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+namespace ums {
+
 class PRNG {
 public:
     explicit PRNG(uint64_t seed = uint64_t(now().time_since_epoch().count())) noexcept
@@ -52,3 +54,5 @@ std::vector<char> file_to_vector(const std::string& path)
     std::ifstream f{path, std::ios_base::binary};
     return std::vector<char>{std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
 }
+
+} // namespace ums

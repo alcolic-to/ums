@@ -5,6 +5,8 @@
 #include "mutex.h"
 #include "util.h"
 
+namespace ums {
+
 // TODO: Check whether exception should be thrown in case of a deadlock.
 // STL implementation does nothing in that case.
 //
@@ -112,3 +114,5 @@ bool Shared_timed_mutex::try_lock_shared_until_internal(const Time_point& time_p
     m_state.inc_readers();
     return true;
 }
+
+} // namespace ums

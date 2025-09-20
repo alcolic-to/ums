@@ -19,6 +19,7 @@
 #include "util.h"
 #include "worker.h"
 
+namespace ums {
 
 // Creates new Scheduler for each bit available in CPUs availability mask.
 //
@@ -659,3 +660,5 @@ template void Scheduler::sync<Sync_context::main>(Worker* worker);
 template void Scheduler::sync<Sync_context::yield>(Worker* worker);
 template void Scheduler::sync<Sync_context::wait>(Worker* worker);
 template void Scheduler::sync<Sync_context::io>(Worker* worker);
+
+} // namespace ums

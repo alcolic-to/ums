@@ -10,6 +10,8 @@
 #include "util.h"
 #include "worker.h"
 
+namespace ums {
+
 Condition_variable::~Condition_variable() noexcept
 {
     notify_all();
@@ -89,3 +91,5 @@ void Condition_variable_any::notify_all() noexcept
 
     m_cv.notify_all();
 }
+
+} // namespace ums

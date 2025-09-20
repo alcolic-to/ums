@@ -8,6 +8,8 @@
 #include "options.h"
 #include "scheduler.h"
 
+namespace ums {
+
 // Thread local worker.
 //
 thread_local Worker* this_worker; // NOLINT
@@ -26,3 +28,5 @@ void init_ums(std::function<void()> main, Options opt)
     schedulers->wait_exit();
     schedulers.reset();
 }
+
+} // namespace ums

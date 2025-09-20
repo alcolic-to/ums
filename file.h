@@ -5,6 +5,8 @@
 
 #include <filesystem>
 
+namespace ums {
+
 namespace fs = std::filesystem;
 
 // RAII file handle wrapper
@@ -25,5 +27,7 @@ public:
 private:
     void* m_handle;
 };
+
+} // namespace ums
 
 #endif // COS_FILE_H

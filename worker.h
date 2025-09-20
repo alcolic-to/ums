@@ -14,6 +14,8 @@
 #include "task.h"
 #include "util.h"
 
+namespace ums {
+
 class Scheduler;
 
 class Worker final {
@@ -148,5 +150,7 @@ private:
 };
 
 extern thread_local Worker* this_worker; // NOLINT
+
+} // namespace ums
 
 #endif // COS_WORKER_H

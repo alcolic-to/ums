@@ -8,6 +8,8 @@
 
 #include "config.h"
 
+namespace ums {
+
 class Options {
 public:
     class Option {
@@ -57,5 +59,7 @@ private:
     //
     Workers_per_scheduler m_workers_per_scheduler;
 };
+
+} // namespace ums
 
 #endif // OPTIONS_H

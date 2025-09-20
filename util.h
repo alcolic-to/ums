@@ -10,6 +10,8 @@
 #include <utility>
 #include <vector>
 
+namespace ums {
+
 // clang-format off
 #define NO_OP do {} while (0) // NOLINT
 // clang-format on
@@ -118,3 +120,5 @@ std::string file_to_string(const std::string& path);
 std::vector<char> file_to_vector(const std::string& path);
 
 #endif // COS_UTIL_H
+
+} // namespace ums

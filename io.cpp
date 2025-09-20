@@ -5,6 +5,8 @@
 #include "os_specific.h"
 #include "worker.h"
 
+namespace ums {
+
 IO_Request::IO_Request(void* file_handle, IO_Buffer buffer, uint64_t offset, Type type) noexcept
     : m_file_handle{file_handle}
     , m_io_buffer{buffer}
@@ -33,3 +35,5 @@ void cos_write_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
 {
     this_worker->write_file(file_handle, buffer, offset);
 }
+
+} // namespace ums

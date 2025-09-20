@@ -11,6 +11,7 @@
 #include "ums.h"
 #include "util.h"
 
+using namespace ums;
 namespace fs = std::filesystem;
 
 // Writes/reads total_bytes bytes at the offset by issuing sync/async I/O requests with io_size.

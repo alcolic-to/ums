@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <memory>
 
+namespace ums {
+
 // Forward declaration.
 struct IO_handle;
 
@@ -39,5 +41,7 @@ public:
 
 void cos_read_file(void* file_handle, IO_Buffer buffer, uint64_t offset);
 void cos_write_file(void* file_handle, IO_Buffer buffer, uint64_t offset);
+
+} // namespace ums
 
 #endif // COS_IO_API_H

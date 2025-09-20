@@ -8,6 +8,8 @@
 
 #include "mutex.h"
 
+namespace ums {
+
 class Condition_variable; // To suppress unused header warnings.
 
 class Condition_variable_any {
@@ -75,5 +77,7 @@ private:
 // TODO: Implement notify_all_at_thread_exit.
 //
 void notify_all_at_thread_exit(Condition_variable& cv, std::unique_lock<Mutex> lock);
+
+} // namespace ums
 
 #endif // COS_CONDITION_VARIABLE_H

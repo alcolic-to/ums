@@ -11,6 +11,8 @@
 #include "mutex.h"
 #include "spinlock.h"
 
+namespace ums {
+
 Task::Task(std::function<void()> function) noexcept : m_func{std::move(function)} {}
 
 void Task::wait()
@@ -65,3 +67,5 @@ std::shared_ptr<Task> Tasks::deque() noexcept
 {
     return size() == 0;
 }
+
+} // namespace ums

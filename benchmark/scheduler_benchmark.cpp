@@ -7,6 +7,8 @@
 #include "benchmark_util.h"
 #include "ums.h"
 
+using namespace ums;
+
 static void DISABLED_BM_clear_caches(benchmark::State& state)
 {
     for (auto _ : state)

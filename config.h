@@ -6,6 +6,8 @@
 #include <chrono>
 #include <cstdint>
 
+namespace ums {
+
 using namespace std::chrono_literals;
 
 // clang-format off
@@ -47,5 +49,7 @@ constexpr auto CFG_idle_sleep_threshold = 20ms;
 constexpr auto CFG_idle_spin_threshold  = 20ms;
 
 // clang-format on
+
+} // namespace ums
 
 #endif // COS_CONFIG_H

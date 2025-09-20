@@ -7,6 +7,8 @@
 
 #include "task.h"
 
+namespace ums {
+
 // Executes function asynchronously.
 // If wait is true, waits for function to finish.
 //
@@ -49,5 +51,7 @@ std::vector<std::shared_ptr<Task>> asyncs(Fns&&... fns)
 
     return tasks;
 }
+
+} // namespace ums
 
 #endif // COS_ASYNC_H

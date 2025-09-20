@@ -1,4 +1,4 @@
-OPTION(BUILD_BENCHMARK "If set, builds all benchmarks." ON)
+OPTION(BUILD_BENCHMARK "If set, builds all benchmarks." OFF)
 if (NOT BUILD_BENCHMARK)
     return ()
 endif()

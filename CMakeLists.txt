@@ -36,6 +36,7 @@ set(HPP_FILES os_specific.h task.h scheduler.h async.h worker.h io_api.h  util.h
 set(ALL_FILES ${CPP_FILES} ${HPP_FILES})
 
 add_library(ums_lib STATIC ${CPP_FILES})
+set(UMS_LIB ums_lib)
 
 if (LINUX)
     add_subdirectory(third_party)
@@ -48,12 +49,10 @@ if (ENABLE_TRACY)
     add_tracy(ums_lib)
 endif()
 
-set(COS_LIBRARIES ums_lib)
-
-OPTION(BUILD_MAIN "If set, builds main.cpp for manual scheduler testing." ON)
-if (BUILD_MAIN)
+OPTION(UMS_BUILD_MAIN "If set, builds main.cpp for manual scheduler testing." OFF)
+if (UMS_BUILD_MAIN)
     add_executable(ums main.cpp)
-    target_link_libraries(ums PRIVATE ${COS_LIBRARIES})
+    target_link_libraries(ums PRIVATE ${UMS_LIB})
     target_include_directories(ums PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 

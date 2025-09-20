@@ -19,6 +19,8 @@
 #include "task.h"
 #include "worker.h"
 
+namespace ums {
+
 using Cpu_Mask = std::bitset<CFG_max_supported_cpus>;
 
 class CPU final {
@@ -205,5 +207,7 @@ private:
     std::atomic<uint32_t> m_idle_schedulers{0};
     std::vector<std::unique_ptr<Scheduler>> m_schedulers;
 };
+
+} // namespace ums
 
 #endif // COS_SCHEDULER_H

@@ -5,6 +5,8 @@
 
 #include <cstdint>
 
+namespace ums {
+
 class IO_Request;
 
 #if defined _WIN32
@@ -65,5 +67,7 @@ void* open_file(const char* file_path, uint64_t flags, uint64_t mode);
 void close_file(void* file_handle);
 
 } // namespace os
+
+} // namespace ums
 
 #endif // OS_SPECIFIC_H

@@ -3,6 +3,8 @@
 #include <atomic>
 #include <cstdint>
 
+namespace ums {
+
 // Pause intrinsic used for spinlock optimization.
 // From intel documentation on void _mm_pause(void):
 // https://www.intel.com/content/www/us/en/docs/cpp-compiler/developer-guide-reference/2021-8/pause-intrinsic.html
@@ -104,3 +106,5 @@ void Spinlock::unlock() noexcept
 {
     m_flag.store(0, mo::release);
 }
+
+} // namespace ums

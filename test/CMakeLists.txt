@@ -1,4 +1,4 @@
-OPTION(BUILD_TEST "If set, builds all tests." ON)
+OPTION(BUILD_TEST "If set, builds all tests." OFF)
 if (NOT BUILD_TEST)
     return()
 endif()

@@ -10,6 +10,8 @@
 #include "spinlock.h"
 #include "util.h"
 
+namespace ums {
+
 class Mutex;
 class Worker;
 
@@ -293,5 +295,7 @@ public:
 private:
     Lockable& m_lockable;
 };
+
+} // namespace ums
 
 #endif // COS_MUTEX_H

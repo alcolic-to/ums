@@ -6,6 +6,8 @@
 #include "condition_variable.h"
 #include "mutex.h"
 
+namespace ums {
+
 // Shared mutex state that holds information for number of active readers (shared)
 // and whether write is requested (unique).
 //
@@ -114,5 +116,7 @@ private:
     [[nodiscard]] bool try_lock_until_internal(const Time_point& time_point);
     [[nodiscard]] bool try_lock_shared_until_internal(const Time_point& time_point);
 };
+
+} // namespace ums
 
 #endif // COS_SHARED_MUTEX_H

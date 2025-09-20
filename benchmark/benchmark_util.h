@@ -11,6 +11,8 @@
 
 #include "util.h"
 
+using namespace ums;
+
 // Since we don't support dynamic caches detection yet, we will simulte some values.
 //
 constexpr uint64_t L1_size = 48 * 1024;        // 48 KiB

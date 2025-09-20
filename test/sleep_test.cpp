@@ -6,6 +6,7 @@
 #include "util.h"
 #include "worker.h"
 
+using namespace ums;
 using namespace std::chrono_literals;
 
 // NOLINTBEGIN

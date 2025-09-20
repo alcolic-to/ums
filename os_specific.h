@@ -5,11 +5,23 @@
 
 #include <cstdint>
 
+// OS specific preprocessor definitions.
+//
+#if defined _WIN32
+#define OS_WINDOWS
+#elif defined __linux__
+#define OS_LINUX
+#else
+#define OS_UNKNOWN
+#endif
+
 namespace ums {
 
 class IO_Request;
 
-#if defined _WIN32
+namespace os {
+
+#if defined OS_WINDOWS
 
 struct Overlapped final {
     unsigned long long m_internal, m_internal_high;
@@ -33,7 +45,7 @@ struct IO_handle final {
     Overlapped m_ol;
 };
 
-#elif defined __linux__
+#elif defined OS_LINUX
 
 // Forward declaration.
 struct io_uring;
@@ -45,8 +57,6 @@ struct IO_handle final {
 };
 
 #endif
-
-namespace os {
 
 // CPU and thread related functions.
 //

@@ -9,7 +9,6 @@ namespace ums {
 
 namespace fs = std::filesystem;
 
-// RAII file handle wrapper
 class File_handle {
 public:
     explicit File_handle(const fs::path& file_path);

@@ -13,17 +13,9 @@
 
 // NOLINTBEGIN(misc-include-cleaner)
 
-// OS specific preprocessor definitions.
-//
-#if defined _WIN32
-#define OS_WINDOWS
-#elif defined __linux__
-#define OS_LINUX
-#else
-#define OS_UNKNOWN
-#endif
+namespace ums {
 
-#if defined(OS_WINDOWS)
+#if defined OS_WINDOWS
 
 // Reduce size of windows.h includes and include windows.
 // NOLINTBEGIN
@@ -38,71 +30,6 @@ constexpr int64_t x_file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_A
                                       FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING |
                                       FILE_FLAG_WRITE_THROUGH;
 
-IO_handle::IO_handle(uint64_t offset) : m_ol{}
-{
-    m_ol.m_offset = DWORD(offset & 0xFFFFFFFF);
-    m_ol.m_offset_high = DWORD(offset >> 32);
-}
-
-#elif defined(OS_LINUX)
-#include <atomic>
-#include <cassert>
-#include <cstddef>
-#include <cstring>
-#include <fcntl.h>
-#include <sched.h>
-#include <unistd.h>
-
-#ifdef IO_URING_ENABLED
-#include <liburing.h>
-#else
-#pragma clang diagnostic ignored "-Wexceptions"
-#pragma GCC diagnostic ignored "-Wexceptions"
-
-namespace ums {
-struct io_uring {};
-} // namespace ums
-#endif
-
-namespace ums {
-
-class IO_uring {
-public:
-    IO_uring()
-    {
-#ifndef IO_URING_ENABLED
-        throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
-#else
-        io_uring_queue_init(1, &m_ring, 0 /* flags */);
-#endif
-    }
-
-    ~IO_uring() noexcept
-    {
-#ifndef IO_URING_ENABLED
-        throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
-#else
-        io_uring_queue_exit(&m_ring);
-#endif
-    }
-
-    io_uring m_ring{};
-};
-
-thread_local IO_uring tls_uring;
-
-IO_handle::IO_handle(uint64_t offset) : m_uring(&tls_uring.m_ring)
-{
-    (void)offset;
-    static std::atomic<uint64_t> io_cnt{0};
-    m_id = io_cnt++;
-}
-
-constexpr int64_t x_file_access = O_CREAT | O_RDWR | O_DIRECT;
-constexpr int64_t x_file_attributes = 0666;
-
-#endif
-
 File_handle::File_handle(const fs::path& file_path)
     : m_handle{os::open_file(file_path.string().c_str(), x_file_access, x_file_attributes)}
 {
@@ -116,11 +43,11 @@ File_handle::~File_handle()
 
 namespace os {
 
-// NOLINTBEGIN(misc-include-cleaner)
-
-// Windows implementations.
-//
-#if defined(OS_WINDOWS)
+IO_handle::IO_handle(uint64_t offset) : m_ol{}
+{
+    m_ol.m_offset = DWORD(offset & 0xFFFFFFFF);
+    m_ol.m_offset_high = DWORD(offset >> 32);
+}
 
 namespace {
 
@@ -258,7 +185,76 @@ void close_file(void* file_handle)
         throw std::runtime_error("Failed to close file handle.");
 }
 
-#elif defined(OS_LINUX)
+} // namespace os
+
+#elif defined OS_LINUX
+#include <atomic>
+#include <cassert>
+#include <cstddef>
+#include <cstring>
+#include <fcntl.h>
+#include <sched.h>
+#include <unistd.h>
+
+#ifdef IO_URING_ENABLED
+#include <liburing.h>
+#else
+#pragma clang diagnostic ignored "-Wexceptions"
+#pragma GCC diagnostic ignored "-Wexceptions"
+
+namespace os {
+struct io_uring {};
+} // namespace os
+
+#endif // #ifdef IO_URING_ENABLED
+
+constexpr int64_t x_file_access = O_CREAT | O_RDWR | O_DIRECT;
+constexpr int64_t x_file_attributes = 0666;
+
+File_handle::File_handle(const fs::path& file_path)
+    : m_handle{os::open_file(file_path.string().c_str(), x_file_access, x_file_attributes)}
+{
+}
+
+// Destructor closes file handle
+File_handle::~File_handle()
+{
+    os::close_file(m_handle);
+}
+
+namespace os {
+
+IO_handle::IO_handle(uint64_t offset) : m_uring(&tls_uring.m_ring)
+{
+    (void)offset;
+    static std::atomic<uint64_t> io_cnt{0};
+    m_id = io_cnt++;
+}
+
+class IO_uring {
+public:
+    IO_uring()
+    {
+#ifndef IO_URING_ENABLED
+        throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
+#else
+        io_uring_queue_init(1, &m_ring, 0 /* flags */);
+#endif
+    }
+
+    ~IO_uring() noexcept
+    {
+#ifndef IO_URING_ENABLED
+        throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
+#else
+        io_uring_queue_exit(&m_ring);
+#endif
+    }
+
+    io_uring m_ring{};
+};
+
+thread_local IO_uring tls_uring;
 
 uint32_t cpus_count() noexcept
 {
@@ -408,12 +404,12 @@ void update_io_state(IO_Request& io) noexcept
     uring_update(io);
 }
 
+} // namespace os
+
 // NOLINTEND(misc-include-cleaner)
 
 #else
 static_assert(!"Unknown OS.");
 #endif
-
-} // namespace os
 
 } // namespace ums

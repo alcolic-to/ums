@@ -9,7 +9,9 @@
 namespace ums {
 
 // Forward declaration.
+namespace os {
 struct IO_handle;
+}
 
 struct IO_Buffer {
     void* m_buffer;
@@ -34,7 +36,7 @@ public:
     void* m_file_handle;
     IO_Buffer m_io_buffer;
     uint64_t m_offset;
-    std::unique_ptr<IO_handle> m_io_handle;
+    std::unique_ptr<os::IO_handle> m_io_handle;
     Type m_type;
     State m_state;
 };

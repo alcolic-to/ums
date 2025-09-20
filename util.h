@@ -8,6 +8,7 @@
 #include <iostream>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 // clang-format off
 #define NO_OP do {} while (0) // NOLINT

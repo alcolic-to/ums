@@ -11,7 +11,6 @@
 #include "ums.h"
 #include "util.h"
 
-
 using namespace std::chrono_literals;
 
 void test_write_read_file(uint64_t io_size)

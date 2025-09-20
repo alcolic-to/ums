@@ -1,8 +1,9 @@
 # Usage:
-# Create initial cmake build folder: cmake -S . -B .\build
-# Create build with desired config: cmake --build .\build --config [Debug/Release/RelWithDebInfo/MinSizeRel]
+# Create initial cmake build folder: cmake [-G Ninja, only allowed on windows] -B build -DCMAKE_BUILD_TYPE=[Debug/Release] -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_C_COMPILER=clang-20
+# Create build with desired config: cmake --build build
+# On linux, you have to use makefiles, since lib_io_uring is build that way, I am not patient enough to make it build with ninja.
 #
-# Clean command: cmake --build .\build --target clean
+# Clean command: cmake --build build --target clean
 
 # If you want to play around with scheduler, you can just enable BUILD_MAIN which builds main.cpp file.
 
@@ -36,7 +37,7 @@ set(ALL_FILES ${CPP_FILES} ${HPP_FILES})
 
 add_library(ums_lib STATIC ${CPP_FILES})
 
-if (UNIX)
+if (LINUX)
     add_subdirectory(third_party)
     target_link_libraries(ums_lib PRIVATE uring)
     add_dependencies(ums_lib uring_project)

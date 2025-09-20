@@ -2,12 +2,16 @@
 
 #include <bit>
 #include <cstdint>
+#include <exception>
 #include <filesystem>
-#include <format>   // NOLINT
+// #include <format>   // NOLINT
 #include <iostream> // NOLINT
+#include <stdexcept>
 
 #include "file.h"
 #include "io_api.h"
+
+// NOLINTBEGIN(misc-include-cleaner)
 
 // OS specific preprocessor definitions.
 //
@@ -41,18 +45,42 @@ IO_handle::IO_handle(uint64_t offset) : m_ol{}
 }
 
 #elif defined(OS_LINUX)
+#include <atomic>
 #include <cassert>
+#include <cstddef>
 #include <cstring>
 #include <fcntl.h>
-#include <liburing.h>
 #include <sched.h>
 #include <unistd.h>
 
+#ifdef IO_URING_ENABLED
+#include <liburing.h>
+#else
+#pragma clang diagnostic ignored "-Wexceptions"
+#pragma GCC diagnostic ignored "-Wexceptions"
+
+struct io_uring {};
+#endif
+
 class IO_uring {
 public:
-    IO_uring() { io_uring_queue_init(1, &m_ring, 0 /* flags */); }
+    IO_uring()
+    {
+#ifndef IO_URING_ENABLED
+        throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+#else
+        io_uring_queue_init(1, &m_ring, 0 /* flags */);
+#endif
+    }
 
-    ~IO_uring() noexcept { io_uring_queue_exit(&m_ring); }
+    ~IO_uring() noexcept
+    {
+#ifndef IO_URING_ENABLED
+        throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+#else
+        io_uring_queue_exit(&m_ring);
+#endif
+    }
 
     io_uring m_ring{};
 };
@@ -270,6 +298,9 @@ void bind_thread(uint64_t cpu_mask) noexcept
 
 void* open_file(const char* file_path, uint64_t flags, uint64_t mode)
 {
+#ifndef IO_URING_ENABLED
+    throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+#else
     int* fd = new int(0);
     *fd = open(file_path, flags, mode);
     if (*fd == -1) {
@@ -279,10 +310,14 @@ void* open_file(const char* file_path, uint64_t flags, uint64_t mode)
     }
 
     return reinterpret_cast<void*>(fd);
+#endif
 }
 
 void close_file(void* file_handle)
 {
+#ifndef IO_URING_ENABLED
+    throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+#else
     int* fd = reinterpret_cast<int*>(file_handle);
     int ret = close(*fd);
     if (ret == -1) {
@@ -290,10 +325,14 @@ void close_file(void* file_handle)
         throw std::runtime_error("Failed to close file descriptor.");
     }
     delete fd;
+#endif
 }
 
 void uring_submit(IO_Request& io) noexcept
 {
+#ifndef IO_URING_ENABLED
+    throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+#else
     const IO_handle* io_handle = io.m_io_handle.get();
 
     io_uring_sqe* sqe = io_uring_get_sqe(io_handle->m_uring);
@@ -316,10 +355,14 @@ void uring_submit(IO_Request& io) noexcept
         assert(!"io_uring_submit should return 1!");
 
     io.m_state = IO_Request::State::pending;
+#endif
 }
 
 void uring_update(IO_Request& io) noexcept
 {
+#ifndef IO_URING_ENABLED
+    throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+#else
     if (io.m_state != IO_Request::State::pending)
         return;
 
@@ -342,7 +385,8 @@ void uring_update(IO_Request& io) noexcept
 
         io_uring_cqe_seen(io_handle->m_uring, cqe);
     }
-    // TODO milant: HANDLE POSSIBLE RETURN VALUES
+// TODO milant: HANDLE POSSIBLE RETURN VALUES
+#endif
 }
 
 void read_file(IO_Request& io) noexcept

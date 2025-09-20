@@ -1,4 +1,4 @@
-OPTION(BUILD_URING "If set, builds uring lib. Not working currently. Call Topalovic." OFF)
+OPTION(BUILD_URING "If set, builds uring lib. Not working currently. Call Topalovic." ON)
 if (NOT BUILD_URING)
     return()
 endif()

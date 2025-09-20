@@ -224,13 +224,6 @@ File_handle::~File_handle()
 
 namespace os {
 
-IO_handle::IO_handle(uint64_t offset) : m_uring(&tls_uring.m_ring)
-{
-    (void)offset;
-    static std::atomic<uint64_t> io_cnt{0};
-    m_id = io_cnt++;
-}
-
 class IO_uring {
 public:
     IO_uring()
@@ -255,6 +248,13 @@ public:
 };
 
 thread_local IO_uring tls_uring;
+
+IO_handle::IO_handle(uint64_t offset) : m_uring(&tls_uring.m_ring)
+{
+    (void)offset;
+    static std::atomic<uint64_t> io_cnt{0};
+    m_id = io_cnt++;
+}
 
 uint32_t cpus_count() noexcept
 {

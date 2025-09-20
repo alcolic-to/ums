@@ -1,5 +1,5 @@
-OPTION(ENABLE_CLANG_TIDY "Enable static analysis with clang-tidy." OFF)
-if (NOT ENABLE_CLANG_TIDY)
+OPTION(UMS_ENABLE_CLANG_TIDY "Enable static analysis with clang-tidy." OFF)
+if (NOT UMS_ENABLE_CLANG_TIDY)
     return()
 endif()
 

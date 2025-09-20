@@ -45,7 +45,7 @@ if (LINUX)
 endif()
 
 include(cmake/profilers.cmake)
-if (ENABLE_TRACY)
+if (UMS_ENABLE_TRACY)
     add_tracy(ums_lib)
 endif()
 

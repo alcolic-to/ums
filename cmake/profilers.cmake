@@ -1,5 +1,5 @@
-OPTION(ENABLE_TRACY "If set, enables tracy profiler and adds function to enable tracy for projects." OFF)
-if (NOT ENABLE_TRACY)
+OPTION(UMS_ENABLE_TRACY "If set, enables tracy profiler and adds function to enable tracy for projects." OFF)
+if (NOT UMS_ENABLE_TRACY)
     return()
 endif()
 

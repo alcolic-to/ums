@@ -71,7 +71,7 @@ public:
     IO_uring()
     {
 #ifndef IO_URING_ENABLED
-        throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+        throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
         io_uring_queue_init(1, &m_ring, 0 /* flags */);
 #endif
@@ -80,7 +80,7 @@ public:
     ~IO_uring() noexcept
     {
 #ifndef IO_URING_ENABLED
-        throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+        throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
         io_uring_queue_exit(&m_ring);
 #endif
@@ -303,7 +303,7 @@ void bind_thread(uint64_t cpu_mask) noexcept
 void* open_file(const char* file_path, uint64_t flags, uint64_t mode)
 {
 #ifndef IO_URING_ENABLED
-    throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+    throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
     int* fd = new int(0);
     *fd = open(file_path, flags, mode);
@@ -320,7 +320,7 @@ void* open_file(const char* file_path, uint64_t flags, uint64_t mode)
 void close_file(void* file_handle)
 {
 #ifndef IO_URING_ENABLED
-    throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+    throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
     int* fd = reinterpret_cast<int*>(file_handle);
     int ret = close(*fd);
@@ -335,7 +335,7 @@ void close_file(void* file_handle)
 void uring_submit(IO_Request& io) noexcept
 {
 #ifndef IO_URING_ENABLED
-    throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+    throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
     const IO_handle* io_handle = io.m_io_handle.get();
 
@@ -365,7 +365,7 @@ void uring_submit(IO_Request& io) noexcept
 void uring_update(IO_Request& io) noexcept
 {
 #ifndef IO_URING_ENABLED
-    throw std::runtime_error("Failed to perform IO - uring is not build."); // NOLINT
+    throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
     if (io.m_state != IO_Request::State::pending)
         return;

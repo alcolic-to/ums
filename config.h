@@ -16,7 +16,7 @@ using namespace std::chrono_literals;
 
 constexpr bool FS_thread_binding_allowed = true;
 constexpr bool FS_work_stealing_allowed = true;
-constexpr bool FS_idle_spinning_allowed = true;
+constexpr bool FS_idle_spinning_allowed = false;
 
 // Config section.
 

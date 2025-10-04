@@ -10,8 +10,6 @@
 #include <utility>
 #include <vector>
 
-namespace ums {
-
 // clang-format off
 #define NO_OP do {} while (0) // NOLINT
 // clang-format on
@@ -30,14 +28,16 @@ namespace ums {
 #define TTracyMessageL(x) NO_OP
 #endif
 
+#define stringify2(x) #x           // NOLINT
+#define stringify(x) stringify2(x) // NOLINT
+
+namespace ums {
+
 #ifdef __cpp_lib_hardware_interference_size
 constexpr std::size_t cache_line_size = std::hardware_destructive_interference_size;
 #else
 constexpr std::size_t cache_line_size = 64;
 #endif
-
-#define stringify2(x) #x           // NOLINT
-#define stringify(x) stringify2(x) // NOLINT
 
 using namespace std::chrono;
 using namespace std::chrono_literals;

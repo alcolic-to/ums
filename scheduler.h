@@ -97,6 +97,7 @@ public:
     void enqueue_task(std::shared_ptr<TaskBase> task);
     std::shared_ptr<TaskBase> next_task() noexcept;
     bool has_tasks() const noexcept;
+    size_t tasks_count() const noexcept;
 
     void schedule_idle_worker(std::shared_ptr<TaskBase> task = nullptr);
 
@@ -118,13 +119,25 @@ public:
     void sleep() noexcept;
     void notify();
 
-    [[nodiscard]] bool initializing() const noexcept { return m_state == State::initializing; }
+    [[nodiscard]] bool initializing() const noexcept
+    {
+        return m_state.load(std::memory_order_relaxed) == State::initializing;
+    }
 
-    [[nodiscard]] bool running() const noexcept { return m_state == State::running; }
+    [[nodiscard]] bool running() const noexcept
+    {
+        return m_state.load(std::memory_order_relaxed) == State::running;
+    }
 
-    [[nodiscard]] bool idle() const noexcept { return m_state == State::idle_sleep; }
+    [[nodiscard]] bool idle() const noexcept
+    {
+        return m_state.load(std::memory_order_relaxed) == State::idle_sleep;
+    }
 
-    [[nodiscard]] bool exiting() const noexcept { return m_state == State::exiting; }
+    [[nodiscard]] bool exiting() const noexcept
+    {
+        return m_state.load(std::memory_order_relaxed) == State::exiting;
+    }
 
     [[nodiscard]] Worker* worker() const noexcept { return m_worker; }
 
@@ -180,7 +193,7 @@ private:
     std::mutex m_mtx;
     std::condition_variable m_cv;
     Tasks m_tasks;
-    State m_state{State::initializing};
+    std::atomic<State> m_state{State::initializing};
     bool m_running{true}; // Flag used for spurious wakeup check.
     bool m_workers_started{false};
 

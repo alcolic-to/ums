@@ -300,6 +300,11 @@ bool Scheduler::has_tasks() const noexcept
     return !m_tasks.empty();
 }
 
+size_t Scheduler::tasks_count() const noexcept
+{
+    return m_tasks.size();
+}
+
 // Schedules idle worker with provided task or with next task from tasks queue if task is empty.
 // We must check whether task exists even if we are getting task from our queue, because someone
 // might have stolen our task in the meantime.
@@ -377,7 +382,8 @@ void Scheduler::schedule_yielded_workers()
 
 /**
  * Steals work (single task) from other scheduler if there are no runnable workers on this
- * scheduler.
+ * scheduler. We will steal work from other scheduler only of it has more than one task or if it has
+ * any tasks and it is running.
  */
 void Scheduler::steal_work()
 {
@@ -387,7 +393,9 @@ void Scheduler::steal_work()
     if (has_runnable_workers() || !has_idle_workers())
         return;
 
-    auto other_with_tasks = [&](auto& other) { return other->id() != id() && other->has_tasks(); };
+    auto other_with_tasks = [&](auto& other) {
+        return other->id() != id() && other->tasks_count() > (other->running() ? 0 : 1);
+    };
 
     for (const auto& other : m_schedulers->filter(other_with_tasks)) {
         if (auto task{other->next_task()}) {
@@ -560,7 +568,7 @@ void Scheduler::sleep() noexcept
 
 void Scheduler::set_state(State state) noexcept
 {
-    m_state = state;
+    m_state.store(state, std::memory_order_relaxed);
 }
 
 // NOLINTBEGIN

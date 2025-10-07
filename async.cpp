@@ -8,30 +8,30 @@
 #include "task.h"
 #include "ums.h"
 
-namespace ums {
+// namespace ums {
 
 // Enques task in best (minimum load) scheduler.
 //
-void enque_task(std::shared_ptr<Task> task)
-{
-    Scheduler& best_scheduler = schedulers->min_load_scheduler();
-    best_scheduler.enqueue_task(std::move(task));
-}
+// void enque_task(std::shared_ptr<Task> task)
+// {
+//     Scheduler& best_scheduler = schedulers->min_load_scheduler();
+//     best_scheduler.enqueue_task(std::move(task));
+// }
 
-template<bool wait>
-std::shared_ptr<Task> async(std::function<void()> func)
-{
-    const std::shared_ptr<Task> task{std::make_shared<Task>(std::move(func))};
+// template<bool wait>
+// std::shared_ptr<Task> async(std::function<void()> func)
+// {
+//     const std::shared_ptr<Task> task{std::make_shared<Task>(std::move(func))};
 
-    enque_task(task);
+//     enque_task(task);
 
-    if constexpr (wait)
-        task->wait();
+//     if constexpr (wait)
+//         task->wait();
 
-    return task;
-}
+//     return task;
+// }
 
-template std::shared_ptr<Task> async<true>(std::function<void()> func);
-template std::shared_ptr<Task> async<false>(std::function<void()> func);
+// template std::shared_ptr<Task> async<true>(std::function<void()> func);
+// template std::shared_ptr<Task> async<false>(std::function<void()> func);
 
-} // namespace ums
+// } // namespace ums

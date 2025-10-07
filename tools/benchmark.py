@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     # Create benchmarks and copy them to tmp folder.
     with chdir(root):
-        cfg_cmd = "cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -G Ninja"
+        cfg_cmd = "cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -G Ninja -DUMS_BUILD_BENCHMARK=1"
         build_cmd = "cmake --build build --config Release"
         run_command(cfg_cmd)
         run_command(build_cmd)

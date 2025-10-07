@@ -28,6 +28,7 @@
 #include <utility>
 
 #include "config.h"
+#include "intrusive_list.hpp"
 #include "io_api.h"
 #include "options.h"
 #include "os_specific.h"
@@ -189,7 +190,7 @@ Scheduler::Scheduler(Schedulers* schedulers, uint64_t cpu_id,
 
     {
         const std::unique_lock<std::mutex> lock{m_workers_mtx};
-        m_worker = m_idle_queue.front();
+        m_worker = &m_idle_queue.front();
         m_worker->notify(lock);
     }
 
@@ -230,7 +231,7 @@ bool Scheduler::has_yielded_workers() const noexcept
 
 void Scheduler::park_runnable(Worker* worker)
 {
-    m_runnable_queue.push_back(worker);
+    m_runnable_queue.push_back(*worker);
     set_worker_state(worker, Worker::State::runnable);
 }
 
@@ -240,9 +241,9 @@ template<bool back>
 void Scheduler::park_idle(Worker* worker)
 {
     if constexpr (back)
-        m_idle_queue.push_back(worker);
+        m_idle_queue.push_back(*worker);
     else
-        m_idle_queue.push_front(worker);
+        m_idle_queue.push_front(*worker);
 
     set_worker_state(worker, Worker::State::idle);
 
@@ -254,13 +255,13 @@ void Scheduler::park_idle(Worker* worker)
 
 void Scheduler::park_waiting(Worker* worker)
 {
-    m_waiting_queue.push_back(worker);
+    m_waiting_queue.push_back(*worker);
     set_worker_state(worker, Worker::State::waiting);
 }
 
 void Scheduler::park_pending_io(Worker* worker)
 {
-    m_pending_io_queue.push_back(worker);
+    m_pending_io_queue.push_back(*worker);
     set_worker_state(worker, Worker::State::pending_io);
 }
 
@@ -272,7 +273,7 @@ void Scheduler::park_yielded(Worker* worker)
 
 void Scheduler::prepare_next_worker() noexcept
 {
-    m_worker = m_runnable_queue.front();
+    m_worker = &m_runnable_queue.front();
     m_runnable_queue.pop_front();
 
     set_worker_state(m_worker, Worker::State::running);
@@ -310,21 +311,22 @@ void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBase> task)
         task = next_task();
 
     if (task) {
-        Worker* worker = m_idle_queue.front();
+        Worker& worker = m_idle_queue.front();
         m_idle_queue.pop_front();
 
-        worker->m_task = std::move(task);
-        park_runnable(worker);
+        worker.m_task = std::move(task);
+        park_runnable(&worker);
     }
 }
 
-// Moves workers from pending_io to runnable queue if worker's I/O is completed.
-//
+/**
+ * Moves workers from pending_io to runnable queue if worker's I/O is completed.
+ */
 void Scheduler::schedule_io_workers()
 {
-    auto io_completed = [](Worker* worker) {
-        worker->m_io_request->update();
-        return !worker->m_io_request->pending();
+    auto io_completed = [](Worker& worker) {
+        worker.m_io_request->update();
+        return !worker.m_io_request->pending();
     };
 
     auto begin = m_pending_io_queue.begin();
@@ -332,24 +334,27 @@ void Scheduler::schedule_io_workers()
 
     for (auto it = std::find_if(begin, end, io_completed); it != end;
          it = std::find_if(it, end, io_completed)) {
-        park_runnable(*it);
+        Worker& worker = *it;
         it = m_pending_io_queue.erase(it);
+        park_runnable(&worker);
     }
 }
 
-// Moves workers from waiting to runnable queue if worker's wait is done.
-//
+/**
+ * Moves workers from waiting to runnable queue if worker's wait is done.
+ */
 void Scheduler::schedule_waiting_workers()
 {
-    auto checker = [](Worker* worker) { return worker->check_wait_info(); };
+    auto checker = [](Worker& worker) { return worker.check_wait_info(); };
 
     auto begin = m_waiting_queue.begin();
     auto end = m_waiting_queue.end();
 
     for (auto it = std::find_if(begin, end, checker); it != end;
          it = std::find_if(it, end, checker)) {
-        park_runnable(*it);
+        Worker& worker = *it;
         it = m_waiting_queue.erase(it);
+        park_runnable(&worker);
     }
 }
 
@@ -462,8 +467,8 @@ auto Scheduler::waiters_info() const noexcept
     } result;
 
     for (const auto& worker : m_waiting_queue) {
-        result.m_cond |= worker->check_cond();
-        result.m_earliest_wait = std::min(result.m_earliest_wait, worker->sleep_time_point());
+        result.m_cond |= worker.check_cond();
+        result.m_earliest_wait = std::min(result.m_earliest_wait, worker.sleep_time_point());
     }
 
     return result;

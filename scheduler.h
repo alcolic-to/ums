@@ -169,11 +169,12 @@ private:
 
     Schedulers* m_schedulers;
     CPU m_cpu;
+
     Worker* m_worker{nullptr};
-    std::deque<Worker*> m_runnable_queue;
-    std::deque<Worker*> m_idle_queue;
-    std::list<Worker*> m_waiting_queue;
-    std::list<Worker*> m_pending_io_queue;
+    stl::IList<Worker, offsetof(Worker, m_node)> m_runnable_queue;
+    stl::IList<Worker, offsetof(Worker, m_node)> m_idle_queue;
+    stl::IList<Worker, offsetof(Worker, m_node)> m_waiting_queue;
+    stl::IList<Worker, offsetof(Worker, m_node)> m_pending_io_queue;
     Worker* m_yielded_worker{nullptr};
 
     std::mutex m_workers_mtx;

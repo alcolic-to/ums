@@ -19,18 +19,19 @@
 #define UMS_WORKER_H
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <thread>
 
+#include "intrusive_list.hpp"
 #include "io_api.h"
 #include "os_specific.h"
 #include "task.h"
 #include "util.h"
 
 namespace ums {
-
 class Scheduler;
 
 class Worker final {
@@ -155,6 +156,7 @@ private:
     //
     uint64_t m_id;
     Scheduler* m_scheduler;
+    stl::INode m_node;
     std::condition_variable m_cv;
     State m_state{State::initializing};
     bool m_running{true}; // Flag used for spurious wakeup check.

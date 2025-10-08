@@ -1,6 +1,5 @@
 #pragma once
 
-#include <type_traits>
 #ifndef COS_TASK_H
 #define COS_TASK_H
 
@@ -8,10 +7,12 @@
 #include <functional>
 #include <memory>
 #include <tuple>
+#include <type_traits>
 
 #include "condition_variable.h"
 #include "mutex.h"
 #include "spinlock.h"
+#include "types.h"
 #include "util.h"
 
 namespace ums {
@@ -62,7 +63,7 @@ public:
     TaskBase& operator=(const TaskBase&) = delete;
     TaskBase& operator=(TaskBase&&) noexcept = delete;
 
-    virtual ~TaskBase() {}
+    virtual ~TaskBase() = default;
 
     virtual void invoke() = 0;
 
@@ -88,30 +89,41 @@ private:
     State m_state{State::not_started};
 };
 
-template<class T, class... Args>
+template<class T>
 class Task : public TaskBase {
 public:
-    using ReturnType = std::conditional_t<std::is_same_v<T, void>, int, T>;
+    using ResultType = std::conditional_t<std::is_same_v<T, void>, u8, T>;
 
-    explicit Task(std::function<T(Args...)> function, Args&&... args) noexcept
+    ~Task() override { std::cout << "Destorying Task!\n"; }
+
+    ResultType result() { return m_result; }
+
+    ResultType m_result;
+};
+
+template<class Fn, class... Args>
+class TaskExec : public Task<std::invoke_result_t<Fn, Args...>> {
+public:
+    using ReturnType = std::invoke_result_t<Fn, Args...>;
+
+    explicit TaskExec(std::function<ReturnType(Args...)> function, Args&&... args) noexcept
         : m_func{std::move(function)}
         , m_args(std::forward<Args>(args)...)
     {
     }
 
+    ~TaskExec() override { std::cout << "Destorying TaskExec!\n"; }
+
     void invoke() override
     {
-        if constexpr (!std::is_same_v<T, void>)
-            m_result = std::apply(m_func, m_args);
+        if constexpr (!std::is_same_v<ReturnType, void>)
+            this->m_result = std::apply(m_func, m_args);
         else
             std::apply(m_func, m_args);
     };
 
-    ReturnType result() { return m_result; }
-
-    std::function<T(Args...)> m_func;
+    std::function<ReturnType(Args...)> m_func;
     std::tuple<Args...> m_args;
-    ReturnType m_result;
 };
 
 // Tasks queue which allows concurrent access.
@@ -129,41 +141,8 @@ public:
 private:
     Spinlock m_lock;
     std::deque<std::shared_ptr<TaskBase>> m_tasks;
-    std::atomic<std::size_t> m_size{0};
+    std::atomic<sz> m_size{0};
 };
-
-// class ClassTBase {
-// public:
-//     virtual void invoke() = 0;
-// };
-
-// template<class T, class... Args>
-// class ClassT : public ClassTBase {
-// public:
-//     ClassT(std::function<T(Args...)> f, Args... args)
-//         : m_func{std::move(f)}
-//         , m_args{std::forward<Args>(args)...}
-//     {
-//     }
-
-//     void invoke() override { m_result = std::apply(m_func, m_args); }
-
-//     std::function<T(Args...)> m_func;
-//     std::tuple<Args...> m_args;
-//     T m_result;
-// };
-
-// template<class T, class... Args, class Result = ClassT<std::invoke_result_t<T, Args...>,
-// Args...>> Result async2(T&& t, Args&&... args)
-// {
-//     Result task{std::forward<T>(t), std::forward<Args>(args)...};
-//     return task;
-
-//     // return t(std::forward<Args>(args)...);
-
-//     // std::function<T(Args...)> func = t;
-//     // func(std::forward<Args>(args)...);
-// }
 
 } // namespace ums
 

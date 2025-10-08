@@ -28,17 +28,19 @@ namespace ums {
 // Executes function asynchronously.
 // If wait is true, waits for function to finish.
 //
-template<class T, class... Args, class TaskType = Task<std::invoke_result_t<T, Args...>, Args...>>
-std::shared_ptr<TaskType> async(T&& t, Args&&... args)
+template<bool wait = false, class Fn, class... Args,
+         class ReturnType = std::invoke_result_t<Fn, Args...>,
+         class TaskExecType = TaskExec<Fn, Args...>>
+std::shared_ptr<Task<ReturnType>> async(Fn&& t, Args&&... args)
 {
-    auto task{std::make_shared<TaskType>(std::forward<T>(t), std::forward<Args>(args)...)};
+    auto task = std::make_shared<TaskExecType>(std::forward<Fn>(t), std::forward<Args>(args)...);
 
     enque_task(task);
 
-    // if constexpr (wait)
-    //     task->wait();
+    if constexpr (wait)
+        task->wait();
 
-    return task;
+    return std::static_pointer_cast<Task<ReturnType>>(task);
 }
 
 void enque_task(auto task)

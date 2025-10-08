@@ -36,12 +36,19 @@ TEST(Scheduler_tests, sanity_test)
 
         std::atomic<int> b{0};
 
-        asyncs<true>([&] { ++b; }, [&] { ++b; }, [&] { ++b; }, [&] { ++b; });
+        async<true>([&] { ++b; });
+        async<true>([&] { ++b; });
+        async<true>([&] { ++b; });
+        async<true>([&] { ++b; });
         ASSERT_TRUE(b == 4);
 
         const auto f = [&] { --b; };
 
-        auto tasks{asyncs(f, f, f, f)};
+        std::vector<decltype(async(f))> tasks;
+        tasks.push_back(async(f));
+        tasks.push_back(async(f));
+        tasks.push_back(async(f));
+        tasks.push_back(async(f));
 
         for (auto task : tasks)
             task->wait();
@@ -58,7 +65,7 @@ TEST(Scheduler_tests, evenly_scheduled_tasks)
         for (uint32_t cpus = 1; cpus <= schedulers->cpus_count(); ++cpus) {
             for (auto task_dur = 1ms; task_dur <= 1024ms; task_dur *= 2) {
                 Stopwatch<false> s;
-                std::vector<std::shared_ptr<Task>> tasks;
+                std::vector<decltype(async([] {}))> tasks;
 
                 for (uint32_t c = 1; c <= cpus; ++c)
                     tasks.push_back(async([=] { hard_work(task_dur); }));

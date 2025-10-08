@@ -103,15 +103,19 @@ void ums_main()
 
     auto task{async(f4, 1024)};
     task->wait();
-    std::cout << "\nDoitio : " << task->result() << "\n";
+    // task->wait();
+    // std::cout << "\nDoitio : " << task->result() << "\n";
 
-    std::function f = [] { std::cout << "Cao, ja sam lambdica!\n"; };
-    ums::async(f)->wait();
+    // std::function f = [] { std::cout << "Cao, ja sam lambdica!\n"; };
+    // ums::async<true>(f)->wait();
 }
 
 int main(int argc, char* argv[])
 {
     init_ums(ums_main);
+    // std::packaged_task<int()> p{};
+    // std::function f = [] { return 5; };
+    // std::future<int> a;
 }
 
 // NOLINTEND

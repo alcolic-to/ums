@@ -131,7 +131,7 @@ void Worker::main_loop()
             return;
 
         try {
-            m_task->m_func();
+            m_task->invoke();
         }
         catch (const std::exception& ex) {
             std::cout << "Unhandled user exception: " << ex.what() << "\n";

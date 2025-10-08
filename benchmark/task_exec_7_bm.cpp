@@ -13,7 +13,7 @@ using namespace ums;
 static void BM_real_work_simulation(benchmark::State& state)
 {
     init_ums([&] {
-        std::vector<std::shared_ptr<Task>> tasks;
+        std::vector<Task<void>> tasks;
 
         for (auto _ : state) {
             auto dur = 20ms;

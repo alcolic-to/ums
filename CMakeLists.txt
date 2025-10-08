@@ -31,7 +31,7 @@ include(cmake/project_config.cmake)
 include(cmake/sanitizers.cmake)
 include(cmake/compiler_options.cmake)
 
-set(CPP_FILES os_specific.cpp task.cpp scheduler.cpp async.cpp worker.cpp io.cpp util.cpp spinlock.cpp mutex.cpp shared_mutex.cpp condition_variable.cpp ums.cpp)
+set(CPP_FILES os_specific.cpp task.cpp scheduler.cpp worker.cpp io.cpp util.cpp spinlock.cpp mutex.cpp shared_mutex.cpp condition_variable.cpp ums.cpp)
 set(HPP_FILES os_specific.h task.h scheduler.h async.h worker.h io_api.h  util.h config.h spinlock.h mutex.h shared_mutex.h condition_variable.h ums.h options.h)
 set(ALL_FILES ${CPP_FILES} ${HPP_FILES})
 

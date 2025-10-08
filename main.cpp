@@ -2,10 +2,16 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
+#include <future>
 #include <iostream>
+#include <memory>
+#include <thread>
+#include <type_traits>
 #include <vector>
 
 #include "async.h"
+#include "types.h"
 #include "ums.h"
 #include "util.h"
 #include "worker.h"
@@ -17,7 +23,7 @@ void f1()
 {
     auto start = now();
 
-    std::vector<uint64_t> v;
+    std::vector<u64> v;
     for (int i = 0; i < 1000; ++i)
         v.push_back(random<uint8_t>());
 
@@ -33,7 +39,7 @@ void f1()
             break;
         }
 
-        if (v[random() % v.size()] == random<uint8_t>() % v.size() && i++ % 100 == 0)
+        if (v[random() % v.size()] == random<u8>() % v.size() && i++ % 100 == 0)
             this_worker->yield();
     }
 
@@ -42,14 +48,14 @@ void f1()
 
 // Duration of ~1s when plugged in.
 //
-uint64_t f3()
+u64 f3()
 {
-    uint64_t first = 0, second = 1;
+    u64 first = 0, second = 1;
 
     // Fibbonaci seq.
     //
-    for (uint64_t i = 2; i < 3000000000; ++i) {
-        uint64_t sum = first + second;
+    for (u64 i = 2; i < 3000000000; ++i) {
+        u64 sum = first + second;
         first = second;
         second = sum;
     }
@@ -59,22 +65,25 @@ uint64_t f3()
 
 void thread_function()
 {
-    for (int i = 0; i < 1000; ++i)
-        async<true>(f3);
+    for (int i = 0; i < 1000; ++i) {
+        auto t = async(f3);
+        t->wait();
+    }
 }
 
 // Duration of ~4ms when plugged in.
 //
-uint64_t f4()
+u64 f4(int a)
 {
-    uint64_t first = 0, second = 1;
+    u64 first = 0, second = 1;
 
     // Fibbonaci seq.
     //
-    for (uint64_t i = 2; i < 10000000; ++i) {
-        uint64_t sum = first + second;
+    for (u64 i = 2; i < 16; ++i) {
+        u64 sum = first + second;
         first = second;
         second = sum;
+        std::cout << second << " ";
     }
 
     return second;
@@ -85,7 +94,7 @@ void ms3_function()
     Stopwatch s;
 
     for (int i = 0; i < 1000; ++i)
-        async(f4);
+        async(f4, 1);
 }
 
 // int ums_main(int argc, char* argv[])
@@ -93,10 +102,19 @@ void ums_main()
 {
     Stopwatch<true, std::chrono::microseconds> s;
 
-    for (int i = 0; i < 1000; ++i) {
-        auto task{async(f4)};
-        task->wait();
-    }
+    Task<u64> task{async(f4, 1024)};
+    std::cout << task->get();
+
+    std::vector<Task<void>> v;
+    v.emplace_back(async([] {}));
+
+    v[0]->wait();
+
+    // task->wait();
+    // std::cout << "\nDoitio : " << task->result() << "\n";
+
+    // std::function f = [] { std::cout << "Cao, ja sam lambdica!\n"; };
+    // ums::async<true>(f)->wait();
 }
 
 int main(int argc, char* argv[])

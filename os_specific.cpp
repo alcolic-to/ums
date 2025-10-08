@@ -10,6 +10,7 @@
 
 #include "file.h"
 #include "io_api.h"
+#include "types.h"
 
 // NOLINTBEGIN(misc-include-cleaner)
 
@@ -25,10 +26,10 @@ namespace ums {
 #undef max
 // NOLINTEND
 
-constexpr int64_t x_file_access = GENERIC_READ | GENERIC_WRITE;
-constexpr int64_t x_file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS |
-                                      FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING |
-                                      FILE_FLAG_WRITE_THROUGH;
+constexpr i64 x_file_access = GENERIC_READ | GENERIC_WRITE;
+constexpr i64 x_file_attributes = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS |
+                                  FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING |
+                                  FILE_FLAG_WRITE_THROUGH;
 
 File_handle::File_handle(const fs::path& file_path)
     : m_handle{os::open_file(file_path.string().c_str(), x_file_access, x_file_attributes)}
@@ -43,7 +44,7 @@ File_handle::~File_handle()
 
 namespace os {
 
-IO_handle::IO_handle(uint64_t offset) : m_ol{}
+IO_handle::IO_handle(u64 offset) : m_ol{}
 {
     m_ol.m_offset = DWORD(offset & 0xFFFFFFFF);
     m_ol.m_offset_high = DWORD(offset >> 32);
@@ -67,7 +68,7 @@ OVERLAPPED* to_windows_ol_ptr(IO_Request& io) noexcept
 
 // Returns number of CPUs in the system.
 //
-uint32_t cpus_count() noexcept
+u32 cpus_count() noexcept
 {
     return GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
 }
@@ -75,10 +76,10 @@ uint32_t cpus_count() noexcept
 // Returns availability mask for this process.
 // Example: returns 15 (0b0000000000001111) -> 4 CPUs are available (0, 1, 2, 3).
 //
-uint64_t cpus_avail_mask() noexcept
+u64 cpus_avail_mask() noexcept
 {
-    uint64_t proc_cpu_mask = 0; // Available CPUs for this process.
-    uint64_t all_cpus_mask = 0; // All available CPUs in the system.
+    u64 proc_cpu_mask = 0; // Available CPUs for this process.
+    u64 all_cpus_mask = 0; // All available CPUs in the system.
 
     GetProcessAffinityMask(GetCurrentProcess(), PDWORD_PTR(&proc_cpu_mask),
                            PDWORD_PTR(&all_cpus_mask));
@@ -91,7 +92,7 @@ uint64_t cpus_avail_mask() noexcept
 
 // Binds current thread to the provided CPU.
 //
-void bind_thread(uint64_t cpu_mask) noexcept
+void bind_thread(u64 cpu_mask) noexcept
 {
     SetThreadAffinityMask(GetCurrentThread(), cpu_mask);
 }
@@ -169,7 +170,7 @@ void update_io_state(IO_Request& io) noexcept
     }
 }
 
-void* open_file(const char* path, uint64_t flags, uint64_t mode)
+void* open_file(const char* path, u64 flags, u64 mode)
 {
     HANDLE handle = CreateFile(path, flags, 0, nullptr, OPEN_ALWAYS, mode, nullptr);
     if (handle == INVALID_HANDLE_VALUE)
@@ -208,8 +209,8 @@ struct io_uring {};
 
 #endif // #ifdef IO_URING_ENABLED
 
-constexpr int64_t x_file_access = O_CREAT | O_RDWR | O_DIRECT;
-constexpr int64_t x_file_attributes = 0666;
+constexpr i64 x_file_access = O_CREAT | O_RDWR | O_DIRECT;
+constexpr i64 x_file_attributes = 0666;
 
 File_handle::File_handle(const fs::path& file_path)
     : m_handle{os::open_file(file_path.string().c_str(), x_file_access, x_file_attributes)}
@@ -249,24 +250,24 @@ public:
 
 thread_local IO_uring tls_uring;
 
-IO_handle::IO_handle(uint64_t offset) : m_uring(&tls_uring.m_ring)
+IO_handle::IO_handle(u64 offset) : m_uring(&tls_uring.m_ring)
 {
     (void)offset;
-    static std::atomic<uint64_t> io_cnt{0};
+    static std::atomic<u64> io_cnt{0};
     m_id = io_cnt++;
 }
 
-uint32_t cpus_count() noexcept
+u32 cpus_count() noexcept
 {
     return sysconf(_SC_NPROCESSORS_ONLN);
 }
 
-uint64_t cpus_avail_mask() noexcept
+u64 cpus_avail_mask() noexcept
 {
     const pid_t pid = getpid();
     cpu_set_t mask;
     CPU_ZERO(&mask);
-    uint64_t cpu_mask = 0;
+    u64 cpu_mask = 0;
 
     if (sched_getaffinity(pid, sizeof(cpu_set_t), &mask) == -1) {
         std::cerr << "sched_getaffinity failed: " << std::strerror(errno) << "\n";
@@ -282,7 +283,7 @@ uint64_t cpus_avail_mask() noexcept
 
 // Binds current thread to provided CPU.
 //
-void bind_thread(uint64_t cpu_mask) noexcept
+void bind_thread(u64 cpu_mask) noexcept
 {
     cpu_set_t mask;
     CPU_ZERO(&mask);
@@ -296,7 +297,7 @@ void bind_thread(uint64_t cpu_mask) noexcept
         std::cerr << "pthread_setaffinity_np failed: " << std::strerror(errno) << "\n";
 }
 
-void* open_file(const char* file_path, uint64_t flags, uint64_t mode)
+void* open_file(const char* file_path, u64 flags, u64 mode)
 {
 #ifndef IO_URING_ENABLED
     throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
@@ -343,7 +344,7 @@ void uring_submit(IO_Request& io) noexcept
     io_vec.iov_base = io.m_io_buffer.m_buffer;
     io_vec.iov_len = io.m_io_buffer.m_size;
     const int fd = *reinterpret_cast<const int*>(io.m_file_handle);
-    const uint64_t offset = io.m_offset;
+    const u64 offset = io.m_offset;
 
     if (io.m_type == IO_Request::Type::write)
         io_uring_prep_writev(sqe, fd, &io_vec, 1, offset);

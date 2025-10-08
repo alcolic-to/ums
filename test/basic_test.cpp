@@ -36,19 +36,12 @@ TEST(Scheduler_tests, sanity_test)
 
         std::atomic<int> b{0};
 
-        async<true>([&] { ++b; });
-        async<true>([&] { ++b; });
-        async<true>([&] { ++b; });
-        async<true>([&] { ++b; });
+        asyncs<true>([&] { ++b; }, [&] { ++b; }, [&] { ++b; }, [&] { ++b; });
         ASSERT_TRUE(b == 4);
 
         const auto f = [&] { --b; };
 
-        std::vector<Task<void>> tasks;
-        tasks.push_back(async(f));
-        tasks.push_back(async(f));
-        tasks.push_back(async(f));
-        tasks.push_back(async(f));
+        auto tasks{asyncs(f, f, f, f)};
 
         for (auto task : tasks)
             task->wait();

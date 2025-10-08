@@ -38,8 +38,9 @@ void enque_task(auto task)
     best_scheduler.enqueue_task(std::move(std::static_pointer_cast<TaskBase>(task)));
 };
 
-// Don't look at code below to prevent brain damage...
-//
+/**
+ * Don't look at code below to prevent brain damage...
+ */
 template<bool wait = false, typename Fn, typename... Fns>
 void asyncs_helper(auto& tasks, Fn&& fn, Fns&&... fns)
 {
@@ -54,9 +55,10 @@ void asyncs_helper(auto& tasks)
 {
 }
 
-// Executes functions asynchronously.
-// If wait is true, waits for functions to finish.
-//
+/**
+ * Executes functions asynchronously.
+ * If wait is true, waits for functions to finish.
+ */
 template<bool wait = false, typename... Fns>
 std::vector<Task<void>> asyncs(Fns&&... fns)
 {

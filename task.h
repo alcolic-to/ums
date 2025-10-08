@@ -19,6 +19,19 @@
 namespace ums {
 
 /**
+ * Generic task implementation.
+ * It allows user to create task which has a generic return type (Task<u64> for example).
+ * Task has a single storage composed of TaskBase, TaskResult and TaskExec.
+ * This storage is shared between user and scheduler, and it's memory is managed automatically.
+ * Task can also be obtained from async() call, which is a standard way of scheduling tasks
+ * asynchronously.
+ *
+ * User can retrieve result from task with get() function, which will block current thread until
+ * task is done. Also, user can call wait(), which will just block until task is done, but without
+ * retieving result from task.
+ */
+
+/**
  * Task base class.
  * It hold all syncronization primitives shared between user and scheduler space.
  */

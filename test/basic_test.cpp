@@ -47,6 +47,17 @@ TEST(Scheduler_tests, sanity_test)
             task->wait();
 
         ASSERT_TRUE(b == 0);
+
+        Task<int> t1 = async([] { return 5; });
+
+        ASSERT_TRUE(t1->get() == 5);
+        ASSERT_ANY_THROW(t1->get());
+
+        Task<int> t2 = async([] { return 5; });
+        t2->wait();
+
+        ASSERT_TRUE(t2->get() == 5);
+        ASSERT_ANY_THROW(t2->get());
     };
 
     init_ums(test);

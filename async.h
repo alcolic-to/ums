@@ -19,7 +19,7 @@ namespace ums {
  */
 template<bool wait = false, class Fn, class... Args,
          class ReturnType = std::invoke_result_t<Fn, Args...>,
-         class TaskExecType = TaskExecImpl<Fn, Args...>>
+         class TaskExecType = TaskExec<Fn, Args...>>
 Task<ReturnType> async(Fn&& t, Args&&... args)
 {
     auto task{std::make_shared<TaskExecType>(std::forward<Fn>(t), std::forward<Args>(args)...)};
@@ -29,13 +29,13 @@ Task<ReturnType> async(Fn&& t, Args&&... args)
     if constexpr (wait)
         task->wait();
 
-    return Task{std::static_pointer_cast<TaskImpl<ReturnType>>(task)};
+    return Task{std::static_pointer_cast<TaskResult<ReturnType>>(task)};
 }
 
 void enque_task(auto task)
 {
     Scheduler& best_scheduler = schedulers->min_load_scheduler();
-    best_scheduler.enqueue_task(std::move(std::static_pointer_cast<TaskBaseImpl>(task)));
+    best_scheduler.enqueue_task(std::move(std::static_pointer_cast<TaskBase>(task)));
 };
 
 // Don't look at code below to prevent brain damage...

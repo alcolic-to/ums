@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "async.h"
+#include "types.h"
 #include "ums.h"
 #include "util.h"
 #include "worker.h"
@@ -22,7 +23,7 @@ void f1()
 {
     auto start = now();
 
-    std::vector<uint64_t> v;
+    std::vector<u64> v;
     for (int i = 0; i < 1000; ++i)
         v.push_back(random<uint8_t>());
 
@@ -38,7 +39,7 @@ void f1()
             break;
         }
 
-        if (v[random() % v.size()] == random<uint8_t>() % v.size() && i++ % 100 == 0)
+        if (v[random() % v.size()] == random<u8>() % v.size() && i++ % 100 == 0)
             this_worker->yield();
     }
 
@@ -47,14 +48,14 @@ void f1()
 
 // Duration of ~1s when plugged in.
 //
-uint64_t f3()
+u64 f3()
 {
-    uint64_t first = 0, second = 1;
+    u64 first = 0, second = 1;
 
     // Fibbonaci seq.
     //
-    for (uint64_t i = 2; i < 3000000000; ++i) {
-        uint64_t sum = first + second;
+    for (u64 i = 2; i < 3000000000; ++i) {
+        u64 sum = first + second;
         first = second;
         second = sum;
     }
@@ -72,14 +73,14 @@ void thread_function()
 
 // Duration of ~4ms when plugged in.
 //
-uint64_t f4(int a)
+u64 f4(int a)
 {
-    uint64_t first = 0, second = 1;
+    u64 first = 0, second = 1;
 
     // Fibbonaci seq.
     //
-    for (uint64_t i = 2; second < a; ++i) {
-        uint64_t sum = first + second;
+    for (u64 i = 2; i < 16; ++i) {
+        u64 sum = first + second;
         first = second;
         second = sum;
         std::cout << second << " ";
@@ -101,8 +102,8 @@ void ums_main()
 {
     Stopwatch<true, std::chrono::microseconds> s;
 
-    auto task{async(f4, 1024)};
-    task->wait();
+    Task<u64> task{async(f4, 1024)};
+    std::cout << task->get();
 
     std::vector<Task<void>> v;
     v.emplace_back(async([] {}));
@@ -119,9 +120,6 @@ void ums_main()
 int main(int argc, char* argv[])
 {
     init_ums(ums_main);
-    // std::packaged_task<int()> p{};
-    // std::function f = [] { return 5; };
-    // std::future<int> a;
 }
 
 // NOLINTEND

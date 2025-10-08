@@ -7,14 +7,13 @@
 #include <string>
 #include <vector>
 
+#include "types.h"
+
 namespace ums {
 
 class PRNG {
 public:
-    explicit PRNG(uint64_t seed = uint64_t(now().time_since_epoch().count())) noexcept
-        : m_seed{seed}
-    {
-    }
+    explicit PRNG(u64 seed = u64(now().time_since_epoch().count())) noexcept : m_seed{seed} {}
 
     template<typename T>
     T rand() noexcept
@@ -23,13 +22,13 @@ public:
     }
 
 private:
-    uint64_t rand64() noexcept
+    u64 rand64() noexcept
     {
         m_seed ^= m_seed >> 12, m_seed ^= m_seed << 25, m_seed ^= m_seed >> 27; // NOLINT
         return m_seed * 2685821657736338717LL;                                  // NOLINT
     }
 
-    uint64_t m_seed;
+    u64 m_seed;
 };
 
 template<typename T>
@@ -38,10 +37,10 @@ T random() noexcept
     return PRNG{}.rand<T>();
 }
 
-template uint8_t random<uint8_t>() noexcept;
-template uint16_t random<uint16_t>() noexcept;
-template uint32_t random<uint32_t>() noexcept;
-template uint64_t random<uint64_t>() noexcept;
+template u8 random<u8>() noexcept;
+template u16 random<u16>() noexcept;
+template u32 random<u32>() noexcept;
+template u64 random<u64>() noexcept;
 
 std::string file_to_string(const std::string& path)
 {

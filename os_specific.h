@@ -3,7 +3,7 @@
 #ifndef OS_SPECIFIC_H
 #define OS_SPECIFIC_H
 
-#include <cstdint>
+#include "types.h"
 
 // OS specific preprocessor definitions.
 //
@@ -38,7 +38,7 @@ struct Overlapped final {
 };
 
 struct IO_handle final {
-    explicit IO_handle(uint64_t offset);
+    explicit IO_handle(u64 offset);
 
     Overlapped* get_ol_ptr() { return &m_ol; }
 
@@ -60,9 +60,9 @@ struct IO_handle final {
 
 // CPU and thread related functions.
 //
-uint32_t cpus_count() noexcept; // maybe just std::thread::hardware_concurrency?
-uint64_t cpus_avail_mask() noexcept;
-void bind_thread(uint64_t cpu_mask) noexcept;
+u32 cpus_count() noexcept; // maybe just std::thread::hardware_concurrency?
+u64 cpus_avail_mask() noexcept;
+void bind_thread(u64 cpu_mask) noexcept;
 void print_thread_affinity() noexcept;
 
 // I/O functions.
@@ -73,7 +73,7 @@ void update_io_state(IO_Request& io) noexcept;
 
 // File functions.
 //
-void* open_file(const char* file_path, uint64_t flags, uint64_t mode);
+void* open_file(const char* file_path, u64 flags, u64 mode);
 void close_file(void* file_handle);
 
 } // namespace os

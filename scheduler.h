@@ -77,11 +77,11 @@ public:
 
     void set_worker_state(Worker* worker, Worker::State state) noexcept;
 
-    void enqueue_task(std::shared_ptr<TaskBase> task);
-    std::shared_ptr<TaskBase> next_task() noexcept;
+    void enqueue_task(std::shared_ptr<TaskBaseImpl> task);
+    std::shared_ptr<TaskBaseImpl> next_task() noexcept;
     bool has_tasks() const noexcept;
 
-    void schedule_idle_worker(std::shared_ptr<TaskBase> task = nullptr);
+    void schedule_idle_worker(std::shared_ptr<TaskBaseImpl> task = nullptr);
 
     void schedule_io_workers();
     void schedule_waiting_workers();

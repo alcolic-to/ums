@@ -44,7 +44,7 @@ TEST(Scheduler_tests, sanity_test)
 
         const auto f = [&] { --b; };
 
-        std::vector<decltype(async(f))> tasks;
+        std::vector<Task<void>> tasks;
         tasks.push_back(async(f));
         tasks.push_back(async(f));
         tasks.push_back(async(f));
@@ -65,7 +65,7 @@ TEST(Scheduler_tests, evenly_scheduled_tasks)
         for (uint32_t cpus = 1; cpus <= schedulers->cpus_count(); ++cpus) {
             for (auto task_dur = 1ms; task_dur <= 1024ms; task_dur *= 2) {
                 Stopwatch<false> s;
-                std::vector<decltype(async([] {}))> tasks;
+                std::vector<Task<void>> tasks;
 
                 for (uint32_t c = 1; c <= cpus; ++c)
                     tasks.push_back(async([=] { hard_work(task_dur); }));
@@ -100,7 +100,7 @@ TEST(Scheduler_tests, sequential_task_execution)
 TEST(Scheduler_tests, parallel_execution)
 {
     auto test = [&] {
-        std::vector<std::shared_ptr<Task>> tasks;
+        std::vector<Task<void>> tasks;
         tasks.reserve(100);
         const auto f = [] { hard_work(20ms); };
 
@@ -121,7 +121,7 @@ TEST(Scheduler_tests, parallel_execution)
 TEST(Scheduler_tests, work_stealing)
 {
     auto test = [&] {
-        std::vector<std::shared_ptr<Task>> tasks;
+        std::vector<Task<void>> tasks;
 
         Stopwatch<false> s;
 
@@ -156,8 +156,8 @@ TEST(Scheduler_tests, work_stealing)
 TEST(Scheduler_tests, task_order_execution)
 {
     auto test = [&] {
-        std::vector<std::shared_ptr<Task>> first_tasks;
-        std::vector<std::shared_ptr<Task>> second_tasks;
+        std::vector<Task<void>> first_tasks;
+        std::vector<Task<void>> second_tasks;
 
         const auto cpus = schedulers->cpus_count();
 
@@ -191,9 +191,9 @@ TEST(Scheduler_tests, task_order_execution_extended)
                     "scheduling new tasks until they are done.";
 
     auto test = [&] {
-        std::vector<std::shared_ptr<Task>> first_tasks;
-        std::vector<std::shared_ptr<Task>> second_tasks;
-        std::vector<std::shared_ptr<Task>> third_tasks;
+        std::vector<Task<void>> first_tasks;
+        std::vector<Task<void>> second_tasks;
+        std::vector<Task<void>> third_tasks;
 
         const auto cpus = schedulers->cpus_count();
 

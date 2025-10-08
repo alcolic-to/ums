@@ -244,13 +244,13 @@ void Scheduler::set_worker_state(Worker* worker, Worker::State state) noexcept
     worker->set_state(state);
 }
 
-void Scheduler::enqueue_task(std::shared_ptr<TaskBase> task)
+void Scheduler::enqueue_task(std::shared_ptr<TaskBaseImpl> task)
 {
     m_tasks.enque(std::move(task));
     notify();
 }
 
-std::shared_ptr<TaskBase> Scheduler::next_task() noexcept
+std::shared_ptr<TaskBaseImpl> Scheduler::next_task() noexcept
 {
     return m_tasks.deque();
 }
@@ -264,7 +264,7 @@ bool Scheduler::has_tasks() const noexcept
 // We must check whether task exists even if we are getting task from our queue, because someone
 // might have stolen our task in the meantime.
 //
-void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBase> task)
+void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBaseImpl> task)
 {
     if (!task)
         task = next_task();

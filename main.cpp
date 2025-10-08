@@ -103,6 +103,12 @@ void ums_main()
 
     auto task{async(f4, 1024)};
     task->wait();
+
+    std::vector<Task<void>> v;
+    v.emplace_back(async([] {}));
+
+    v[0]->wait();
+
     // task->wait();
     // std::cout << "\nDoitio : " << task->result() << "\n";
 

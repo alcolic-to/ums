@@ -51,26 +51,26 @@ namespace ums {
 //     std::atomic<std::size_t> m_size{0};
 // };
 
-class TaskBase {
+class TaskBaseImpl {
 public:
     enum class State : int { not_started, running, done };
 
-    TaskBase() = default;
+    TaskBaseImpl() = default;
 
-    TaskBase(const TaskBase&) = delete;
-    TaskBase(TaskBase&&) noexcept = delete;
+    TaskBaseImpl(const TaskBaseImpl&) = delete;
+    TaskBaseImpl(TaskBaseImpl&&) noexcept = delete;
 
-    TaskBase& operator=(const TaskBase&) = delete;
-    TaskBase& operator=(TaskBase&&) noexcept = delete;
+    TaskBaseImpl& operator=(const TaskBaseImpl&) = delete;
+    TaskBaseImpl& operator=(TaskBaseImpl&&) noexcept = delete;
 
-    virtual ~TaskBase() = default;
+    virtual ~TaskBaseImpl() = default;
 
     virtual void invoke() = 0;
 
     void wait()
     {
         std::unique_lock<Mutex> lock{m_mtx};
-        m_cv.wait(lock, [&] { return m_state == TaskBase::State::done; });
+        m_cv.wait(lock, [&] { return m_state == TaskBaseImpl::State::done; });
     }
 
     void notify() noexcept
@@ -90,11 +90,11 @@ private:
 };
 
 template<class T>
-class Task : public TaskBase {
+class TaskImpl : public TaskBaseImpl {
 public:
     using ResultType = std::conditional_t<std::is_same_v<T, void>, u8, T>;
 
-    ~Task() override { std::cout << "Destorying Task!\n"; }
+    // ~TaskImpl() override { std::cout << "Destorying Task!\n"; }
 
     ResultType result() { return m_result; }
 
@@ -102,17 +102,17 @@ public:
 };
 
 template<class Fn, class... Args>
-class TaskExec : public Task<std::invoke_result_t<Fn, Args...>> {
+class TaskExecImpl : public TaskImpl<std::invoke_result_t<Fn, Args...>> {
 public:
     using ReturnType = std::invoke_result_t<Fn, Args...>;
 
-    explicit TaskExec(std::function<ReturnType(Args...)> function, Args&&... args) noexcept
+    explicit TaskExecImpl(std::function<ReturnType(Args...)> function, Args&&... args) noexcept
         : m_func{std::move(function)}
         , m_args(std::forward<Args>(args)...)
     {
     }
 
-    ~TaskExec() override { std::cout << "Destorying TaskExec!\n"; }
+    // ~TaskExecImpl() override { std::cout << "Destorying TaskExec!\n"; }
 
     void invoke() override
     {
@@ -126,21 +126,38 @@ public:
     std::tuple<Args...> m_args;
 };
 
+class TaskBase {
+public:
+    std::shared_ptr<TaskBaseImpl> m_storage;
+
+    TaskBaseImpl* operator->() { return m_storage.get(); }
+};
+
+template<class T>
+class Task {
+public:
+    explicit Task(std::shared_ptr<TaskImpl<T>> task) noexcept : m_storage{std::move(task)} {}
+
+    std::shared_ptr<TaskImpl<T>> m_storage;
+
+    TaskImpl<T>* operator->() { return m_storage.get(); }
+};
+
 // Tasks queue which allows concurrent access.
 // Note that all memory operations can be relaxed, because spinlock has acquire-release memory
 // ordering.
 //
 class alignas(cache_line_size) Tasks {
 public:
-    void enque(std::shared_ptr<TaskBase> task);
-    std::shared_ptr<TaskBase> deque() noexcept;
+    void enque(std::shared_ptr<TaskBaseImpl> task);
+    std::shared_ptr<TaskBaseImpl> deque() noexcept;
 
     [[nodiscard]] size_t size() const noexcept;
     [[nodiscard]] bool empty() const noexcept;
 
 private:
     Spinlock m_lock;
-    std::deque<std::shared_ptr<TaskBase>> m_tasks;
+    std::deque<std::shared_ptr<TaskBaseImpl>> m_tasks;
     std::atomic<sz> m_size{0};
 };
 

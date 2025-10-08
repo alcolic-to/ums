@@ -56,8 +56,6 @@ if (UMS_BUILD_MAIN)
     target_include_directories(ums PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
-# add_executable(ums main_2.cpp)
-
 include(CTest)
 add_subdirectory(test)
 add_subdirectory(benchmark)

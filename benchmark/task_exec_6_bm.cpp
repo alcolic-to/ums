@@ -13,7 +13,7 @@ using namespace ums;
 static void BM_task_exec_stress(benchmark::State& state)
 {
     init_ums([&] {
-        std::vector<std::shared_ptr<Task>> tasks;
+        std::vector<Task<void>> tasks;
 
         for (auto _ : state) {
             for (int i = 0; i < 1024 * 1024; ++i)

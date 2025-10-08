@@ -13,7 +13,7 @@ using namespace ums;
 static void BM_task_exec_all_cpus_multiple_tasks(benchmark::State& state)
 {
     init_ums([&] {
-        std::vector<std::shared_ptr<Task>> tasks;
+        std::vector<Task<void>> tasks;
         tasks.reserve(state.range(1));
 
         for (auto _ : state) {

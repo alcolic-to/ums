@@ -4,7 +4,6 @@
 #define COS_TASK_H
 
 #include <deque>
-#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <tuple>
@@ -114,34 +113,38 @@ public:
 /**
  * Task execution class.
  * It is composed out of task with result and it contains user function along with provided
- * parameters. It is used for function invokation.
+ * parameters. It is used for task invokation.
  */
 template<class Fn, class... Args>
 class TaskExec : public TaskResult<std::invoke_result_t<Fn, Args...>> {
 public:
     using ReturnType = std::invoke_result_t<Fn, Args...>;
 
-    explicit TaskExec(std::function<ReturnType(Args...)> function, Args&&... args) noexcept
-        : m_func{std::move(function)}
-        , m_args(std::forward<Args>(args)...)
+    template<class F, class... A>
+    explicit TaskExec(F&& func, A&&... args) noexcept
+        : m_args{std::forward<F>(func), std::forward<A>(args)...}
     {
+    }
+
+    ReturnType execute()
+    {
+        return std::apply([](auto&& f, auto&&... args) { return f(args...); }, m_args);
     }
 
     void invoke() override
     {
         if constexpr (!std::is_same_v<ReturnType, void>)
-            this->m_result = std::apply(m_func, m_args);
+            this->m_result = execute();
         else
-            std::apply(m_func, m_args);
+            execute();
     };
 
-    std::function<ReturnType(Args...)> m_func;
-    std::tuple<Args...> m_args;
+    std::tuple<std::decay_t<Fn>, std::decay_t<Args>...> m_args;
 };
 
 /**
  * Simple wrapper class for user task.
- * It holds shared pointer to task storage in for automatic memory management.
+ * It holds shared pointer to task storage for automatic memory management.
  */
 template<class T>
 class Task {

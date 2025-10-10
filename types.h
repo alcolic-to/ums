@@ -1,5 +1,5 @@
-#ifndef TYPES_H
-#define TYPES_H
+#ifndef UMS_TYPES_H
+#define UMS_TYPES_H
 
 #include <cmath>
 #include <cstddef>
@@ -19,5 +19,7 @@ using f32 = std::float_t;
 using f64 = std::double_t;
 
 using sz = std::size_t;
+using iptr = std::intptr_t;
+using uptr = std::uintptr_t;
 
-#endif // TYPES_H
+#endif // UMS_TYPES_H

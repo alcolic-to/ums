@@ -1,6 +1,15 @@
-# COS - cooperative scheduling lib
+# UMS - user mode (cooperative) scheduling lib
 
 ## Introduction
+UMS implements a model of async task execution.
+
+Similar to std::async, it provides a simple APIs for asynchronious execution, but with stable number of threads (workers).  
+It tries to minimize interactions with OS and all scheduling is done is user space.
+
+Whole `std::thread` lib is implemented from scratch along with all synchronization primitives: `std::mutex`, `std::condition_variable`, `std::future` etc. 
+Therefore, user must use those primitives instead of `std::` ones.
+
+Only important difference between `std::async` and this lib is that user must manually call `yield()` on computation heavy tasks in order to prevent single worker from monopolizing scheduler. This will be explained in details later. 
 
 Supported OS:
 * Windows
@@ -11,24 +20,19 @@ Supported OS:
 * `cmake` - minimum version 3.10
 * `clang` and `clang++`
 * `Ninja` - for faster build times
-* For linux 'liburing-dev' library is required
+* For linux 'liburing-dev' library is required:
+    - ubuntu: `sudo apt install liburing-dev`
 
 ## Usage
 
 ```bash
-git clone https://github.com/aleksandarcolic22414/cos-cooperative-scheduling
-cd cos-cooperative-scheduling
+git clone https://github.com/alcolic-to/ums
+cd ums
 ```
 
-Build on `Linux`:
+Build:
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ 
-cmake --build build
-```
-
-Build on `Windows`:
-```bash
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 cmake --build build
 ```
 

@@ -1,3 +1,8 @@
+# To enable tracy profiler, build project with UMS_ENABLE_TRACY=ON
+# You will also need tracy server, GUI etc. installed, since we are not building it from scratch (I tried couple of times and it failed, so I gave up).
+# For windows, found needed binaries under releases https://github.com/wolfpld/tracy. Note that server (downloaded binaries) and client version (one compiled by UMS) needs to be the same.
+# Also, on windows, make sure to run program as administrator so tracy can collect stack traces.
+
 OPTION(UMS_ENABLE_TRACY "If set, enables tracy profiler and adds function to enable tracy for projects." OFF)
 if (NOT UMS_ENABLE_TRACY)
     return()

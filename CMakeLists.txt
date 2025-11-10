@@ -1,16 +1,11 @@
 # Usage:
-# Create initial cmake build folder: cmake [-G Ninja, only allowed on windows] -B build -DCMAKE_BUILD_TYPE=[Debug/Release] -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_C_COMPILER=clang-20
+# Create initial cmake build folder: cmake [-G Ninja] -B build -DCMAKE_BUILD_TYPE=[Debug/Release] -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_C_COMPILER=clang-20
 # Create build with desired config: cmake --build build
-# On linux, you have to use makefiles, since lib_io_uring is build that way, I am not patient enough to make it build with ninja.
+# On linux, you also have to use make, since lib_io_uring is build that way, and I am not patient enough to make it build with ninja.
 #
 # Clean command: cmake --build build --target clean
 
-# If you want to play around with scheduler, you can just enable BUILD_MAIN which builds main.cpp file.
-
-# To enable tracy profiler, build project with ENABLE_TRACY=ON and make sure to have debug symbols (e.g. RelWithDebugInfo)
-# You will also need tracy server, GUI etc. installed, since we are not build it from scratch (I tried couple of times and it failed, so I gave up).
-# For windows, found needed binaries under releases https://github.com/wolfpld/tracy. Note that server (downloaded binaries) and client version (one compiled by UMS) needs to be the same.
-# Also, on windows, make sure to run program as administrator so tracy can collect stack traces.
+# If you want to play around with scheduler, you can just enable UMS_BUILD_MAIN which builds main.cpp file.
 
 cmake_minimum_required(VERSION 3.10)
 project(user_mode_scheduler)
@@ -35,25 +30,25 @@ set(CPP_FILES os_specific.cpp task.cpp scheduler.cpp worker.cpp io.cpp util.cpp 
 set(HPP_FILES os_specific.h task.h scheduler.h async.h worker.h io_api.h  util.h config.h spinlock.h mutex.h shared_mutex.h condition_variable.h ums.h options.h)
 set(ALL_FILES ${CPP_FILES} ${HPP_FILES})
 
-add_library(ums_lib STATIC ${CPP_FILES})
-set(UMS_LIB ums_lib)
+add_library(ums STATIC ${CPP_FILES})
+set(UMS_LIB ums)
 
 if (LINUX)
     add_subdirectory(third_party)
-    target_link_libraries(ums_lib PRIVATE uring)
-    add_dependencies(ums_lib uring_project)
+    target_link_libraries(ums PRIVATE uring)
+    add_dependencies(ums uring_project)
 endif()
 
 include(cmake/profilers.cmake)
 if (UMS_ENABLE_TRACY)
-    add_tracy(ums_lib)
+    add_tracy(ums)
 endif()
 
 OPTION(UMS_BUILD_MAIN "If set, builds main.cpp for manual scheduler testing." OFF)
 if (UMS_BUILD_MAIN)
-    add_executable(ums main.cpp)
-    target_link_libraries(ums PRIVATE ${UMS_LIB})
-    target_include_directories(ums PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    add_executable(ums_main main.cpp)
+    target_link_libraries(ums_main PRIVATE ${UMS_LIB})
+    target_include_directories(ums_main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
 include(CTest)

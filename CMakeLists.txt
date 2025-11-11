@@ -1,7 +1,7 @@
 # Usage:
 # Create initial cmake build folder: cmake [-G Ninja] -B build -DCMAKE_BUILD_TYPE=[Debug/Release] -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_C_COMPILER=clang-20
 # Create build with desired config: cmake --build build
-# On linux, you also have to use make, since lib_io_uring is build that way, and I am not patient enough to make it build with ninja.
+# On linux, if you want to use fast I/O, you have to use makefiles for build, since lib_io_uring is build that way, and I am not patient enough to make it build with ninja. Also, you need to set UMS_BUILD_URING
 #
 # Clean command: cmake --build build --target clean
 
@@ -33,8 +33,8 @@ set(ALL_FILES ${CPP_FILES} ${HPP_FILES})
 add_library(ums STATIC ${CPP_FILES})
 set(UMS_LIB ums)
 
-if (LINUX)
-    add_subdirectory(third_party)
+add_subdirectory(third_party)
+if (UMS_BUILD_URING)
     target_link_libraries(ums PRIVATE uring)
     add_dependencies(ums uring_project)
 endif()

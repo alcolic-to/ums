@@ -1,9 +1,10 @@
-OPTION(BUILD_URING "If set, builds uring lib. Not working currently. Call Topalovic." ON)
-if (NOT BUILD_URING)
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+
+OPTION(UMS_BUILD_URING "If set, builds uring lib. Not working currently. Call Topalovic." OFF)
+if (NOT UMS_BUILD_URING)
     return()
 endif()
 
-if (LINUX)
 # Add global define for uring, to be able to disable it in a source code.
 add_compile_definitions(IO_URING_ENABLED=1)
 include(ExternalProject)
@@ -19,4 +20,5 @@ ExternalProject_Add(
     BUILD_COMMAND  bash -c "cd ${URING_PROJECT_SOURCE} && make -j$(nproc);"
     INSTALL_COMMAND bash -c "cd ${URING_PROJECT_SOURCE} && sudo make install;"
 )
+
 endif()

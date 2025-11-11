@@ -18,11 +18,32 @@ Supported OS:
 ## Prerequisites
 
 * `cmake` - minimum version 3.10
+    ```bash
+    sudo apt install cmake
+    ```
 * `clang` and `clang++`
-* `Ninja` - for faster build times
-* For linux 'liburing-dev' library is required:
-    - ubuntu: `sudo apt install liburing-dev`
+    ```bash
+    wget https://apt.llvm.org/llvm.sh
+    chmod u+x llvm.sh
+    sudo ./llvm.sh 21
+    sudo apt install -y libc++-21-dev libc++abi-21-dev
+    sudo ln -s /usr/bin/clang-21 /usr/bin/clang
+    sudo ln -s /usr/bin/clang++-21 /usr/bin/clang++
+    ```
 
+* `clang-tidy` (optional):
+    ```bash
+    sudo apt install clang-tidy-21
+    sudo ln -s /usr/bin/clang-tidy-21 /usr/bin/clang-tidy
+    ```
+* `Ninja` - for faster build times
+    ```bash
+    sudo apt install ninja-build
+    ```
+* For linux `liburing-dev` library is required if you want to use fast I/O:
+    ```bash
+    sudo apt install liburing-dev
+    ```
 ## Usage
 
 ```bash

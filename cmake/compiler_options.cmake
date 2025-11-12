@@ -8,9 +8,9 @@ endif()
 
 # Next section is compiler options.
 
-# Optional, using libc++ for better debugging with lldb-dap.
+# Optional, using libc++ with clang, for better debugging with lldb-dap.
 OPTION(UMS_USE_LIBCPP "If set, sets compiler stdlib value to libc++." ON)
-if (UMS_USE_LIBCPP)
+if (UMS_USE_LIBCPP AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
 endif()
 

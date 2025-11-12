@@ -1,11 +1,8 @@
 if (MSVC)
     add_compile_definitions($<$<CONFIG:Debug>:DEBUG>)
-    add_compile_definitions($<$<CONFIG:Release>:RELEASE>)
 else()
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_definitions(-DDEBUG)
-    else()
-        add_definitions(-DRELEASE)
     endif()
 endif()
 

@@ -50,7 +50,7 @@ Task<ReturnType> async(Fn&& t, Args&&... args)
 void enque_task(auto task)
 {
     Scheduler& best_scheduler = schedulers->min_load_scheduler();
-    best_scheduler.enqueue_task(std::move(std::static_pointer_cast<TaskBase>(task)));
+    best_scheduler.enqueue_task(std::static_pointer_cast<TaskBase>(task));
 };
 
 /**

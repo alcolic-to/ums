@@ -1,0 +1,7 @@
+Copyright 2025, Aleksandar Colic
+
+The following dependencies are utilized by this project but may not be explicitly distributed as part of the software:
+
+- googletest - BSD 3-Clause License (https://github.com/google/googletest)
+- tracy - BSD 3-Clause License (https://github.com/wolfpld/tracy)
+- stockfish GNU General Public License v3.0 (https://github.com/official-stockfish/Stockfish)

@@ -38,7 +38,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Configure
-      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DUMS_BUILD_TEST=ON -DCMAKE_C_COMPILER=${{ matrix.config.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
 
     - name: Build
       run: cmake --build build --config ${{ matrix.build_type }}

@@ -25,7 +25,10 @@
 
 namespace ums {
 
-class Condition_variable; // To suppress unused header warnings.
+/**
+ * To suppress unused header warnings. Condition_variable implementation is located in mutex.h
+ */
+class Condition_variable;
 
 class Condition_variable_any {
 public:

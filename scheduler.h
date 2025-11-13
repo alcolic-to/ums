@@ -192,7 +192,6 @@ public:
     explicit Schedulers(Options opt = Options{}) noexcept;
 
     [[nodiscard]] Scheduler& min_load_scheduler() const noexcept;
-    [[nodiscard]] Scheduler& max_load_scheduler() const noexcept;
     [[nodiscard]] uint32_t workers_count() const noexcept;
     [[nodiscard]] uint32_t cpus_count() const noexcept;
 

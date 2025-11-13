@@ -61,6 +61,10 @@ catch (...) {
 
 // clang-format on
 
+// TODO: Prefer this scheduler if this scheduler has the same load as min scheduler, since we can
+// than execute task instantly. Also, make invokation on the same thread that schedules task
+// possible and check if it makes sense. Also, make scheduling policy: async and concurent and
+// decide based on that.
 Scheduler& Schedulers::min_load_scheduler() const noexcept
 {
     const auto cmp = [](const auto& left, const auto& right) {
@@ -68,15 +72,6 @@ Scheduler& Schedulers::min_load_scheduler() const noexcept
     };
 
     return **std::ranges::min_element(m_schedulers, cmp);
-}
-
-Scheduler& Schedulers::max_load_scheduler() const noexcept
-{
-    const auto cmp = [](const auto& left, const auto& right) {
-        return left->load() > right->load();
-    };
-
-    return **std::ranges::max_element(m_schedulers, cmp);
 }
 
 [[nodiscard]] uint32_t Schedulers::workers_count() const noexcept
@@ -153,7 +148,7 @@ void Schedulers::wait_exit()
 // Creates scheduler and workers for provided CPU.
 // After workers are created, starts single worker from idle queue
 // and waits until worker (scheduler) goes to sleep.
-//
+// TODO: Speed this up with parallel workes creation.
 Scheduler::Scheduler(Schedulers& schedulers, uint64_t cpu_id,
                      Options::Workers_per_scheduler workers_count)
     : m_schedulers{schedulers}

@@ -1,6 +1,6 @@
 Copyright 2025, Aleksandar Colic
 
-The following dependencies are utilized by this project but may not be explicitly distributed as part of the software:
+The following dependencies are utilized by this project, but may not be explicitly distributed as part of the software:
 
 - google test - BSD 3-Clause License (https://github.com/google/googletest)
 - google benchmark - Apache License v2.0 (https://github.com/google/benchmark)

@@ -3,7 +3,6 @@
 #include <atomic>
 #include <functional>
 #include <gtest/gtest.h>
-#include <iostream>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
@@ -16,6 +15,7 @@
 #include "shared_mutex.h"
 #include "ums.h"
 #include "util.h"
+#include "worker.h"
 
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 
@@ -1087,6 +1087,8 @@ void test_timed_behavior()
 
                 if (!SharedLock.owns_lock())
                     launch_readers.exchange(1);
+
+                this_worker->yield();
             }
         };
 

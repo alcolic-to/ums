@@ -59,6 +59,24 @@ class Scheduler final {
 public:
     enum class State : int { initializing, running, idle_wait, idle_sleep, exiting };
 
+    static std::string state_to_string(State state)
+    {
+        switch (state) {
+        case State::initializing:
+            return "initializing";
+        case State::running:
+            return "running";
+        case State::idle_wait:
+            return "idle_wait";
+        case State::idle_sleep:
+            return "idle_sleep";
+        case State::exiting:
+            return "exiting";
+        default:
+            return "unkown";
+        }
+    }
+
     explicit Scheduler(Schedulers& schedulers, uint64_t cpu_id,
                        Options::Workers_per_scheduler workers_count);
     ~Scheduler() noexcept;
@@ -155,7 +173,14 @@ public:
     [[nodiscard]] uint64_t id() const noexcept { return m_cpu.m_id; }
 
 private:
-    void wait(std::unique_lock<std::mutex>& lock, Time_point abs_time = Time_point::max());
+    template<class Predicate>
+    void wait(std::unique_lock<std::mutex>& lock, Predicate&& pred)
+    {
+        m_running = false;
+        m_cv.wait(lock, std::forward<Predicate>(pred));
+    }
+
+    void wait_until(std::unique_lock<std::mutex>& lock, Time_point abs_time);
     void notify(const std::unique_lock<std::mutex>& lock) noexcept;
 
     Schedulers& m_schedulers;
@@ -219,6 +244,7 @@ private:
     std::mutex m_mtx;
     std::condition_variable m_cv;
     std::atomic<uint32_t> m_idle_schedulers{0};
+    bool m_check_idle = false;
     std::vector<std::unique_ptr<Scheduler>> m_schedulers;
 };
 

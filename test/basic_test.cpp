@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "async.h"
+#include "options.h"
 #include "ums.h"
 #include "util.h"
 #include "worker.h"

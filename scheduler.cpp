@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -88,17 +89,18 @@ Scheduler& Schedulers::min_load_scheduler() const noexcept
     return m_schedulers.size();
 }
 
-// Returns whether all schedulers are idle.
-// Every time scheduler gets idle, it increases m_idle_schedulers, so we just check whether it
-// matches shedulers size.
-// There is a tricky case that we must handle: If we have only 1 running scheduler (others are idle)
-// and user executes async task which gets scheduled on a sleeping scheduler, it might happen that
-// all schedulers becomes idle (because waking up scheduler takes time), so we are not allowed to
-// exit. Instead, we must lock all schedulers and check their state and tasks before exiting, to be
-// sure that there is no more work to do. Note that locking schedulers 1 by 1 and checking
-// their tasks would not solve the problem, because we might miss execution of async task which can
-// execute another async task etc.
-//
+/**
+ * Returns whether all schedulers are idle.
+ * Every time scheduler gets idle, it increases m_idle_schedulers, so we just check whether it
+ * matches shedulers size.
+ * There is a tricky case that we must handle: If we have only 1 running scheduler (others are idle)
+ * and user executes async task which gets scheduled on a sleeping scheduler, it might happen that
+ * all schedulers becomes idle (because waking up scheduler takes time), so we are not allowed to
+ * exit. Instead, we must lock all schedulers and check their state and tasks before exiting, to be
+ * sure that there is no more work to do. Note that locking schedulers 1 by 1 and checking
+ * their tasks would not solve the problem, because we might miss execution of async task which can
+ * execute another async task etc.
+ */
 bool Schedulers::all_idle() noexcept
 {
     if (m_idle_schedulers.load(std::memory_order_relaxed) < m_schedulers.size())
@@ -113,25 +115,22 @@ bool Schedulers::all_idle() noexcept
     return r;
 }
 
-// Increases number of idle schedulers.
-// If all schedulers are idle, it means that there is no more work to do and we can exit all
-// schedulers.
-// Note that we are not locking Schedulers::m_mtx before notify, because we might enter a deadlock:
-//        First thread                                  Second thread
-// 1. lock(Schedulers::mtx) in wait_exit()
-//                                            2. lock(Scheduler::mtx) in sleep();
-// 3. lock(Scheduler::mtx) in all_idle()
-//                                            4. lock(Schedulers::mtx) in signal_idle()
-// Both threads are waiting for a mutex which is owned by other thread, so we are deadlocked.
-// We should be safe this way without locking, because this function is called under
-// lock in sleep().
-//
+/**
+ * Increases the number of idle schedulers and notifies main thread (waiting in wait_exit)
+ * if all shcedulers are idle.
+ */
 void Schedulers::signal_idle() noexcept
 {
     const uint32_t idle_count = m_idle_schedulers.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (idle_count < m_schedulers.size())
+        return;
 
-    if (idle_count == m_schedulers.size())
-        m_cv.notify_one();
+    {
+        std::scoped_lock<std::mutex> lock{m_mtx};
+        m_check_idle = true;
+    }
+
+    m_cv.notify_one();
 }
 
 void Schedulers::signal_running() noexcept
@@ -139,10 +138,29 @@ void Schedulers::signal_running() noexcept
     m_idle_schedulers.fetch_sub(1, std::memory_order_relaxed);
 }
 
+/**
+ * Waits for schedulers to exit.
+ * Schedulers will notify us only when all of them are idle. After notification, we must check
+ * whether all schedulers are really idle (see all_idle for details). In order to prevent deadlock
+ * while checking for idle states, we must unlock our mutex before calling all idle, since signal
+ * idle would require it.
+ * Of course, there are a lot of edge cases that are handled with this implementation, and
+ * explaining all of them would be a waste of time.
+ */
 void Schedulers::wait_exit()
 {
     std::unique_lock<std::mutex> lock{m_mtx};
-    m_cv.wait(lock, [&] { return all_idle(); });
+    m_cv.wait(lock, [&] {
+        if (!m_check_idle)
+            return false;
+
+        m_check_idle = false;
+
+        {
+            Scoped_unlock<std::mutex> unlock{m_mtx};
+            return all_idle();
+        }
+    });
 }
 
 // Creates scheduler and workers for provided CPU.
@@ -345,9 +363,10 @@ void Scheduler::schedule_yielded_workers()
     }
 }
 
-// Steals work (single task) from other scheduler if there are no runnable workers on this
-// scheduler.
-//
+/**
+ * Steals work (single task) from other scheduler if there are no runnable workers on this
+ * scheduler.
+ */
 void Scheduler::steal_work()
 {
     if constexpr (!FS_work_stealing_allowed)
@@ -397,10 +416,13 @@ void Scheduler::schedule()
     }
 }
 
-void Scheduler::wait(std::unique_lock<std::mutex>& lock, Time_point abs_time)
+void Scheduler::wait_until(std::unique_lock<std::mutex>& lock, Time_point abs_time)
 {
     m_running = false;
-    m_cv.wait_until(lock, abs_time, [&] { return m_running; });
+    bool wait_res = m_cv.wait_until(lock, abs_time, [&] { return m_running; });
+
+    assert(m_running || !wait_res); // Either someone notified us or we timed out on wait.
+    m_running = true;
 }
 
 void Scheduler::notify([[maybe_unused]] const std::unique_lock<std::mutex>& lock) noexcept
@@ -414,7 +436,7 @@ void Scheduler::notify([[maybe_unused]] const std::unique_lock<std::mutex>& lock
 void Scheduler::notify()
 {
     const std::unique_lock<std::mutex> lock{m_mtx};
-    notify(lock);
+    notify(lock); // TODO: Unlock before notify to avoid pessimization!
 }
 
 // Returns struct which holds info about workers in a waiting queue (whether any condition is
@@ -454,30 +476,32 @@ bool Scheduler::should_idle_spin() noexcept
     return now() <= m_idle_start_time + CFG_idle_spin_threshold;
 }
 
-// Sleep if there is no work.
-// Our sleep is determined by waiting workers. We have to wait until any waiting worker's
-// condition is signaled or earlies sleep time expires for all waiting workers. This function is
-// called after initial workers scheduling when there are no runnable workers.
-//
-// NOTE:
-// Since scheduler is going to sleep, we need to signal it every time new task arrives,
-// earlies sleep time expires, any condition variable or exit is signaled.
-// At any moment new task can come, condition might be signaled etc., so we need to check
-// everything under lock before going to sleep and all scheduler notifications must be done
-// under lock to avoid race conditions. In order to allow precise sleep time (15ms or less) we
-// must include idle_sleep_threshold. Since windows clock is not that precise (clock cycle is
-// ~15ms) and OS scheduler can delay wakeup of any sleeping thread, we choose arbitrary value
-// for idle_sleep_threshold of 20ms. Note that all functions trying to notify scheduler are
-// blocked until all of our checks are done under lock. One potential problem is that OS
-// scheduler might schedule worker out if mutex is locked in this function and we are, for
-// example, trying to add new task from another worker which must notify scheduler.
-// This problem maybe can be solved with global run queue.
-//
+/**
+ * Sleep if there is no work.
+ * Our sleep is determined by waiting workers. We have to wait until any waiting worker's
+ * condition is signaled or earlies sleep time expires for all waiting workers. This function is
+ * called after initial workers scheduling when there are no runnable workers.
+ *
+ * NOTE:
+ * Since scheduler is going to sleep, we need to signal it every time new task arrives,
+ * earlies sleep time expires, any condition variable or exit is signaled.
+ * At any moment new task can come, condition might be signaled etc., so we need to check
+ * everything under lock before going to sleep and all scheduler notifications must be done
+ * under lock to avoid race conditions. In order to allow precise sleep time (15ms or less) we
+ * must include idle_sleep_threshold. Since windows clock is not that precise (clock cycle is
+ * ~15ms) and OS scheduler can delay wakeup of any sleeping thread, we choose arbitrary value
+ * for idle_sleep_threshold of 20ms. Note that all functions trying to notify scheduler are
+ * blocked until all of our checks are done under lock. One potential problem is that OS
+ * scheduler might schedule worker out if mutex is locked in this function and we are, for
+ * example, trying to add new task from another worker which must notify scheduler.
+ * This problem maybe can be solved with global run queue.
+ */
 void Scheduler::sleep() noexcept
 {
-    // For pending I/O workers, we will just keep scheduling until I/O is done.
-    // TODO: Check whether we can aford to sleep for I/O operations.
-    //
+    /**
+     * For pending I/O workers, we will just keep scheduling until I/O is done.
+     * TODO: Check whether we can aford to sleep for I/O operations.
+     */
     if (has_pending_io_workers())
         return;
 
@@ -489,9 +513,10 @@ void Scheduler::sleep() noexcept
     if (has_tasks() && has_idle_workers())
         return;
 
-    // TODO: It should be enough to just check waiting workers, since if there are tasks and
-    // there are no waiting workers, I don't know where they are.
-    //
+    /**
+     * TODO: It should be enough to just check waiting workers, since if there are tasks and
+     * there are no waiting workers, I don't know where they are.
+     */
     if (exit_signaled() && !has_waiting_workers() && !has_tasks())
         return;
 
@@ -503,21 +528,22 @@ void Scheduler::sleep() noexcept
             return;
 
         set_state(State::idle_wait);
-        wait(lock, wait_info.m_earliest_wait);
+        wait_until(lock, wait_info.m_earliest_wait);
         set_state(State::running);
+
+        return;
     }
-    else {
-        if (initializing()) [[unlikely]]
-            notify(lock); // Notify thread (waiting in scheduler constructor) to continue.
 
-        set_state(State::idle_sleep);
-        m_schedulers.signal_idle();
+    if (initializing()) [[unlikely]]
+        notify(lock); // Notify thread (waiting in scheduler constructor) to continue.
 
-        wait(lock);
+    set_state(State::idle_sleep);
+    m_schedulers.signal_idle();
 
-        m_schedulers.signal_running();
-        set_state(State::running);
-    }
+    wait(lock, [&] { return has_tasks() || exit_signaled(); });
+
+    m_schedulers.signal_running();
+    set_state(State::running);
 }
 
 void Scheduler::set_state(State state) noexcept
@@ -607,6 +633,9 @@ bool Scheduler::sync_init(Worker* worker)
     worker->notify(lock); // Notify thread (waiting in worker constructor) to continue
     worker->wait(lock);   // and go to sleep.
 
+    if (exit_signaled()) [[unlikely]]
+        return false;
+
     return m_workers_started ? false : (m_workers_started = true);
 }
 
@@ -658,12 +687,15 @@ void Scheduler::exit()
 bool Scheduler::has_work() const noexcept
 {
     return has_runnable_workers() || has_waiting_workers() || has_pending_io_workers() ||
-           has_tasks();
+           has_tasks() || has_yielded_workers();
 }
 
 bool Scheduler::should_exit() const noexcept
 {
-    return exit_signaled() && !has_work();
+    bool exit = exit_signaled();
+    assert(!exit || !has_work());
+
+    return exit;
 }
 
 template void Scheduler::sync<Sync_context::main>(Worker* worker);

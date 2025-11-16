@@ -25,7 +25,6 @@
 #include "io_api.h"
 #include "os_specific.h"
 #include "scheduler.h"
-#include "task.h"
 #include "util.h"
 
 namespace ums {

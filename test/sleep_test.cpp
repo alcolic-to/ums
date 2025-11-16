@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "async.h"
+#include "config.h"
 #include "ums.h"
 #include "util.h"
 #include "worker.h"
@@ -30,9 +31,15 @@ void sleep_test(const uint32_t iterations, const auto sleep_time)
 
 TEST(Sleep, sleep_test)
 {
-    for (uint32_t i = 1; i <= 5; ++i)
-        for (uint32_t sleep_ms = 1; sleep_ms <= 512; sleep_ms *= 2)
+    for (uint32_t i = 1; i <= 5; ++i) {
+        for (uint32_t sleep_ms = 1; sleep_ms <= 512; sleep_ms *= 2) {
+            // Only if idle spin is allowed, we can (almost) guarantee sleeps of < 20ms.
+            if (!FS_idle_spinning_allowed && sleep_ms < 16)
+                continue;
+
             sleep_test(i, std::chrono::milliseconds{sleep_ms});
+        }
+    }
 }
 
 // NOLINTEND

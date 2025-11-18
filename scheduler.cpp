@@ -419,7 +419,7 @@ void Scheduler::schedule()
 void Scheduler::wait_until(std::unique_lock<std::mutex>& lock, Time_point abs_time)
 {
     m_running = false;
-    bool wait_res = m_cv.wait_until(lock, abs_time, [&] { return m_running; });
+    [[maybe_unused]] bool wait_res = m_cv.wait_until(lock, abs_time, [&] { return m_running; });
 
     assert(m_running || !wait_res); // Either someone notified us or we timed out on wait.
     m_running = true;

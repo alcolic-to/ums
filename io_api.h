@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef COS_IO_API_H
-#define COS_IO_API_H
+#ifndef UMS_IO_API_H
+#define UMS_IO_API_H
 
 #include <cstdint>
 #include <memory>
@@ -61,4 +61,4 @@ void cos_write_file(void* file_handle, IO_Buffer buffer, uint64_t offset);
 
 } // namespace ums
 
-#endif // COS_IO_API_H
+#endif // UMS_IO_API_H

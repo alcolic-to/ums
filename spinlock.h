@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef COS_SPINLOCK_H
-#define COS_SPINLOCK_H
+#ifndef UMS_SPINLOCK_H
+#define UMS_SPINLOCK_H
 
 #include <atomic>
 #include <cstdint>
@@ -45,4 +45,4 @@ private:
 
 } // namespace ums
 
-#endif // COS_SPINLOCK_H
+#endif // UMS_SPINLOCK_H

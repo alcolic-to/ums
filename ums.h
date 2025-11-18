@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef COS_UMS_H
-#define COS_UMS_H
+#ifndef UMS_UMS_H
+#define UMS_UMS_H
 
 #include <functional>
 #include <memory>
@@ -35,4 +35,4 @@ void init_ums(std::function<void()> main, Options opt = Options{});
 
 } // namespace ums
 
-#endif // COS_UMS_H
+#endif // UMS_UMS_H

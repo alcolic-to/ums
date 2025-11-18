@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef COS_UTIL_H
-#define COS_UTIL_H
+#ifndef UMS_UTIL_H
+#define UMS_UTIL_H
 
 #include <chrono>
 #include <cstdint>
@@ -134,6 +134,6 @@ T random() noexcept;
 std::string file_to_string(const std::string& path);
 std::vector<char> file_to_vector(const std::string& path);
 
-#endif // COS_UTIL_H
+#endif // UMS_UTIL_H
 
 } // namespace ums

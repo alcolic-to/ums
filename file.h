@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef COS_FILE_H
-#define COS_FILE_H
+#ifndef UMS_FILE_H
+#define UMS_FILE_H
 
 #include <filesystem>
 
@@ -44,4 +44,4 @@ private:
 
 } // namespace ums
 
-#endif // COS_FILE_H
+#endif // UMS_FILE_H

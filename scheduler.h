@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef COS_SCHEDULER_H
-#define COS_SCHEDULER_H
+#ifndef UMS_SCHEDULER_H
+#define UMS_SCHEDULER_H
 
 #include <algorithm>
 #include <atomic>
@@ -250,4 +250,4 @@ private:
 
 } // namespace ums
 
-#endif // COS_SCHEDULER_H
+#endif // UMS_SCHEDULER_H

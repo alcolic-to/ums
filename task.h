@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef COS_TASK_H
-#define COS_TASK_H
+#ifndef UMS_TASK_H
+#define UMS_TASK_H
 
 #include <deque>
 #include <memory>
@@ -192,4 +192,4 @@ private:
 
 } // namespace ums
 
-#endif // COS_TASK_H
+#endif // UMS_TASK_H

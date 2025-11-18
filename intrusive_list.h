@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef COS_INTRUSIVE_LIST_H
-#define COS_INTRUSIVE_LIST_H
+#pragma once
+
+#ifndef UMS_INTRUSIVE_LIST_H
+#define UMS_INTRUSIVE_LIST_H
 
 #include <bit>
 
@@ -191,4 +193,4 @@ private:
 
 // NOLINTEND(readability-implicit-bool-conversion)
 
-#endif // COS_INTRUSIVE_LIST_H
+#endif // UMS_INTRUSIVE_LIST_H

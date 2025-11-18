@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef COS_WORKER_H
-#define COS_WORKER_H
+#ifndef UMS_WORKER_H
+#define UMS_WORKER_H
 
 #include <atomic>
 #include <cstdint>
@@ -168,4 +168,4 @@ extern thread_local Worker* this_worker; // NOLINT
 
 } // namespace ums
 
-#endif // COS_WORKER_H
+#endif // UMS_WORKER_H

@@ -15,10 +15,9 @@
  */
 #pragma once
 
-#ifndef COS_ASYNC_H
-#define COS_ASYNC_H
+#ifndef UMS_ASYNC_H
+#define UMS_ASYNC_H
 
-#include <functional>
 #include <memory>
 #include <type_traits>
 
@@ -91,4 +90,4 @@ std::vector<Task<void>> asyncs(Fns&&... fns)
 
 } // namespace ums
 
-#endif // COS_ASYNC_H
+#endif // UMS_ASYNC_H

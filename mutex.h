@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef COS_MUTEX_H
-#define COS_MUTEX_H
+#ifndef UMS_MUTEX_H
+#define UMS_MUTEX_H
 
 #include <condition_variable>
 #include <mutex>
@@ -313,4 +313,4 @@ private:
 
 } // namespace ums
 
-#endif // COS_MUTEX_H
+#endif // UMS_MUTEX_H

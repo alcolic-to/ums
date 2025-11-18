@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef COS_SHARED_MUTEX_H
-#define COS_SHARED_MUTEX_H
+#ifndef UMS_SHARED_MUTEX_H
+#define UMS_SHARED_MUTEX_H
 
 #include "condition_variable.h"
 #include "mutex.h"
@@ -134,4 +134,4 @@ private:
 
 } // namespace ums
 
-#endif // COS_SHARED_MUTEX_H
+#endif // UMS_SHARED_MUTEX_H

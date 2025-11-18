@@ -61,7 +61,7 @@ public:
 
     static std::string state_to_string(State state);
 
-    explicit Scheduler(Schedulers& schedulers, uint64_t cpu_id,
+    explicit Scheduler(Schedulers* schedulers, uint64_t cpu_id,
                        Options::Workers_per_scheduler workers_count);
     ~Scheduler() noexcept;
 
@@ -167,7 +167,7 @@ private:
     void wait_until(std::unique_lock<std::mutex>& lock, Time_point abs_time);
     void notify(const std::unique_lock<std::mutex>& lock) noexcept;
 
-    Schedulers& m_schedulers;
+    Schedulers* m_schedulers;
     CPU m_cpu;
     Worker* m_worker{nullptr};
     std::deque<Worker*> m_runnable_queue;

@@ -49,7 +49,7 @@ Schedulers::Schedulers(Options opt) noexcept try
 
     while (cpu_id < m_cpus_avail_mask.size() && sch_created < opt.schedulers_count()) {
         if (m_cpus_avail_mask.test(cpu_id)) {
-            m_schedulers.emplace_back(std::make_unique<Scheduler>(*this, cpu_id, opt.workers_per_scheduler()));
+            m_schedulers.emplace_back(std::make_unique<Scheduler>(this, cpu_id, opt.workers_per_scheduler()));
             ++sch_created;
         }
 
@@ -175,13 +175,13 @@ std::string Scheduler::state_to_string(State state)
 // After workers are created, starts single worker from idle queue
 // and waits until worker (scheduler) goes to sleep.
 // TODO: Speed this up with parallel workes creation.
-Scheduler::Scheduler(Schedulers& schedulers, uint64_t cpu_id,
+Scheduler::Scheduler(Schedulers* schedulers, uint64_t cpu_id,
                      Options::Workers_per_scheduler workers_count)
     : m_schedulers{schedulers}
     , m_cpu{cpu_id}
 {
     for (uint32_t i = 0; i < workers_count; ++i)
-        m_workers.push_back(std::make_unique<Worker>(i, *this));
+        m_workers.push_back(std::make_unique<Worker>(i, this));
 
     {
         const std::unique_lock<std::mutex> lock{m_workers_mtx};
@@ -385,7 +385,7 @@ void Scheduler::steal_work()
 
     auto other_with_tasks = [&](auto& other) { return other->id() != id() && other->has_tasks(); };
 
-    for (const auto& other : m_schedulers.filter(other_with_tasks)) {
+    for (const auto& other : m_schedulers->filter(other_with_tasks)) {
         if (auto task{other->next_task()}) {
             schedule_idle_worker(std::move(task));
             return;
@@ -546,11 +546,11 @@ void Scheduler::sleep() noexcept
         notify(lock); // Notify thread (waiting in scheduler constructor) to continue.
 
     set_state(State::idle_sleep);
-    m_schedulers.signal_idle();
+    m_schedulers->signal_idle();
 
     wait(lock, [&] { return has_tasks() || exit_signaled(); });
 
-    m_schedulers.signal_running();
+    m_schedulers->signal_running();
     set_state(State::running);
 }
 

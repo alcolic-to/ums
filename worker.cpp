@@ -32,19 +32,19 @@ namespace ums {
 // Creates worker object and starts worker thread on a provided CPU.
 // We will wait for a signal from created thread, so we can continue when it is ready.
 //
-Worker::Worker(uint64_t id, Scheduler& scheduler)
+Worker::Worker(uint64_t id, Scheduler* scheduler)
     : m_id{id}
     , m_scheduler{scheduler}
     , m_thread{&Worker::entry_point, this}
 {
-    std::unique_lock<std::mutex> lock{m_scheduler.m_workers_mtx};
+    std::unique_lock<std::mutex> lock{m_scheduler->m_workers_mtx};
     m_cv.wait(lock, [&] { return !m_running; });
 }
 
 Worker::~Worker()
 {
     {
-        const std::unique_lock<std::mutex> lock{m_scheduler.m_workers_mtx};
+        const std::unique_lock<std::mutex> lock{m_scheduler->m_workers_mtx};
         set_state(Worker::State::exiting);
         notify(lock);
     }
@@ -67,13 +67,13 @@ bool Worker::exit() const noexcept
 //
 void Worker::yield()
 {
-    m_scheduler.sync<Sync_context::yield>(this);
+    m_scheduler->sync<Sync_context::yield>(this);
 }
 
 void Worker::wait_cond_or_sleep()
 {
     if (!check_wait_info())
-        m_scheduler.sync<Sync_context::wait>(this);
+        m_scheduler->sync<Sync_context::wait>(this);
 }
 
 void Worker::sleep_until_internal(const Time_point& time_point)
@@ -88,7 +88,7 @@ void Worker::read_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
         std::make_unique<IO_Request>(file_handle, buffer, offset, IO_Request::Type::read);
 
     if (m_io_request->m_state == IO_Request::State::pending)
-        m_scheduler.sync<Sync_context::io>(this);
+        m_scheduler->sync<Sync_context::io>(this);
 }
 
 void Worker::write_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
@@ -97,7 +97,7 @@ void Worker::write_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
         std::make_unique<IO_Request>(file_handle, buffer, offset, IO_Request::Type::write);
 
     if (m_io_request->m_state == IO_Request::State::pending)
-        m_scheduler.sync<Sync_context::io>(this);
+        m_scheduler->sync<Sync_context::io>(this);
 }
 
 void Worker::wait(std::unique_lock<std::mutex>& lock)
@@ -117,7 +117,7 @@ void Worker::notify([[maybe_unused]] const std::unique_lock<std::mutex>& lock) n
 void Worker::notify_waiter() noexcept
 {
     set_cond();
-    m_scheduler.notify();
+    m_scheduler->notify();
 }
 
 void Worker::entry_point()
@@ -125,7 +125,7 @@ void Worker::entry_point()
     this_worker = this;
 
     if constexpr (FS_thread_binding_allowed)
-        os::bind_thread(m_scheduler.m_cpu.m_mask.to_ullong());
+        os::bind_thread(m_scheduler->m_cpu.m_mask.to_ullong());
 
     // std::cout << "Started thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
 
@@ -139,7 +139,7 @@ void Worker::entry_point()
 void Worker::main_loop()
 {
     while (true) {
-        m_scheduler.sync<Sync_context::main>(this);
+        m_scheduler->sync<Sync_context::main>(this);
 
         if (exit()) [[unlikely]]
             return;

@@ -48,7 +48,7 @@ public:
         exiting
     };
 
-    Worker(uint64_t id, Scheduler& scheduler);
+    Worker(uint64_t id, Scheduler* scheduler);
 
     ~Worker();
 
@@ -153,14 +153,14 @@ public:
 private:
     // TODO: reorganize data members for quicker access.
     //
-    std::condition_variable m_cv;
     uint64_t m_id;
+    Scheduler* m_scheduler;
+    std::condition_variable m_cv;
     State m_state{State::initializing};
     bool m_running{true}; // Flag used for spurious wakeup check.
     Wait_info m_wait_info;
     std::shared_ptr<TaskBase> m_task{nullptr};
     std::unique_ptr<IO_Request> m_io_request{nullptr};
-    Scheduler& m_scheduler;
     std::thread m_thread;
 };
 

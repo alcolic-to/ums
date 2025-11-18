@@ -77,11 +77,7 @@ Scheduler& Schedulers::min_load_scheduler() const noexcept
 
 [[nodiscard]] uint32_t Schedulers::workers_count() const noexcept
 {
-    uint32_t c = 0;
-    for (const auto& scheduler : m_schedulers)
-        c += scheduler->workers_count();
-
-    return c;
+    return m_schedulers.size() * m_schedulers.front()->workers_count();
 }
 
 [[nodiscard]] uint32_t Schedulers::cpus_count() const noexcept
@@ -161,6 +157,18 @@ void Schedulers::wait_exit()
             return all_idle();
         }
     });
+}
+
+std::string Scheduler::state_to_string(State state)
+{
+    switch (state) { // clang-format off
+    case State::initializing: return "initializing";
+    case State::running:      return "running";
+    case State::idle_wait:    return "idle_wait";
+    case State::idle_sleep:   return "idle_sleep";
+    case State::exiting:      return "exiting";
+    default:                  return "unkown";
+    } // clang-format on
 }
 
 // Creates scheduler and workers for provided CPU.

@@ -87,21 +87,21 @@ void thread_function()
     }
 }
 
-// Duration of ~4ms when plugged in.
-//
-u64 f4(int a)
+u64 fib(u64 n)
 {
     u64 first = 0, second = 1;
 
-    // Fibbonaci seq.
-    //
-    for (u64 i = 2; i < 16; ++i) {
+    if (n > 0)
+        std::cout << first;
+
+    for (u64 i = 1; i < n; ++i) {
         u64 sum = first + second;
         first = second;
         second = sum;
-        std::cout << second << " ";
+        std::cout << " " << second;
     }
 
+    std::cout << "\n";
     return second;
 }
 
@@ -110,32 +110,33 @@ void ms3_function()
     Stopwatch s;
 
     for (int i = 0; i < 1000; ++i)
-        async(f4, 1);
+        async(fib, 1);
 }
 
-// int ums_main(int argc, char* argv[])
-void ums_main()
+void ums_main(int argc, char* argv[])
 {
+    std::cout << "argc: " << argc << "\n";
+    std::cout << "argv: \n";
+    for (int i = 0; i < argc; ++i)
+        std::cout << argv[0] << "\n";
+
+    std::cout << "Schedulers count: " << schedulers->cpus_count() << "\n";
+    std::cout << "Workers count: " << schedulers->workers_count() << "\n";
+
     Stopwatch<true, std::chrono::microseconds> s;
 
-    Task<u64> task{async(f4, 1024)};
-    std::cout << task->get();
+    Task<u64> task{async(fib, 16)};
+    std::cout << task->get() << "\n";
 
     std::vector<Task<void>> v;
     v.emplace_back(async([] {}));
 
     v[0]->wait();
-
-    // task->wait();
-    // std::cout << "\nDoitio : " << task->result() << "\n";
-
-    // std::function f = [] { std::cout << "Cao, ja sam lambdica!\n"; };
-    // ums::async<true>(f)->wait();
 }
 
 int main(int argc, char* argv[])
 {
-    init_ums(ums_main);
+    init_ums([&] { ums_main(argc, argv); });
 }
 
 // NOLINTEND

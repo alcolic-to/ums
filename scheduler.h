@@ -59,23 +59,7 @@ class Scheduler final {
 public:
     enum class State : int { initializing, running, idle_wait, idle_sleep, exiting };
 
-    static std::string state_to_string(State state)
-    {
-        switch (state) {
-        case State::initializing:
-            return "initializing";
-        case State::running:
-            return "running";
-        case State::idle_wait:
-            return "idle_wait";
-        case State::idle_sleep:
-            return "idle_sleep";
-        case State::exiting:
-            return "exiting";
-        default:
-            return "unkown";
-        }
-    }
+    static std::string state_to_string(State state);
 
     explicit Scheduler(Schedulers& schedulers, uint64_t cpu_id,
                        Options::Workers_per_scheduler workers_count);

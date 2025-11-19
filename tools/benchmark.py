@@ -7,11 +7,11 @@ from contextlib import chdir
 from distutils.dir_util import copy_tree, remove_tree
 
 # Utility functions
-def run_command(command, cwd=None, cout=False):
+def run_command(command : str, cout: bool = False):
     """Run a shell command and return its output."""
     try:
-        print(f"Running: {command}")
-        result = subprocess.run(command, cwd=cwd, text=True, capture_output=not cout, check=True)
+        print(command)
+        result = subprocess.run(command.split(), text=True, capture_output=not cout, check=True)
         if (not cout):
             return result.stdout.strip()
     except subprocess.CalledProcessError as e:
@@ -19,18 +19,18 @@ def run_command(command, cwd=None, cout=False):
         print(e.stderr)
         sys.exit(1)
 
-def find_file(name, path):
+def find_file(name : str, path : str):
     for root, dirs, files in os.walk(path):
         if name in files:
             return os.path.join(root, name)
 
-def rm_dir(path):
+def rm_dir(path : str):
     try:
         remove_tree(path)
     except:
         print(f"Directory {path} does not exist.")
 
-def execs_in_dir(directory):
+def execs_in_dir(directory : str):
     return [
         entry.name
         for entry in os.scandir(directory)
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         for exe in execs_in_dir(bm_baseline_dir):
             bm_baseline_exe = bm_baseline_dir + "/" + exe
             bm_test_exe = bm_test_dir + "/" + exe
-            run_command("py " + compare_py_script + " benchmarks " + bm_baseline_exe + " " + bm_test_exe, cout=True)
+            run_command("python " + compare_py_script + " benchmarks " + bm_baseline_exe + " " + bm_test_exe, cout=True)
         
         remove_tree(bm_baseline_dir)
         remove_tree(bm_test_dir)

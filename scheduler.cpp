@@ -104,8 +104,12 @@ bool Schedulers::all_idle() noexcept
 
     using namespace std::ranges;
 
+    if (any_of(m_schedulers, [&](const auto& s) { return s->has_tasks(); }))
+        return false;
+
     for_each(m_schedulers, [](auto& s) { s->m_mtx.lock(); });
-    const bool r = all_of(m_schedulers, [&](auto& s) { return s->idle() && !s->has_tasks(); });
+    const bool r =
+        all_of(m_schedulers, [&](const auto& s) { return s->idle() && !s->has_tasks(); });
     for_each(m_schedulers, [](auto& s) { s->m_mtx.unlock(); });
 
     return r;

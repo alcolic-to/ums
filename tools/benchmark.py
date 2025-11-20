@@ -1,4 +1,7 @@
+#!/usr/bin/env python
+
 import os
+import argparse
 import platform
 import subprocess
 import sys
@@ -39,7 +42,11 @@ def execs_in_dir(directory : str):
 
 # Main workflow
 if __name__ == "__main__":
-    cwd = os.getcwd()
+    parser = argparse.ArgumentParser(prog="top", description="Parse filters")
+    parser.add_argument("-f", "--filter", nargs="?", default="BM", help="filter regex for benchmark")
+    args = parser.parse_args()
+
+    # main
     root = run_command("git rev-parse --show-toplevel")
 
     bm_baseline_branch = "master"
@@ -79,7 +86,7 @@ if __name__ == "__main__":
         for exe in execs_in_dir(bm_baseline_dir):
             bm_baseline_exe = bm_baseline_dir + "/" + exe
             bm_test_exe = bm_test_dir + "/" + exe
-            run_command("python " + compare_py_script + " benchmarks " + bm_baseline_exe + " " + bm_test_exe, cout=True)
+            run_command(compare_py_script + " benchmarksfiltered " + bm_baseline_exe + " " + args.filter + " " + bm_test_exe + " " + args.filter , cout=True)
         
         remove_tree(bm_baseline_dir)
         remove_tree(bm_test_dir)

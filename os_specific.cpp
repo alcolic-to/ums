@@ -212,17 +212,15 @@ void close_file(void* file_handle)
 #include <sched.h>
 #include <unistd.h>
 
-#ifdef IO_URING_ENABLED
+#ifdef UMS_IO_URING_ENABLED
 #include <liburing.h>
 #else
 #pragma clang diagnostic ignored "-Wexceptions"
 #pragma GCC diagnostic ignored "-Wexceptions"
 
-namespace os {
 struct io_uring {};
-} // namespace os
 
-#endif // #ifdef IO_URING_ENABLED
+#endif // #ifdef UMS_IO_URING_ENABLED
 
 constexpr i64 x_file_access = O_CREAT | O_RDWR | O_DIRECT;
 constexpr i64 x_file_attributes = 0666;
@@ -244,7 +242,7 @@ class IO_uring {
 public:
     IO_uring()
     {
-#ifndef IO_URING_ENABLED
+#ifndef UMS_IO_URING_ENABLED
         throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
         io_uring_queue_init(1, &m_ring, 0 /* flags */);
@@ -253,7 +251,7 @@ public:
 
     ~IO_uring() noexcept
     {
-#ifndef IO_URING_ENABLED
+#ifndef UMS_IO_URING_ENABLED
         throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
         io_uring_queue_exit(&m_ring);
@@ -314,7 +312,7 @@ void bind_thread(u64 cpu_mask) noexcept
 
 void* open_file(const char* file_path, u64 flags, u64 mode)
 {
-#ifndef IO_URING_ENABLED
+#ifndef UMS_IO_URING_ENABLED
     throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
     int* fd = new int(0);
@@ -331,7 +329,7 @@ void* open_file(const char* file_path, u64 flags, u64 mode)
 
 void close_file(void* file_handle)
 {
-#ifndef IO_URING_ENABLED
+#ifndef UMS_IO_URING_ENABLED
     throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
     int* fd = reinterpret_cast<int*>(file_handle);
@@ -346,7 +344,7 @@ void close_file(void* file_handle)
 
 void uring_submit(IO_Request& io) noexcept
 {
-#ifndef IO_URING_ENABLED
+#ifndef UMS_IO_URING_ENABLED
     throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
     const IO_handle* io_handle = io.m_io_handle.get();
@@ -376,7 +374,7 @@ void uring_submit(IO_Request& io) noexcept
 
 void uring_update(IO_Request& io) noexcept
 {
-#ifndef IO_URING_ENABLED
+#ifndef UMS_IO_URING_ENABLED
     throw std::runtime_error("Failed to perform IO - uring is not built."); // NOLINT
 #else
     if (io.m_state != IO_Request::State::pending)

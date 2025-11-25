@@ -39,6 +39,7 @@ add_subdirectory(third_party)
 if (UMS_BUILD_URING)
     target_link_libraries(ums PRIVATE uring)
     add_dependencies(ums uring_project)
+    add_compile_definitions(UMS_IO_URING_ENABLED=1) # Add global define for uring, to be able to disable it in a source code.
 endif()
 
 include(cmake/profilers.cmake)

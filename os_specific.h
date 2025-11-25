@@ -34,6 +34,10 @@ namespace ums {
 
 class IO_Request;
 
+#ifdef OS_LINUX
+struct io_uring;
+#endif
+
 namespace os {
 
 #if defined OS_WINDOWS
@@ -61,9 +65,6 @@ struct IO_handle final {
 };
 
 #elif defined OS_LINUX
-
-// Forward declaration.
-struct io_uring;
 
 struct IO_handle final {
     explicit IO_handle(uint64_t offset);

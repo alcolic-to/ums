@@ -26,6 +26,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "array_map.hpp"
 #include "async.h"
 #include "types.h"
 #include "ums.h"

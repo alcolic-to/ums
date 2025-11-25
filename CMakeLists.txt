@@ -33,6 +33,8 @@ set(ALL_FILES ${CPP_FILES} ${HPP_FILES})
 add_library(ums STATIC ${CPP_FILES})
 set(UMS_LIB ums)
 
+include(cmake/stl.cmake)
+
 add_subdirectory(third_party)
 if (UMS_BUILD_URING)
     target_link_libraries(ums PRIVATE uring)

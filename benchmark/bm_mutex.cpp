@@ -14,6 +14,7 @@
 #include "async.hpp"
 #include "bm_util.hpp"
 #include "mutex.hpp"
+#include "task.hpp"
 #include "ums.hpp"
 
 using namespace ums;
@@ -99,7 +100,7 @@ static void BM_spinlock(benchmark::State& state)
             }
         };
 
-        std::vector<std::shared_ptr<Task>> tasks;
+        std::vector<Task<void>> tasks;
         tasks.reserve(state.range(0));
 
         for (auto _ : state) {
@@ -127,7 +128,7 @@ static void BM_mutex(benchmark::State& state)
             }
         };
 
-        std::vector<std::shared_ptr<Task>> tasks;
+        std::vector<Task<void>> tasks;
         tasks.reserve(state.range(0));
 
         for (auto _ : state) {
@@ -182,7 +183,7 @@ static void BM_spinlock_with_work(benchmark::State& state)
             }
         };
 
-        std::vector<std::shared_ptr<Task>> tasks;
+        std::vector<Task<void>> tasks;
         tasks.reserve(state.range(0));
 
         for (auto _ : state) {
@@ -209,7 +210,7 @@ static void BM_mutex_with_work(benchmark::State& state)
             }
         };
 
-        std::vector<std::shared_ptr<Task>> tasks;
+        std::vector<Task<void>> tasks;
         tasks.reserve(state.range(0));
 
         for (auto _ : state) {

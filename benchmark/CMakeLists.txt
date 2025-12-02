@@ -28,7 +28,7 @@ function(add_ums_benchmark BENCHMARK_FILE)
     target_include_directories(${BENCHMARK_NAME} PUBLIC ${CMAKE_SOURCE_DIR})
 endfunction()
 
-# add_ums_benchmark("bm_scheduler.cpp")
+# add_ums_benchmark("bm_clear_caches.cpp")
 # add_ums_benchmark("bm_containers.cpp")
 # add_ums_benchmark("bm_mutex.cpp")
 # add_ums_benchmark("bm_io.cpp")

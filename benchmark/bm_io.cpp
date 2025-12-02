@@ -6,6 +6,7 @@
 #include <mutex>
 #include <thread>
 
+#include "async.hpp"
 #include "bm_util.hpp"
 #include "file.hpp"
 #include "ums.hpp"
@@ -17,9 +18,9 @@ namespace fs = std::filesystem;
 // Writes/reads total_bytes bytes at the offset by issuing sync/async I/O requests with io_size.
 //
 void sequential_ios(File_handle& file, std::vector<std::vector<char>>& io_v, bool write,
-                    uint64_t offset = 0, bool async = false)
+                    uint64_t offset = 0, bool asynchro = false)
 {
-    std::vector<std::shared_ptr<Task>> tasks;
+    std::vector<Task<void>> tasks;
 
     uint64_t idx = 0;
     for (auto& io_data : io_v) {
@@ -32,7 +33,7 @@ void sequential_ios(File_handle& file, std::vector<std::vector<char>>& io_v, boo
                 cos_read_file(file, io_buf, offset + idx * io_data.size());
         };
 
-        if (async)
+        if (asynchro)
             tasks.push_back(async(io_func));
         else
             io_func();
@@ -40,7 +41,7 @@ void sequential_ios(File_handle& file, std::vector<std::vector<char>>& io_v, boo
         ++idx;
     }
 
-    if (async)
+    if (asynchro)
         for (auto& task : tasks)
             task->wait();
 }

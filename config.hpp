@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef UMS_CONFIG_H
-#define UMS_CONFIG_H
+#ifndef UMS_CONFIG_HPP
+#define UMS_CONFIG_HPP
 
 #include <chrono>
 #include <cstdint>
@@ -67,4 +67,4 @@ constexpr auto CFG_idle_spin_threshold  = 20ms;
 
 } // namespace ums
 
-#endif // UMS_CONFIG_H
+#endif // UMS_CONFIG_HPP

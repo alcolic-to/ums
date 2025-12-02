@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "shared_mutex.h"
+#include "shared_mutex.hpp"
 
 #include <mutex>
 
-#include "mutex.h"
-#include "util.h"
+#include "mutex.hpp"
+#include "util.hpp"
 
 namespace ums {
 

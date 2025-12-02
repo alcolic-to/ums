@@ -6,10 +6,10 @@
 #include <gtest/gtest.h>
 #include <vector>
 
-#include "file.h"
-#include "io_api.h"
-#include "ums.h"
-#include "util.h"
+#include "file.hpp"
+#include "io.hpp"
+#include "ums.hpp"
+#include "util.hpp"
 
 using namespace ums;
 using namespace std::chrono_literals;

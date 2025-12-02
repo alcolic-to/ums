@@ -8,14 +8,14 @@
 #include <thread>
 #include <vector>
 
-#include "async.h"
-#include "condition_variable.h"
-#include "mutex.h"
-#include "scheduler.h"
-#include "shared_mutex.h"
-#include "ums.h"
-#include "util.h"
-#include "worker.h"
+#include "async.hpp"
+#include "condition_variable.hpp"
+#include "mutex.hpp"
+#include "scheduler.hpp"
+#include "shared_mutex.hpp"
+#include "ums.hpp"
+#include "util.hpp"
+#include "worker.hpp"
 
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 

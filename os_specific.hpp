@@ -15,10 +15,10 @@
  */
 #pragma once
 
-#ifndef OS_SPECIFIC_H
-#define OS_SPECIFIC_H
+#ifndef OS_SPECIFIC_HPP
+#define OS_SPECIFIC_HPP
 
-#include "types.h"
+#include "types.hpp"
 
 // OS specific preprocessor definitions.
 //
@@ -96,4 +96,4 @@ void close_file(void* file_handle);
 
 } // namespace ums
 
-#endif // OS_SPECIFIC_H
+#endif // OS_SPECIFIC_HPP

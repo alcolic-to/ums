@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef UMS_UTIL_H
-#define UMS_UTIL_H
+#ifndef UMS_UTIL_HPP
+#define UMS_UTIL_HPP
 
 #include <chrono>
 #include <cstdint>
@@ -26,7 +26,7 @@
 #include <utility>
 #include <vector>
 
-#include "types.h"
+#include "types.hpp"
 
 // clang-format off
 #define NO_OP do {} while (0) // NOLINT
@@ -286,4 +286,4 @@ inline std::vector<char> file_to_vector(const std::string& path)
 
 } // namespace ums
 
-#endif // UMS_UTIL_H
+#endif // UMS_UTIL_HPP

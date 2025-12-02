@@ -15,24 +15,32 @@
  */
 #pragma once
 
-#ifndef UMS_UMS_H
-#define UMS_UMS_H
+#ifndef UMS_TYPES_HPP
+#define UMS_TYPES_HPP
 
-#include <functional>
-#include <memory>
-
-#include "scheduler.h"
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 
 namespace ums {
 
-// Global Schedulers.
-//
-extern std::unique_ptr<Schedulers> schedulers; // NOLINT
+using i8 = std::int8_t;
+using i16 = std::int16_t;
+using i32 = std::int32_t;
+using i64 = std::int64_t;
 
-// void init_ums(std::function<int(int, char**)>& main, int argc, char** argv, Options opt =
-// Options{});
-void init_ums(std::function<void()> main, Options opt = Options{});
+using u8 = std::uint8_t;
+using u16 = std::uint16_t;
+using u32 = std::uint32_t;
+using u64 = std::uint64_t;
+
+using f32 = std::float_t;
+using f64 = std::double_t;
+
+using usize = std::size_t;
+using iptr = std::intptr_t;
+using uptr = std::uintptr_t;
 
 } // namespace ums
 
-#endif // UMS_UMS_H
+#endif // UMS_TYPES_HPP

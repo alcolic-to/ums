@@ -15,32 +15,34 @@
  */
 #pragma once
 
-#ifndef UMS_TYPES_H
-#define UMS_TYPES_H
+#ifndef UMS_SPINLOCK_HPP
+#define UMS_SPINLOCK_HPP
 
-#include <cmath>
-#include <cstddef>
+#include <atomic>
 #include <cstdint>
 
 namespace ums {
 
-using i8 = std::int8_t;
-using i16 = std::int16_t;
-using i32 = std::int32_t;
-using i64 = std::int64_t;
+class Spinlock {
+public:
+    Spinlock() noexcept = default;
+    ~Spinlock() noexcept = default;
 
-using u8 = std::uint8_t;
-using u16 = std::uint16_t;
-using u32 = std::uint32_t;
-using u64 = std::uint64_t;
+    Spinlock(const Spinlock&) = delete;
+    Spinlock& operator=(const Spinlock&) = delete;
 
-using f32 = std::float_t;
-using f64 = std::double_t;
+    Spinlock(Spinlock&&) noexcept = delete;
+    Spinlock& operator=(Spinlock&&) = delete;
 
-using usize = std::size_t;
-using iptr = std::intptr_t;
-using uptr = std::uintptr_t;
+    void lock() noexcept;
+    bool try_lock() noexcept;
+    bool lock_with_timeout() noexcept;
+    void unlock() noexcept;
+
+private:
+    std::atomic<uint32_t> m_flag{0};
+};
 
 } // namespace ums
 
-#endif // UMS_TYPES_H
+#endif // UMS_SPINLOCK_HPP

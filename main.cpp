@@ -27,11 +27,11 @@
 #include <vector>
 
 #include "array_map.hpp"
-#include "async.h"
-#include "types.h"
-#include "ums.h"
-#include "util.h"
-#include "worker.h"
+#include "async.hpp"
+#include "types.hpp"
+#include "ums.hpp"
+#include "util.hpp"
+#include "worker.hpp"
 
 using namespace std::chrono_literals;
 using namespace ums;

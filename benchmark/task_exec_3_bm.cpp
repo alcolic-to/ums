@@ -4,9 +4,9 @@
 #include <chrono>
 #include <memory>
 
-#include "async.h"
+#include "async.hpp"
 #include "benchmark_util.h"
-#include "ums.h"
+#include "ums.hpp"
 
 using namespace ums;
 

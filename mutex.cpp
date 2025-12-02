@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "mutex.h"
+#include "mutex.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -21,9 +21,9 @@
 #include <system_error>
 #include <thread>
 
-#include "spinlock.h"
-#include "util.h"
-#include "worker.h"
+#include "spinlock.hpp"
+#include "util.hpp"
+#include "worker.hpp"
 
 namespace ums {
 

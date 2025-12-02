@@ -15,34 +15,24 @@
  */
 #pragma once
 
-#ifndef UMS_SPINLOCK_H
-#define UMS_SPINLOCK_H
+#ifndef UMS_UMS_HPP
+#define UMS_UMS_HPP
 
-#include <atomic>
-#include <cstdint>
+#include <functional>
+#include <memory>
+
+#include "scheduler.hpp"
 
 namespace ums {
 
-class Spinlock {
-public:
-    Spinlock() noexcept = default;
-    ~Spinlock() noexcept = default;
+// Global Schedulers.
+//
+extern std::unique_ptr<Schedulers> schedulers; // NOLINT
 
-    Spinlock(const Spinlock&) = delete;
-    Spinlock& operator=(const Spinlock&) = delete;
-
-    Spinlock(Spinlock&&) noexcept = delete;
-    Spinlock& operator=(Spinlock&&) = delete;
-
-    void lock() noexcept;
-    bool try_lock() noexcept;
-    bool lock_with_timeout() noexcept;
-    void unlock() noexcept;
-
-private:
-    std::atomic<uint32_t> m_flag{0};
-};
+// void init_ums(std::function<int(int, char**)>& main, int argc, char** argv, Options opt =
+// Options{});
+void init_ums(std::function<void()> main, Options opt = Options{});
 
 } // namespace ums
 
-#endif // UMS_SPINLOCK_H
+#endif // UMS_UMS_HPP

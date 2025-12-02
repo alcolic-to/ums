@@ -7,9 +7,9 @@
 #include <thread>
 
 #include "benchmark_util.h"
-#include "file.h"
-#include "ums.h"
-#include "util.h"
+#include "file.hpp"
+#include "ums.hpp"
+#include "util.hpp"
 
 using namespace ums;
 namespace fs = std::filesystem;

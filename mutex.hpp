@@ -15,15 +15,15 @@
  */
 #pragma once
 
-#ifndef UMS_MUTEX_H
-#define UMS_MUTEX_H
+#ifndef UMS_MUTEX_HPP
+#define UMS_MUTEX_HPP
 
 #include <condition_variable>
 #include <mutex>
 #include <thread>
 
-#include "spinlock.h"
-#include "util.h"
+#include "spinlock.hpp"
+#include "util.hpp"
 
 namespace ums {
 
@@ -313,4 +313,4 @@ private:
 
 } // namespace ums
 
-#endif // UMS_MUTEX_H
+#endif // UMS_MUTEX_HPP

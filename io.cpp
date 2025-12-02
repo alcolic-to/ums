@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "io.hpp"
+
 #include <cstdint>
 #include <memory>
 
-#include "io_api.h"
-#include "os_specific.h"
-#include "worker.h"
+#include "os_specific.hpp"
+#include "worker.hpp"
 
 namespace ums {
 

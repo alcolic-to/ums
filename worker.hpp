@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef UMS_WORKER_H
-#define UMS_WORKER_H
+#ifndef UMS_WORKER_HPP
+#define UMS_WORKER_HPP
 
 #include <atomic>
 #include <condition_variable>
@@ -26,10 +26,10 @@
 #include <thread>
 
 #include "intrusive_list.hpp"
-#include "io_api.h"
-#include "os_specific.h"
-#include "task.h"
-#include "util.h"
+#include "io.hpp"
+#include "os_specific.hpp"
+#include "task.hpp"
+#include "util.hpp"
 
 namespace ums {
 class Scheduler;
@@ -170,4 +170,4 @@ extern thread_local Worker* this_worker; // NOLINT
 
 } // namespace ums
 
-#endif // UMS_WORKER_H
+#endif // UMS_WORKER_HPP

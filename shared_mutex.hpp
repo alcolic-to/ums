@@ -15,11 +15,11 @@
  */
 #pragma once
 
-#ifndef UMS_SHARED_MUTEX_H
-#define UMS_SHARED_MUTEX_H
+#ifndef UMS_SHARED_MUTEX_HPP
+#define UMS_SHARED_MUTEX_HPP
 
-#include "condition_variable.h"
-#include "mutex.h"
+#include "condition_variable.hpp"
+#include "mutex.hpp"
 
 namespace ums {
 
@@ -134,4 +134,4 @@ private:
 
 } // namespace ums
 
-#endif // UMS_SHARED_MUTEX_H
+#endif // UMS_SHARED_MUTEX_HPP

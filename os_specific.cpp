@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "os_specific.h"
+#include "os_specific.hpp"
 
 #include <bit>
 #include <cstdint>
@@ -23,9 +23,9 @@
 #include <iostream> // NOLINT
 #include <stdexcept>
 
-#include "file.h"
-#include "io_api.h"
-#include "types.h"
+#include "file.hpp"
+#include "io.hpp"
+#include "types.hpp"
 
 // NOLINTBEGIN(misc-include-cleaner)
 

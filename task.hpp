@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef UMS_TASK_H
-#define UMS_TASK_H
+#ifndef UMS_TASK_HPP
+#define UMS_TASK_HPP
 
 #include <deque>
 #include <memory>
@@ -24,11 +24,11 @@
 #include <tuple>
 #include <type_traits>
 
-#include "condition_variable.h"
-#include "mutex.h"
-#include "spinlock.h"
-#include "types.h"
-#include "util.h"
+#include "condition_variable.hpp"
+#include "mutex.hpp"
+#include "spinlock.hpp"
+#include "types.hpp"
+#include "util.hpp"
 
 namespace ums {
 
@@ -192,4 +192,4 @@ private:
 
 } // namespace ums
 
-#endif // UMS_TASK_H
+#endif // UMS_TASK_HPP

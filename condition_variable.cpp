@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "condition_variable.h"
+#include "condition_variable.hpp"
 
 #include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <vector>
 
-#include "mutex.h"
-#include "spinlock.h"
-#include "util.h"
-#include "worker.h"
+#include "mutex.hpp"
+#include "spinlock.hpp"
+#include "util.hpp"
+#include "worker.hpp"
 
 namespace ums {
 

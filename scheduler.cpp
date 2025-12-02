@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "scheduler.h"
+#include "scheduler.hpp"
 
 // #include <iostream>
 #include <algorithm>
@@ -27,14 +27,14 @@
 #include <mutex>
 #include <utility>
 
-#include "config.h"
+#include "config.hpp"
 #include "intrusive_list.hpp"
-#include "io_api.h"
-#include "options.h"
-#include "os_specific.h"
-#include "task.h"
-#include "util.h"
-#include "worker.h"
+#include "io.hpp"
+#include "options.hpp"
+#include "os_specific.hpp"
+#include "task.hpp"
+#include "util.hpp"
+#include "worker.hpp"
 
 namespace ums {
 

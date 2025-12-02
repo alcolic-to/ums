@@ -11,10 +11,10 @@
 #include <thread>
 #include <vector>
 
-#include "async.h"
+#include "async.hpp"
 #include "benchmark_util.h"
-#include "mutex.h"
-#include "ums.h"
+#include "mutex.hpp"
+#include "ums.hpp"
 
 using namespace ums;
 

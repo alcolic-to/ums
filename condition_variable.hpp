@@ -15,18 +15,18 @@
  */
 #pragma once
 
-#ifndef UMS_CONDITION_VARIABLE_H
-#define UMS_CONDITION_VARIABLE_H
+#ifndef UMS_CONDITION_VARIABLE_HPP
+#define UMS_CONDITION_VARIABLE_HPP
 
 #include <condition_variable>
 #include <mutex>
 
-#include "mutex.h"
+#include "mutex.hpp"
 
 namespace ums {
 
 /**
- * To suppress unused header warnings. Condition_variable implementation is located in mutex.h
+ * To suppress unused header warnings. Condition_variable implementation is located in mutex.hpp
  */
 class Condition_variable;
 
@@ -98,4 +98,4 @@ void notify_all_at_thread_exit(Condition_variable& cv, std::unique_lock<Mutex> l
 
 } // namespace ums
 
-#endif // UMS_CONDITION_VARIABLE_H
+#endif // UMS_CONDITION_VARIABLE_HPP

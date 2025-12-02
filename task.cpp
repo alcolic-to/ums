@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "task.h"
+#include "task.hpp"
 
 #include <atomic>
 #include <cstddef>
@@ -22,8 +22,8 @@
 #include <mutex>
 #include <utility>
 
-#include "mutex.h"
-#include "spinlock.h"
+#include "mutex.hpp"
+#include "spinlock.hpp"
 
 namespace ums {
 

@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef UMS_SCHEDULER_H
-#define UMS_SCHEDULER_H
+#ifndef UMS_SCHEDULER_HPP
+#define UMS_SCHEDULER_HPP
 
 #include <algorithm>
 #include <atomic>
@@ -29,10 +29,10 @@
 #include <ranges>
 #include <vector>
 
-#include "config.h"
-#include "options.h"
-#include "task.h"
-#include "worker.h"
+#include "config.hpp"
+#include "options.hpp"
+#include "task.hpp"
+#include "worker.hpp"
 
 namespace ums {
 
@@ -235,4 +235,4 @@ private:
 
 } // namespace ums
 
-#endif // UMS_SCHEDULER_H
+#endif // UMS_SCHEDULER_HPP

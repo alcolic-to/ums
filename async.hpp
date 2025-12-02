@@ -15,15 +15,15 @@
  */
 #pragma once
 
-#ifndef UMS_ASYNC_H
-#define UMS_ASYNC_H
+#ifndef UMS_ASYNC_HPP
+#define UMS_ASYNC_HPP
 
 #include <memory>
 #include <type_traits>
 
-#include "scheduler.h"
-#include "task.h"
-#include "ums.h"
+#include "scheduler.hpp"
+#include "task.hpp"
+#include "ums.hpp"
 
 namespace ums {
 
@@ -90,4 +90,4 @@ std::vector<Task<void>> asyncs(Fns&&... fns)
 
 } // namespace ums
 
-#endif // UMS_ASYNC_H
+#endif // UMS_ASYNC_HPP

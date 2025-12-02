@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "ums.h"
+#include "ums.hpp"
 
 #include <functional>
 #include <memory>
 #include <utility>
 
-#include "async.h"
-#include "options.h"
-#include "scheduler.h"
+#include "async.hpp"
+#include "options.hpp"
+#include "scheduler.hpp"
 
 namespace ums {
 

@@ -5,7 +5,7 @@
 #include <memory>
 
 #include "benchmark_util.h"
-#include "ums.h"
+#include "ums.hpp"
 
 using namespace ums;
 

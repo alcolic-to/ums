@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "worker.h"
+#include "worker.hpp"
 
 #include <cstdint>
 #include <exception>
@@ -21,11 +21,11 @@
 #include <memory>
 #include <mutex>
 
-#include "config.h"
-#include "io_api.h"
-#include "os_specific.h"
-#include "scheduler.h"
-#include "util.h"
+#include "config.hpp"
+#include "io.hpp"
+#include "os_specific.hpp"
+#include "scheduler.hpp"
+#include "util.hpp"
 
 namespace ums {
 

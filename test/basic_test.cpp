@@ -5,11 +5,11 @@
 #include <cstdint>
 #include <gtest/gtest.h>
 
-#include "async.h"
-#include "options.h"
-#include "ums.h"
-#include "util.h"
-#include "worker.h"
+#include "async.hpp"
+#include "options.hpp"
+#include "ums.hpp"
+#include "util.hpp"
+#include "worker.hpp"
 
 using namespace ums;
 using namespace std::chrono_literals;

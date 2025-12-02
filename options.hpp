@@ -15,13 +15,13 @@
  */
 #pragma once
 
-#ifndef OPTIONS_H
-#define OPTIONS_H
+#ifndef OPTIONS_HPP
+#define OPTIONS_HPP
 
 #include <algorithm>
 #include <cstdint>
 
-#include "config.h"
+#include "config.hpp"
 
 namespace ums {
 
@@ -77,4 +77,4 @@ private:
 
 } // namespace ums
 
-#endif // OPTIONS_H
+#endif // OPTIONS_HPP

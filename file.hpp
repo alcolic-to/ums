@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef UMS_FILE_H
-#define UMS_FILE_H
+#ifndef UMS_FILE_HPP
+#define UMS_FILE_HPP
 
 #include <filesystem>
 
@@ -44,4 +44,4 @@ private:
 
 } // namespace ums
 
-#endif // UMS_FILE_H
+#endif // UMS_FILE_HPP

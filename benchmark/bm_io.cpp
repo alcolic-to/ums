@@ -6,7 +6,7 @@
 #include <mutex>
 #include <thread>
 
-#include "benchmark_util.h"
+#include "bm_util.hpp"
 #include "file.hpp"
 #include "ums.hpp"
 #include "util.hpp"

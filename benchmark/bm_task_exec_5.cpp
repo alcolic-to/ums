@@ -5,21 +5,19 @@
 #include <memory>
 
 #include "async.hpp"
-#include "benchmark_util.h"
+#include "bm_util.hpp"
 #include "ums.hpp"
 
 using namespace ums;
 
-static void BM_task_exec_all_cpus_multiple_tasks(benchmark::State& state)
+static void BM_task_exec_short_tasks(benchmark::State& state)
 {
     init_ums([&] {
         std::vector<Task<void>> tasks;
-        tasks.reserve(state.range(1));
 
         for (auto _ : state) {
             for (int i = 0; i < schedulers->cpus_count(); ++i)
-                for (int i = 0; i < state.range(1); ++i)
-                    tasks.push_back(async([&] { hard_work(microseconds(state.range(0))); }));
+                tasks.push_back(async([&] { hard_work(microseconds(state.range())); }));
 
             for (auto task : tasks)
                 task->wait();
@@ -27,11 +25,11 @@ static void BM_task_exec_all_cpus_multiple_tasks(benchmark::State& state)
     });
 }
 
-BENCHMARK(BM_task_exec_all_cpus_multiple_tasks)
+BENCHMARK(BM_task_exec_short_tasks)
     ->Unit(benchmark::kMicrosecond)
     ->MeasureProcessCPUTime()
-    ->RangeMultiplier(8)
-    ->Ranges({/* task duration in us */ {1, 1 << 14}, /* tasks count */ {1, 128}});
+    ->RangeMultiplier(2)
+    ->Range(1, 1024);
 
 BENCHMARK_MAIN();
 

@@ -5,19 +5,19 @@
 #include <memory>
 
 #include "async.hpp"
-#include "benchmark_util.h"
+#include "bm_util.hpp"
 #include "ums.hpp"
 
 using namespace ums;
 
-static void BM_task_exec_all_cpus(benchmark::State& state)
+static void BM_task_exec_stress(benchmark::State& state)
 {
     init_ums([&] {
         std::vector<Task<void>> tasks;
 
         for (auto _ : state) {
-            for (int i = 0; i < schedulers->cpus_count(); ++i)
-                tasks.push_back(async([&] { hard_work(microseconds(state.range())); }));
+            for (int i = 0; i < 1024 * 1024; ++i)
+                tasks.push_back(async([&] { return; }));
 
             for (auto task : tasks)
                 task->wait();
@@ -25,11 +25,11 @@ static void BM_task_exec_all_cpus(benchmark::State& state)
     });
 }
 
-BENCHMARK(BM_task_exec_all_cpus)
-    ->Unit(benchmark::kMicrosecond)
+BENCHMARK(BM_task_exec_stress)
+    ->Unit(benchmark::kMillisecond)
     ->MeasureProcessCPUTime()
-    ->RangeMultiplier(2)
-    ->Range(1, 1 << 16);
+    ->Repetitions(10)
+    ->DisplayAggregatesOnly();
 
 BENCHMARK_MAIN();
 

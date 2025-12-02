@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "async.hpp"
-#include "benchmark_util.h"
+#include "bm_util.hpp"
 #include "mutex.hpp"
 #include "ums.hpp"
 

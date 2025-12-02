@@ -4,7 +4,7 @@
 #include <chrono>
 #include <memory>
 
-#include "benchmark_util.h"
+#include "bm_util.hpp"
 #include "ums.hpp"
 
 using namespace ums;

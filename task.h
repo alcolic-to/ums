@@ -187,7 +187,7 @@ public:
 private:
     Spinlock m_lock;
     std::deque<std::shared_ptr<TaskBase>> m_tasks;
-    std::atomic<sz> m_size{0};
+    std::atomic<usize> m_size{0};
 };
 
 } // namespace ums

@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#pragma once
+
 #ifndef UMS_TYPES_H
 #define UMS_TYPES_H
 
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+
+namespace ums {
 
 using i8 = std::int8_t;
 using i16 = std::int16_t;
@@ -33,8 +37,10 @@ using u64 = std::uint64_t;
 using f32 = std::float_t;
 using f64 = std::double_t;
 
-using sz = std::size_t;
+using usize = std::size_t;
 using iptr = std::intptr_t;
 using uptr = std::uintptr_t;
+
+} // namespace ums
 
 #endif // UMS_TYPES_H

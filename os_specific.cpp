@@ -287,7 +287,7 @@ u64 cpus_avail_mask() noexcept
         return -1;
     }
 
-    for (std::size_t i = 0; i < cpus_count(); ++i)
+    for (usize i = 0; i < cpus_count(); ++i)
         if (CPU_ISSET(i, &mask))
             cpu_mask |= (1U << i);
 
@@ -301,7 +301,7 @@ void bind_thread(u64 cpu_mask) noexcept
     cpu_set_t mask;
     CPU_ZERO(&mask);
 
-    for (std::size_t i = 0; i < cpus_count(); ++i)
+    for (usize i = 0; i < cpus_count(); ++i)
         if ((bool)(cpu_mask & (1U << i)))
             CPU_SET(i, &mask);
 

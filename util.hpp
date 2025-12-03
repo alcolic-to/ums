@@ -50,9 +50,9 @@
 namespace ums {
 
 #ifdef __cpp_lib_hardware_interference_size
-constexpr std::size_t cache_line_size = std::hardware_destructive_interference_size;
+constexpr usize cache_line_size = std::hardware_destructive_interference_size;
 #else
-constexpr std::size_t cache_line_size = 64;
+constexpr usize cache_line_size = 64;
 #endif
 
 /**

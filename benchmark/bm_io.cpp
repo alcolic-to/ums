@@ -9,6 +9,7 @@
 #include "async.hpp"
 #include "bm_util.hpp"
 #include "file.hpp"
+#include "types.hpp"
 #include "ums.hpp"
 #include "util.hpp"
 
@@ -18,11 +19,11 @@ namespace fs = std::filesystem;
 // Writes/reads total_bytes bytes at the offset by issuing sync/async I/O requests with io_size.
 //
 void sequential_ios(File_handle& file, std::vector<std::vector<char>>& io_v, bool write,
-                    uint64_t offset = 0, bool asynchro = false)
+                    u64 offset = 0, bool asynchro = false)
 {
     std::vector<Task<void>> tasks;
 
-    uint64_t idx = 0;
+    u64 idx = 0;
     for (auto& io_data : io_v) {
         IO_Buffer io_buf{io_data.data(), io_data.size()};
 
@@ -48,7 +49,7 @@ void sequential_ios(File_handle& file, std::vector<std::vector<char>>& io_v, boo
 
 // Creates file and calls sequential_ios.
 //
-void sequential_ios(std::vector<std::vector<char>>& io_v, bool write, uint64_t offset = 0,
+void sequential_ios(std::vector<std::vector<char>>& io_v, bool write, u64 offset = 0,
                     bool async = false)
 {
     const fs::path file_path{"io_file"};
@@ -61,8 +62,8 @@ void sequential_ios(std::vector<std::vector<char>>& io_v, bool write, uint64_t o
     fs::remove(file_path);
 }
 
-static void BM_sequential_ios(benchmark::State& state, uint64_t total_bytes, uint64_t io_size,
-                              bool write, bool async = false)
+static void BM_sequential_ios(benchmark::State& state, u64 total_bytes, u64 io_size, bool write,
+                              bool async = false)
 {
     std::vector<std::vector<char>> io_v(total_bytes / io_size, std::vector(io_size, 'a'));
     const fs::path file_path{"io_file"};
@@ -107,8 +108,8 @@ BENCHMARK(BM_single_read)
 static void BM_multiple_writes(benchmark::State& state)
 {
     init_ums([&] {
-        BM_sequential_ios(state, uint64_t(state.range(0)) * 1024 * 1024,
-                          uint64_t(state.range(1)) * 1024, true);
+        BM_sequential_ios(state, u64(state.range(0)) * 1024 * 1024, u64(state.range(1)) * 1024,
+                          true);
     });
 }
 
@@ -120,8 +121,8 @@ BENCHMARK(BM_multiple_writes)
 static void BM_multiple_reads(benchmark::State& state)
 {
     init_ums([&] {
-        BM_sequential_ios(state, uint64_t(state.range(0)) * 1024 * 1024,
-                          uint64_t(state.range(1)) * 1024, false);
+        BM_sequential_ios(state, u64(state.range(0)) * 1024 * 1024, u64(state.range(1)) * 1024,
+                          false);
     });
 }
 
@@ -133,8 +134,7 @@ BENCHMARK(BM_multiple_reads)
 static void BM_multiple_writes_async(benchmark::State& state)
 {
     init_ums([&] {
-        BM_sequential_ios(state, uint64_t(1024) * 1024 * 1024, uint64_t(state.range(0)) * 1024,
-                          true, true);
+        BM_sequential_ios(state, u64(1024) * 1024 * 1024, u64(state.range(0)) * 1024, true, true);
     });
 }
 
@@ -147,8 +147,7 @@ BENCHMARK(BM_multiple_writes_async)
 static void BM_multiple_reads_async(benchmark::State& state)
 {
     init_ums([&] {
-        BM_sequential_ios(state, uint64_t(1024) * 1024 * 1024, uint64_t(state.range(0)) * 1024,
-                          false, true);
+        BM_sequential_ios(state, u64(1024) * 1024 * 1024, u64(state.range(0)) * 1024, false, true);
     });
 }
 
@@ -161,8 +160,8 @@ BENCHMARK(BM_multiple_reads_async)
 static void BM_multiple_writes_large_file_async(benchmark::State& state)
 {
     init_ums([&] {
-        BM_sequential_ios(state, uint64_t(state.range(0)) * 1024 * 1024 * 1024,
-                          uint64_t(state.range(1)) * 1024, true, true);
+        BM_sequential_ios(state, u64(state.range(0)) * 1024 * 1024 * 1024,
+                          u64(state.range(1)) * 1024, true, true);
     });
 }
 
@@ -175,8 +174,8 @@ BENCHMARK(BM_multiple_writes_large_file_async)
 static void BM_multiple_reads_large_file_async(benchmark::State& state)
 {
     init_ums([&] {
-        BM_sequential_ios(state, uint64_t(state.range(0)) * 1024 * 1024 * 1024,
-                          uint64_t(state.range(1)) * 1024, false, true);
+        BM_sequential_ios(state, u64(state.range(0)) * 1024 * 1024 * 1024,
+                          u64(state.range(1)) * 1024, false, true);
     });
 }
 

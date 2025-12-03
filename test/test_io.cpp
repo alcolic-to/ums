@@ -8,13 +8,14 @@
 
 #include "file.hpp"
 #include "io.hpp"
+#include "types.hpp"
 #include "ums.hpp"
 #include "util.hpp"
 
 using namespace ums;
 using namespace std::chrono_literals;
 
-void test_write_read_file(uint64_t io_size)
+void test_write_read_file(u64 io_size)
 {
     const fs::path file_path{"io_file"};
 
@@ -33,7 +34,7 @@ void test_write_read_file(uint64_t io_size)
     fs::remove(file_path);
 }
 
-void seq_writes_and_reads(uint64_t io_size, uint32_t iterations, bool forward = true)
+void seq_writes_and_reads(u64 io_size, uint32_t iterations, bool forward = true)
 {
     const fs::path file_path{"io_file"};
     std::vector<std::vector<char>> io_data(iterations, std::vector<char>(io_size));
@@ -43,13 +44,13 @@ void seq_writes_and_reads(uint64_t io_size, uint32_t iterations, bool forward = 
 
         for (uint32_t i = 0; i < iterations; ++i) {
             std::ranges::fill(io_data[i], char('a' + i));
-            uint64_t offset = io_size * (forward ? i : (iterations - 1 - i));
+            u64 offset = io_size * (forward ? i : (iterations - 1 - i));
             cos_write_file(file, {io_data[i].data(), io_data[i].size()}, offset);
         }
 
         for (uint32_t i = 0; i < iterations; ++i) {
             std::vector<char> read_vec(io_size);
-            uint64_t offset = io_size * (forward ? i : (iterations - 1 - i));
+            u64 offset = io_size * (forward ? i : (iterations - 1 - i));
             cos_read_file(file, {read_vec.data(), read_vec.size()}, offset);
             ASSERT_TRUE(io_data[i] == read_vec);
         }
@@ -58,7 +59,7 @@ void seq_writes_and_reads(uint64_t io_size, uint32_t iterations, bool forward = 
     fs::remove(file_path);
 }
 
-void random_writes_and_reads(uint64_t io_size, uint32_t iterations)
+void random_writes_and_reads(u64 io_size, uint32_t iterations)
 {
     const fs::path file_path{"io_file"};
     std::vector<std::vector<char>> io_data(iterations, std::vector<char>(io_size));
@@ -120,7 +121,7 @@ TEST(IO, sanity_test)
 TEST(IO, sanity_write_test)
 {
     auto test = [] {
-        constexpr uint64_t io_size = 1 * 1024;
+        constexpr u64 io_size = 1 * 1024;
         const fs::path file_path{"io_file"};
 
         std::vector<char> io_data(io_size, 'a');
@@ -143,7 +144,7 @@ TEST(IO, sanity_write_test)
 TEST(IO, sanity_read_test)
 {
     auto test = [] {
-        constexpr uint64_t io_size = 1 * 1024;
+        constexpr u64 io_size = 1 * 1024;
         const fs::path file_path{"io_file"};
 
         std::vector<char> io_data(io_size, 'a');
@@ -171,7 +172,7 @@ TEST(IO, sanity_read_test)
 TEST(IO, sanity_write_read_test)
 {
     auto test = [] {
-        constexpr uint64_t io_size = 1 * 1024;
+        constexpr u64 io_size = 1 * 1024;
         const fs::path file_path{"io_file"};
 
         std::vector<char> io_data(io_size, 'a');
@@ -195,7 +196,7 @@ TEST(IO, sanity_write_read_test)
 TEST(IO, io_with_different_sizes)
 {
     auto test = [] {
-        for (uint64_t io_size = 1024; io_size <= 10 * 1024 * 1024; io_size <<= 1U)
+        for (u64 io_size = 1024; io_size <= 10 * 1024 * 1024; io_size <<= 1U)
             test_write_read_file(io_size);
     };
 

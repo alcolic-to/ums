@@ -29,6 +29,7 @@
 #include "io.hpp"
 #include "os_specific.hpp"
 #include "task.hpp"
+#include "types.hpp"
 #include "util.hpp"
 
 namespace ums {
@@ -49,7 +50,7 @@ public:
         exiting
     };
 
-    Worker(uint64_t id, Scheduler* scheduler);
+    Worker(u64 id, Scheduler* scheduler);
 
     ~Worker();
 
@@ -64,8 +65,8 @@ public:
     void main_loop();
 
     void yield();
-    void read_file(void* file_handle, IO_Buffer buffer, uint64_t offset);
-    void write_file(void* file_handle, IO_Buffer buffer, uint64_t offset);
+    void read_file(void* file_handle, IO_Buffer buffer, u64 offset);
+    void write_file(void* file_handle, IO_Buffer buffer, u64 offset);
     void wait_cond_or_sleep();
 
     template<class Clock, class Duration>
@@ -85,7 +86,7 @@ public:
     void wait(std::unique_lock<std::mutex>& lock);
     void notify(const std::unique_lock<std::mutex>& lock) noexcept;
 
-    [[nodiscard]] constexpr uint64_t id() const noexcept { return m_id; }
+    [[nodiscard]] constexpr u64 id() const noexcept { return m_id; }
 
     [[nodiscard]] constexpr State state() const noexcept { return m_state; }
 
@@ -154,7 +155,7 @@ public:
 private:
     // TODO: reorganize data members for quicker access.
     //
-    uint64_t m_id;
+    u64 m_id;
     Scheduler* m_scheduler;
     stl::INode m_node;
     std::condition_variable m_cv;

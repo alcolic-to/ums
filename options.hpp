@@ -22,6 +22,7 @@
 #include <cstdint>
 
 #include "config.hpp"
+#include "types.hpp"
 
 namespace ums {
 
@@ -29,26 +30,23 @@ class Options {
 public:
     class Option {
     public:
-        Option(uint64_t value, uint64_t min, uint64_t max) noexcept
-            : m_value{std::clamp(value, min, max)}
-        {
-        }
+        Option(u64 value, u64 min, u64 max) noexcept : m_value{std::clamp(value, min, max)} {}
 
-        operator uint64_t() const noexcept { return m_value; } // NOLINT
+        operator u64() const noexcept { return m_value; } // NOLINT
 
     private:
-        uint64_t m_value;
+        u64 m_value;
     };
 
     struct Schedulers_count : Option {
-        explicit Schedulers_count(uint64_t value = CFG_default_schedulers_count) noexcept
+        explicit Schedulers_count(u64 value = CFG_default_schedulers_count) noexcept
             : Option{value, CFG_min_schedulers_count, CFG_max_schedulers_count}
         {
         }
     };
 
     struct Workers_per_scheduler : Option {
-        explicit Workers_per_scheduler(uint64_t value = CFG_default_workers_per_scheduler) noexcept
+        explicit Workers_per_scheduler(u64 value = CFG_default_workers_per_scheduler) noexcept
             : Option{value, CFG_min_workers_per_scheduler, CFG_max_workers_per_scheduler}
         {
         }

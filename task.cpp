@@ -49,7 +49,7 @@ std::shared_ptr<TaskBase> Tasks::deque() noexcept
     return t;
 }
 
-[[nodiscard]] size_t Tasks::size() const noexcept
+[[nodiscard]] usize Tasks::size() const noexcept
 {
     return m_size.load(std::memory_order_relaxed);
 }

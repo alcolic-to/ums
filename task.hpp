@@ -181,7 +181,7 @@ public:
     void enque(std::shared_ptr<TaskBase> task);
     std::shared_ptr<TaskBase> deque() noexcept;
 
-    [[nodiscard]] size_t size() const noexcept;
+    [[nodiscard]] usize size() const noexcept;
     [[nodiscard]] bool empty() const noexcept;
 
 private:

@@ -15,6 +15,7 @@
 #include "bm_util.hpp"
 #include "mutex.hpp"
 #include "task.hpp"
+#include "types.hpp"
 #include "ums.hpp"
 
 using namespace ums;
@@ -22,7 +23,7 @@ using namespace ums;
 static void BM_spinlock_plain(benchmark::State& state)
 {
     static Spinlock spinlock;
-    [[maybe_unused]] static uint64_t counter = 0;
+    [[maybe_unused]] static u64 counter = 0;
 
     for (auto _ : state) {
         const std::scoped_lock<Spinlock> lock{spinlock};
@@ -38,7 +39,7 @@ BENCHMARK(BM_spinlock_plain)
 static void BM_std_mutex_plain(benchmark::State& state)
 {
     static std::mutex mtx;
-    [[maybe_unused]] static uint64_t counter = 0;
+    [[maybe_unused]] static u64 counter = 0;
 
     for (auto _ : state) {
         const std::scoped_lock<std::mutex> lock{mtx};
@@ -56,7 +57,7 @@ constexpr auto work_dur = 1us;
 static void BM_spinlock_plain_with_work(benchmark::State& state)
 {
     static Spinlock spinlock;
-    [[maybe_unused]] static uint64_t counter = 0;
+    [[maybe_unused]] static u64 counter = 0;
 
     for (auto _ : state) {
         const std::scoped_lock<Spinlock> lock{spinlock};
@@ -72,7 +73,7 @@ BENCHMARK(BM_spinlock_plain_with_work)
 static void BM_std_mutex_plain_with_work(benchmark::State& state)
 {
     static std::mutex mtx;
-    [[maybe_unused]] static uint64_t counter = 0;
+    [[maybe_unused]] static u64 counter = 0;
 
     for (auto _ : state) {
         const std::scoped_lock<std::mutex> lock{mtx};

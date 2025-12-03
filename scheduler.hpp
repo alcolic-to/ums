@@ -32,6 +32,7 @@
 #include "config.hpp"
 #include "options.hpp"
 #include "task.hpp"
+#include "types.hpp"
 #include "worker.hpp"
 
 namespace ums {
@@ -40,9 +41,9 @@ using Cpu_Mask = std::bitset<CFG_max_supported_cpus>;
 
 class CPU final {
 public:
-    explicit CPU(uint64_t cpu_id) noexcept : m_id{cpu_id}, m_mask{Cpu_Mask{}.set(cpu_id)} {}
+    explicit CPU(u64 cpu_id) noexcept : m_id{cpu_id}, m_mask{Cpu_Mask{}.set(cpu_id)} {}
 
-    uint64_t m_id;
+    u64 m_id;
     Cpu_Mask m_mask;
 };
 
@@ -61,7 +62,7 @@ public:
 
     static std::string state_to_string(State state);
 
-    explicit Scheduler(Schedulers* schedulers, uint64_t cpu_id,
+    explicit Scheduler(Schedulers* schedulers, u64 cpu_id,
                        Options::Workers_per_scheduler workers_count);
     ~Scheduler() noexcept;
 
@@ -131,7 +132,7 @@ public:
     void set_state(State state) noexcept;
 
     void manage_load(Worker::State prev_state, Worker::State new_state) noexcept;
-    uint64_t load() const noexcept;
+    u64 load() const noexcept;
 
     void context_switch(Worker* prev_worker);
 
@@ -154,7 +155,7 @@ public:
 
     [[nodiscard]] const Tasks& tasks() const noexcept { return m_tasks; }
 
-    [[nodiscard]] uint64_t id() const noexcept { return m_cpu.m_id; }
+    [[nodiscard]] u64 id() const noexcept { return m_cpu.m_id; }
 
 private:
     template<class Predicate>
@@ -185,7 +186,7 @@ private:
     bool m_running{true}; // Flag used for spurious wakeup check.
     bool m_workers_started{false};
 
-    std::atomic<uint64_t> m_load{0};
+    std::atomic<u64> m_load{0};
     std::atomic<bool> m_exit{false};
 
     Time_point m_idle_start_time{Time_point::max()};

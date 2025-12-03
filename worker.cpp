@@ -25,6 +25,7 @@
 #include "io.hpp"
 #include "os_specific.hpp"
 #include "scheduler.hpp"
+#include "types.hpp"
 #include "util.hpp"
 
 namespace ums {
@@ -32,7 +33,7 @@ namespace ums {
 // Creates worker object and starts worker thread on a provided CPU.
 // We will wait for a signal from created thread, so we can continue when it is ready.
 //
-Worker::Worker(uint64_t id, Scheduler* scheduler)
+Worker::Worker(u64 id, Scheduler* scheduler)
     : m_id{id}
     , m_scheduler{scheduler}
     , m_thread{&Worker::entry_point, this}
@@ -82,7 +83,7 @@ void Worker::sleep_until_internal(const Time_point& time_point)
     wait_cond_or_sleep();
 }
 
-void Worker::read_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
+void Worker::read_file(void* file_handle, IO_Buffer buffer, u64 offset)
 {
     m_io_request =
         std::make_unique<IO_Request>(file_handle, buffer, offset, IO_Request::Type::read);
@@ -91,7 +92,7 @@ void Worker::read_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
         m_scheduler->sync<Sync_context::io>(this);
 }
 
-void Worker::write_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
+void Worker::write_file(void* file_handle, IO_Buffer buffer, u64 offset)
 {
     m_io_request =
         std::make_unique<IO_Request>(file_handle, buffer, offset, IO_Request::Type::write);

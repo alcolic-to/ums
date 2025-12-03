@@ -33,6 +33,7 @@
 #include "options.hpp"
 #include "os_specific.hpp"
 #include "task.hpp"
+#include "types.hpp"
 #include "util.hpp"
 #include "worker.hpp"
 
@@ -45,8 +46,8 @@ Schedulers::Schedulers(Options opt) noexcept try
     : m_system_cpus_count{std::min(os::cpus_count(), CFG_max_supported_cpus)}
     , m_cpus_avail_mask{Cpu_Mask{os::cpus_avail_mask()} & Cpu_Mask{CFG_allowed_cpus_mask}}
 {
-    size_t cpu_id = 0;
-    uint64_t sch_created = 0;
+    usize cpu_id = 0;
+    u64 sch_created = 0;
 
     while (cpu_id < m_cpus_avail_mask.size() && sch_created < opt.schedulers_count()) {
         if (m_cpus_avail_mask.test(cpu_id)) {
@@ -180,7 +181,7 @@ std::string Scheduler::state_to_string(State state)
 // After workers are created, starts single worker from idle queue
 // and waits until worker (scheduler) goes to sleep.
 // TODO: Speed this up with parallel workes creation.
-Scheduler::Scheduler(Schedulers* schedulers, uint64_t cpu_id,
+Scheduler::Scheduler(Schedulers* schedulers, u64 cpu_id,
                      Options::Workers_per_scheduler workers_count)
     : m_schedulers{schedulers}
     , m_cpu{cpu_id}
@@ -604,9 +605,9 @@ void Scheduler::manage_load(Worker::State prev_state, Worker::State new_state) n
     m_load.fetch_add(Loads[new_state] - Loads[prev_state], std::memory_order_relaxed);
 }
 
-uint64_t Scheduler::load() const noexcept
+u64 Scheduler::load() const noexcept
 {
-    const uint64_t tasks_load = m_tasks.size() * Loads[Worker::State::runnable];
+    const u64 tasks_load = m_tasks.size() * Loads[Worker::State::runnable];
     return m_load.load(std::memory_order_relaxed) + tasks_load;
 }
 

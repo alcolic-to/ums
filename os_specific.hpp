@@ -67,9 +67,9 @@ struct IO_handle final {
 #elif defined OS_LINUX
 
 struct IO_handle final {
-    explicit IO_handle(uint64_t offset);
+    explicit IO_handle(u64 offset);
     io_uring* m_uring;
-    uint64_t m_id;
+    u64 m_id;
 };
 
 #endif

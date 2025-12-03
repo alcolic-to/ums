@@ -6,6 +6,10 @@
 #include <deque>
 #include <memory>
 
+#include "types.hpp"
+
+using namespace ums;
+
 static void BM_vector_push_back(benchmark::State& state)
 {
     std::vector<int> v;
@@ -34,7 +38,7 @@ BENCHMARK(BM_deque_push_back)->Range(1, 1024 * 1024);
 
 static void BM_vector_push_front(benchmark::State& state)
 {
-    std::vector<uint64_t> v;
+    std::vector<u64> v;
 
     for (auto _ : state) {
         v.insert(v.begin(), 42);
@@ -52,7 +56,7 @@ BENCHMARK(BM_vector_push_front)->RangeMultiplier(2)->Range(1, 1024 * 1024);
 
 static void BM_deque_push_front(benchmark::State& state)
 {
-    std::deque<uint64_t> q;
+    std::deque<u64> q;
 
     for (auto _ : state) {
         q.push_front(42);
@@ -70,7 +74,7 @@ BENCHMARK(BM_deque_push_front)->RangeMultiplier(2)->Range(1, 1024 * 1024);
 
 static void BM_vector_pop_back(benchmark::State& state)
 {
-    std::vector<uint64_t> v;
+    std::vector<u64> v;
     benchmark::DoNotOptimize(v);
     for (int i = 0; i < state.range(0) - 1; ++i)
         v.push_back(42);
@@ -90,7 +94,7 @@ BENCHMARK(BM_vector_pop_back)->RangeMultiplier(2)->Range(1, 1024);
 
 static void BM_deque_pop_back(benchmark::State& state)
 {
-    std::deque<uint64_t> q;
+    std::deque<u64> q;
     benchmark::DoNotOptimize(q);
     for (int i = 0; i < state.range(0) - 1; ++i)
         q.push_back(42);
@@ -110,7 +114,7 @@ BENCHMARK(BM_deque_pop_back)->RangeMultiplier(2)->Range(1, 1024);
 
 static void BM_vector_pop_front(benchmark::State& state)
 {
-    std::vector<uint64_t> v;
+    std::vector<u64> v;
     benchmark::DoNotOptimize(v);
     for (int i = 0; i < state.range(0) - 1; ++i)
         v.push_back(42);
@@ -130,7 +134,7 @@ BENCHMARK(BM_vector_pop_front)->RangeMultiplier(2)->Range(1, 1024);
 
 static void BM_deque_pop_front(benchmark::State& state)
 {
-    std::deque<uint64_t> q;
+    std::deque<u64> q;
     benchmark::DoNotOptimize(q);
     for (int i = 0; i < state.range(0) - 1; ++i)
         q.push_back(42);

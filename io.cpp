@@ -19,11 +19,12 @@
 #include <memory>
 
 #include "os_specific.hpp"
+#include "types.hpp"
 #include "worker.hpp"
 
 namespace ums {
 
-IO_Request::IO_Request(void* file_handle, IO_Buffer buffer, uint64_t offset, Type type) noexcept
+IO_Request::IO_Request(void* file_handle, IO_Buffer buffer, u64 offset, Type type) noexcept
     : m_file_handle{file_handle}
     , m_io_buffer{buffer}
     , m_offset{offset}
@@ -42,12 +43,12 @@ void IO_Request::update() noexcept
     os::update_io_state(*this);
 }
 
-void cos_read_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
+void cos_read_file(void* file_handle, IO_Buffer buffer, u64 offset)
 {
     this_worker->read_file(file_handle, buffer, offset);
 }
 
-void cos_write_file(void* file_handle, IO_Buffer buffer, uint64_t offset)
+void cos_write_file(void* file_handle, IO_Buffer buffer, u64 offset)
 {
     this_worker->write_file(file_handle, buffer, offset);
 }

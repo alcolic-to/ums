@@ -195,7 +195,7 @@ private:
 /**
  * Random number generator.
  */
-template<typename T = uint64_t>
+template<typename T = u64>
 T random() noexcept
 {
     return PRNG{}.rand<T>();

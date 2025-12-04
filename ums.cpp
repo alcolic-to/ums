@@ -17,6 +17,7 @@
 
 #include <functional>
 #include <memory>
+#include <util.hpp>
 #include <utility>
 
 #include "async.hpp"
@@ -26,16 +27,14 @@
 namespace ums {
 
 // Thread local worker.
-//
 thread_local Worker* this_worker; // NOLINT
 
 // Global Schedulers.
-//
 std::unique_ptr<Schedulers> schedulers; // NOLINT
 
-// void init_ums(std::function<int(int, char**)>& main, int argc, char** argv)
 void init_ums(std::function<void()> main, Options opt)
 {
+    TZoneScoped; // It looks like it is required for making a connection with the server.
     schedulers = std::make_unique<Schedulers>(opt);
 
     async(std::move(main));

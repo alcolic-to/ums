@@ -126,7 +126,7 @@ void ums_main(int argc, char* argv[])
 
     Stopwatch<true, std::chrono::microseconds> s;
 
-    Task<u64> task{async(fib, 16)};
+    Task<u64> task{async(fib, 10 * 1024 * 1024)};
     std::cout << task->get() << "\n";
 
     std::vector<Task<void>> v;
@@ -137,7 +137,16 @@ void ums_main(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-    init_ums([&] { ums_main(argc, argv); });
+    // init_ums([&] { ums_main(argc, argv); });
+
+    Options::Schedulers_count sch{4};
+    Options::Workers_per_scheduler wps{4};
+    init_ums(
+        [&] {
+            for (usize i = 0; i < 10 * 1024 * 1024; ++i)
+                async([&] {});
+        },
+        Options{sch, wps});
 }
 
 // NOLINTEND

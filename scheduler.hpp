@@ -22,8 +22,6 @@
 #include <atomic>
 #include <bitset>
 #include <cstdint>
-#include <deque>
-#include <list>
 #include <memory>
 #include <mutex>
 #include <ranges>

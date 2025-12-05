@@ -24,6 +24,7 @@
 #include "scheduler.hpp"
 #include "task.hpp"
 #include "ums.hpp"
+#include "util.hpp"
 
 namespace ums {
 
@@ -35,9 +36,8 @@ template<bool wait = false, class Fn, class... Args,
          class ReturnType = std::invoke_result_t<Fn, Args...>,
          class TaskExecType = TaskExec<Fn, Args...>>
 Task<ReturnType> async(Fn&& t, Args&&... args)
-{
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     auto task{std::make_shared<TaskExecType>(std::forward<Fn>(t), std::forward<Args>(args)...)};
-
     enque_task(task);
 
     if constexpr (wait)
@@ -46,8 +46,8 @@ Task<ReturnType> async(Fn&& t, Args&&... args)
     return Task{std::static_pointer_cast<TaskResult<ReturnType>>(task)};
 }
 
-void enque_task(auto task)
-{
+void enque_task(const auto& task)
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     Scheduler& best_scheduler = schedulers->min_load_scheduler();
     best_scheduler.enqueue_task(std::static_pointer_cast<TaskBase>(task));
 };

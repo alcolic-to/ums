@@ -34,7 +34,8 @@ std::unique_ptr<Schedulers> schedulers; // NOLINT
 
 void init_ums(std::function<void()> main, Options opt)
 {
-    TZoneScoped; // It looks like it is required for making a connection with the server.
+    TZoneScopedC(tracy::Color::Green1);
+
     schedulers = std::make_unique<Schedulers>(opt);
 
     async(std::move(main));

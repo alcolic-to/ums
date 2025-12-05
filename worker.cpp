@@ -15,7 +15,6 @@
  */
 #include "worker.hpp"
 
-#include <cstdint>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -135,8 +134,9 @@ void Worker::entry_point()
     // std::cout << "Ended thread: " << id() << " on CPU " << m_scheduler.m_cpu.m_id << "\n";
 }
 
-// Main worker loop.
-//
+/**
+ * Main worker loop.
+ */
 void Worker::main_loop()
 {
     while (true) {
@@ -145,7 +145,8 @@ void Worker::main_loop()
         if (exit()) [[unlikely]]
             return;
 
-        try { /* clang-format off */ TZoneScoped; /* clang-format on */
+        try {
+            TZoneScopedC(tracy::Color::Green1);
             m_task->invoke();
         }
         catch (const std::exception& ex) {

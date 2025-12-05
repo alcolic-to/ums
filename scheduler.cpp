@@ -67,7 +67,9 @@ catch (...) {
  * decide based on that.
  */
 Scheduler& Schedulers::min_load_scheduler() const noexcept
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
+    TZoneScopedC(tracy::Color::DarkGreen);
+
     const auto cmp = [](const auto& left, const auto& right) {
         return left->load() < right->load();
     };
@@ -236,8 +238,9 @@ void Scheduler::park_runnable(Worker* worker)
     set_worker_state(worker, Worker::State::runnable);
 }
 
-// Parks worker to idle queue. If worker has completed task, notify user and release task.
-//
+/**
+ * Parks worker to idle queue. If worker has completed task, notify user and release task.
+ */
 template<bool back>
 void Scheduler::park_idle(Worker* worker)
 {
@@ -308,7 +311,8 @@ bool Scheduler::has_tasks() const noexcept
  * might have stolen our task in the meantime.
  */
 void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBase> task)
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
+    TZoneScopedC(tracy::Color::Blue1);
     if (!task)
         task = next_task();
 
@@ -325,7 +329,9 @@ void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBase> task)
  * Moves workers from pending_io to runnable queue if worker's I/O is completed.
  */
 void Scheduler::schedule_io_workers()
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
+    TZoneScopedC(tracy::Color::Blue1);
+
     auto io_completed = [](Worker& worker) {
         worker.m_io_request->update();
         return !worker.m_io_request->pending();
@@ -346,7 +352,9 @@ void Scheduler::schedule_io_workers()
  * Moves workers from waiting to runnable queue if worker's wait is done.
  */
 void Scheduler::schedule_waiting_workers()
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
+    TZoneScopedC(tracy::Color::Blue1);
+
     auto checker = [](Worker& worker) { return worker.check_wait_info(); };
 
     auto begin = m_waiting_queue.begin();
@@ -368,7 +376,9 @@ void Scheduler::schedule_waiting_workers()
  * the same priority as for the old ones.
  */
 void Scheduler::schedule_idle_workers()
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
+    TZoneScopedC(tracy::Color::Blue1);
+
     if (!has_runnable_workers() && has_idle_workers() && has_tasks())
         schedule_idle_worker();
 }
@@ -377,7 +387,9 @@ void Scheduler::schedule_idle_workers()
  * Schedules yielded worker by moving it to the runnable queue.
  */
 void Scheduler::schedule_yielded_workers()
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
+    TZoneScopedC(tracy::Color::Blue1);
+
     if (m_yielded_worker != nullptr) {
         park_runnable(m_yielded_worker);
         m_yielded_worker = nullptr;
@@ -389,9 +401,11 @@ void Scheduler::schedule_yielded_workers()
  * scheduler.
  */
 void Scheduler::steal_work()
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
     if constexpr (!FS_work_stealing_allowed)
         return;
+
+    TZoneScopedC(tracy::Color::DarkRed);
 
     if (has_runnable_workers() || !has_idle_workers())
         return;
@@ -401,14 +415,16 @@ void Scheduler::steal_work()
     for (const auto& other : m_schedulers->filter(other_with_tasks)) {
         if (auto task{other->next_task()}) {
             schedule_idle_worker(std::move(task));
-            TTracyMessageL("Stolen work.");
+            TTracyMessageLC("Stolen work.", tracy::Color::Red1);
             return;
         }
     }
 }
 
 void Scheduler::schedule_workers()
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
+    TZoneScopedC(tracy::Color::Blue1);
+
     schedule_io_workers();
     schedule_waiting_workers();
     schedule_idle_workers();
@@ -425,6 +441,8 @@ void Scheduler::prepare_exec() noexcept
 
 void Scheduler::schedule()
 {
+    TZoneScopedC(tracy::Color::Blue1);
+
     while (true) {
         schedule_workers();
 
@@ -519,7 +537,9 @@ bool Scheduler::should_idle_spin() noexcept
  * This problem maybe can be solved with global run queue.
  */
 void Scheduler::sleep() noexcept
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
+    TZoneScopedC(tracy::Color::Gray);
+
     /**
      * For pending I/O workers, we will just keep scheduling until I/O is done.
      * TODO: Check whether we can aford to sleep for I/O operations.
@@ -574,8 +594,8 @@ void Scheduler::set_state(State state) noexcept
 }
 
 // NOLINTBEGIN
-// clang-format off
-class Scheduler_loads {
+
+class Scheduler_loads { /* clang-format off */
 public:
     static constexpr int loads_size = int(Worker::State::exiting) + 1;
 
@@ -595,9 +615,8 @@ public:
 
 private:
     std::array<uint8_t, loads_size> m_loads{};
-};
+}; /* clang-format on */
 
-// clang-format on
 // NOLINTEND
 
 static constexpr Scheduler_loads Loads;
@@ -663,8 +682,9 @@ bool Scheduler::sync_init(Worker* worker)
     return m_workers_started ? false : (m_workers_started = true);
 }
 
-// Parks worker to proper queue based on synchronization context.
-//
+/**
+ * Parks worker to proper queue based on synchronization context.
+ */
 template<Sync_context ctx>
 void Scheduler::park_worker(Worker* worker)
 {
@@ -681,10 +701,11 @@ void Scheduler::park_worker(Worker* worker)
         park_pending_io(worker);
 }
 
-// Synchronization point for the workers.
-// We will park current worker to proper queue, schedule workers and context switch to
-// next worker if needed. For workers initialization, we will enter sync_init function.
-//
+/**
+ * Synchronization point for the workers.
+ * We will park current worker to proper queue, schedule workers and context switch to
+ * next worker if needed. For workers initialization, we will enter sync_init function.
+ */
 template<Sync_context ctx>
 void Scheduler::sync(Worker* worker)
 {
@@ -699,9 +720,10 @@ void Scheduler::sync(Worker* worker)
         context_switch(worker);
 }
 
-// Sets exit state for scheduler and current worker.
-// Other workers will set their exit state in worker destructor.
-//
+/**
+ * Sets exit state for scheduler and current worker.
+ * Other workers will set their exit state in worker destructor.
+ */
 void Scheduler::exit()
 {
     set_worker_state(m_worker, Worker::State::exiting);

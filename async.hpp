@@ -36,7 +36,9 @@ template<bool wait = false, class Fn, class... Args,
          class ReturnType = std::invoke_result_t<Fn, Args...>,
          class TaskExecType = TaskExec<Fn, Args...>>
 Task<ReturnType> async(Fn&& t, Args&&... args)
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
+    TZoneScopedC(tracy::Color::DarkGreen);
+
     auto task{std::make_shared<TaskExecType>(std::forward<Fn>(t), std::forward<Args>(args)...)};
     enque_task(task);
 
@@ -47,7 +49,9 @@ Task<ReturnType> async(Fn&& t, Args&&... args)
 }
 
 void enque_task(const auto& task)
-{ /* clang-format off */ TZoneScoped; /* clang-format on */
+{
+    TZoneScopedC(tracy::Color::DarkGreen);
+
     Scheduler& best_scheduler = schedulers->min_load_scheduler();
     best_scheduler.enqueue_task(std::static_pointer_cast<TaskBase>(task));
 };

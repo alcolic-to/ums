@@ -41,10 +41,14 @@
 #ifdef TRACY_ENABLE
 #include "tracy/Tracy.hpp"
 #define TZoneScoped ZoneScoped
+#define TZoneScopedC(x) ZoneScopedC(x)
 #define TTracyMessageL(x) TracyMessageL(x)
+#define TTracyMessageLC(x, y) TracyMessageLC(x, y)
 #else
 #define TZoneScoped NO_OP
+#define TZoneScopedC(x) NO_OP
 #define TTracyMessageL(x) NO_OP
+#define TTracyMessageLC(x) NO_OP
 #endif
 
 namespace ums {

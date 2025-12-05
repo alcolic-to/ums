@@ -26,11 +26,8 @@
 namespace ums {
 
 // Global Schedulers.
-//
 extern std::unique_ptr<Schedulers> schedulers; // NOLINT
 
-// void init_ums(std::function<int(int, char**)>& main, int argc, char** argv, Options opt =
-// Options{});
 void init_ums(std::function<void()> main, Options opt = Options{});
 
 } // namespace ums

@@ -48,7 +48,7 @@
 #define TZoneScoped NO_OP
 #define TZoneScopedC(x) NO_OP
 #define TTracyMessageL(x) NO_OP
-#define TTracyMessageLC(x) NO_OP
+#define TTracyMessageLC(x, y) NO_OP
 #endif
 
 namespace ums {

@@ -137,13 +137,11 @@ void ums_main(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-    // init_ums([&] { ums_main(argc, argv); });
-
     Options::Schedulers_count sch{4};
     Options::Workers_per_scheduler wps{4};
     init_ums(
         [&] {
-            for (usize i = 0; i < 10 * 1024 * 1024; ++i)
+            for (usize i = 0; i < 1024 * 1024; ++i)
                 async([&] {});
         },
         Options{sch, wps});

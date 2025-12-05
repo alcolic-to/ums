@@ -16,14 +16,12 @@
 #include "task.hpp"
 
 #include <atomic>
-#include <cstddef>
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <utility>
 
-#include "mutex.hpp"
 #include "spinlock.hpp"
+#include "util.hpp"
 
 namespace ums {
 
@@ -33,6 +31,7 @@ void Tasks::enque(std::shared_ptr<TaskBase> task)
 
     m_tasks.push_back(std::move(task));
     m_size.fetch_add(1, std::memory_order_relaxed);
+    TTracyMessageL("Enqued task.");
 }
 
 std::shared_ptr<TaskBase> Tasks::deque() noexcept
@@ -46,6 +45,8 @@ std::shared_ptr<TaskBase> Tasks::deque() noexcept
     m_tasks.pop_front();
 
     m_size.fetch_sub(1, std::memory_order_relaxed);
+    TTracyMessageL("Dequed task.");
+
     return t;
 }
 

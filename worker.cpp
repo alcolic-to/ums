@@ -145,7 +145,7 @@ void Worker::main_loop()
         if (exit()) [[unlikely]]
             return;
 
-        try {
+        try { /* clang-format off */ TZoneScoped; /* clang-format on */
             m_task->invoke();
         }
         catch (const std::exception& ex) {

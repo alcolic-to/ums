@@ -20,8 +20,6 @@
 #include <array>
 #include <atomic>
 #include <cassert>
-#include <cstddef>
-#include <cstdint>
 #include <exception>
 #include <memory>
 #include <mutex>
@@ -39,10 +37,10 @@
 
 namespace ums {
 
-// Creates new Scheduler for each bit available in CPUs availability mask.
-//
-// clang-format off
-Schedulers::Schedulers(Options opt) noexcept try
+/**
+ * Creates new Scheduler for each bit available in CPUs availability mask.
+ */
+Schedulers::Schedulers(Options opt) noexcept /* clang-format off */ try
     : m_system_cpus_count{std::min(os::cpus_count(), CFG_max_supported_cpus)}
     , m_cpus_avail_mask{Cpu_Mask{os::cpus_avail_mask()} & Cpu_Mask{CFG_allowed_cpus_mask}}
 {
@@ -60,16 +58,16 @@ Schedulers::Schedulers(Options opt) noexcept try
 }
 catch (...) {
     std::terminate();
-}
+} /* clang-format on */
 
-// clang-format on
-
-// TODO: Prefer this scheduler if this scheduler has the same load as min scheduler, since we can
-// than execute task instantly. Also, make invokation on the same thread that schedules task
-// possible and check if it makes sense. Also, make scheduling policy: async and concurent and
-// decide based on that.
+/**
+ * TODO: Prefer this scheduler if this scheduler has the same load as min scheduler, since we can
+ * than execute task instantly. Also, make invokation on the same thread that schedules task
+ * possible and check if it makes sense. Also, make scheduling policy: async and concurent and
+ * decide based on that.
+ */
 Scheduler& Schedulers::min_load_scheduler() const noexcept
-{
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     const auto cmp = [](const auto& left, const auto& right) {
         return left->load() < right->load();
     };
@@ -177,10 +175,12 @@ std::string Scheduler::state_to_string(State state)
     } // clang-format on
 }
 
-// Creates scheduler and workers for provided CPU.
-// After workers are created, starts single worker from idle queue
-// and waits until worker (scheduler) goes to sleep.
-// TODO: Speed this up with parallel workes creation.
+/**
+ * Creates scheduler and workers for provided CPU.
+ * After workers are created, starts single worker from idle queue
+ * and waits until worker (scheduler) goes to sleep.
+ * TODO: Speed this up with parallel workes creation.
+ */
 Scheduler::Scheduler(Schedulers* schedulers, u64 cpu_id,
                      Options::Workers_per_scheduler workers_count)
     : m_schedulers{schedulers}
@@ -302,12 +302,13 @@ bool Scheduler::has_tasks() const noexcept
     return !m_tasks.empty();
 }
 
-// Schedules idle worker with provided task or with next task from tasks queue if task is empty.
-// We must check whether task exists even if we are getting task from our queue, because someone
-// might have stolen our task in the meantime.
-//
+/**
+ * Schedules idle worker with provided task or with next task from tasks queue if task is empty.
+ * We must check whether task exists even if we are getting task from our queue, because someone
+ * might have stolen our task in the meantime.
+ */
 void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBase> task)
-{
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     if (!task)
         task = next_task();
 
@@ -324,7 +325,7 @@ void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBase> task)
  * Moves workers from pending_io to runnable queue if worker's I/O is completed.
  */
 void Scheduler::schedule_io_workers()
-{
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     auto io_completed = [](Worker& worker) {
         worker.m_io_request->update();
         return !worker.m_io_request->pending();
@@ -345,7 +346,7 @@ void Scheduler::schedule_io_workers()
  * Moves workers from waiting to runnable queue if worker's wait is done.
  */
 void Scheduler::schedule_waiting_workers()
-{
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     auto checker = [](Worker& worker) { return worker.check_wait_info(); };
 
     auto begin = m_waiting_queue.begin();
@@ -359,22 +360,24 @@ void Scheduler::schedule_waiting_workers()
     }
 }
 
-// Schedules single idle worker with the earliest enqued task.
-// This is done only if there is no work to do (no previous tasks that got scheduled out due to I/O,
-// yield, wait on mutex or condition_variable etc. and are now ready to continue). This way we are
-// prioritizing execution of old unfinished tasks, instead of beeing "fair" and giving all new tasks
-// the same priority as for the old ones.
-//
+/**
+ * Schedules single idle worker with the earliest enqued task.
+ * This is done only if there is no work to do (no previous tasks that got scheduled out due to I/O,
+ * yield, wait on mutex or condition_variable etc. and are now ready to continue). This way we are
+ * prioritizing execution of old unfinished tasks, instead of beeing "fair" and giving all new tasks
+ * the same priority as for the old ones.
+ */
 void Scheduler::schedule_idle_workers()
-{
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     if (!has_runnable_workers() && has_idle_workers() && has_tasks())
         schedule_idle_worker();
 }
 
-// Schedules yielded worker by moving it to the runnable queue.
-//
+/**
+ * Schedules yielded worker by moving it to the runnable queue.
+ */
 void Scheduler::schedule_yielded_workers()
-{
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     if (m_yielded_worker != nullptr) {
         park_runnable(m_yielded_worker);
         m_yielded_worker = nullptr;
@@ -386,7 +389,7 @@ void Scheduler::schedule_yielded_workers()
  * scheduler.
  */
 void Scheduler::steal_work()
-{
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     if constexpr (!FS_work_stealing_allowed)
         return;
 
@@ -398,13 +401,14 @@ void Scheduler::steal_work()
     for (const auto& other : m_schedulers->filter(other_with_tasks)) {
         if (auto task{other->next_task()}) {
             schedule_idle_worker(std::move(task));
+            TTracyMessageL("Stolen work.");
             return;
         }
     }
 }
 
 void Scheduler::schedule_workers()
-{
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     schedule_io_workers();
     schedule_waiting_workers();
     schedule_idle_workers();
@@ -515,7 +519,7 @@ bool Scheduler::should_idle_spin() noexcept
  * This problem maybe can be solved with global run queue.
  */
 void Scheduler::sleep() noexcept
-{
+{ /* clang-format off */ TZoneScoped; /* clang-format on */
     /**
      * For pending I/O workers, we will just keep scheduling until I/O is done.
      * TODO: Check whether we can aford to sleep for I/O operations.
@@ -611,18 +615,19 @@ u64 Scheduler::load() const noexcept
     return m_load.load(std::memory_order_relaxed) + tasks_load;
 }
 
-// Switches thread execution context from previous worker to current.
-//
-// Notes:
-// There is a single mutex on scheduler used for workers synchronization and every worker has
-// it's own condition variable. In order to atomically suspend single worker thread (go to sleep
-// by calling wait) and wake up next, we will take lock on mutex before notifying another thread
-// to wake up. Condition_variable::wait function guarantees that it will unlock mutex and go to
-// sleep atomically and it also guarantees that it will take lock on mutex when wait is done. So
-// when we notify another thread to wake up we are already holding lock on mutex (and notified
-// thread can not wake up until we release lock) so mutex will be unlocked only when we call
-// wait on this thread, which will release lock and wake up another thread.
-//
+/**
+ * Switches thread execution context from previous worker to current.
+ *
+ * Notes:
+ * There is a single mutex on scheduler used for workers synchronization and every worker has
+ * it's own condition variable. In order to atomically suspend single worker thread (go to sleep
+ * by calling wait) and wake up next, we will take lock on mutex before notifying another thread
+ * to wake up. Condition_variable::wait function guarantees that it will unlock mutex and go to
+ * sleep atomically and it also guarantees that it will take lock on mutex when wait is done. So
+ * when we notify another thread to wake up we are already holding lock on mutex (and notified
+ * thread can not wake up until we release lock) so mutex will be unlocked only when we call
+ * wait on this thread, which will release lock and wake up another thread.
+ */
 void Scheduler::context_switch(Worker* prev_worker)
 {
     std::unique_lock<std::mutex> lock{m_workers_mtx};
@@ -630,18 +635,19 @@ void Scheduler::context_switch(Worker* prev_worker)
     prev_worker->wait(lock);
 }
 
-// Synchronization point for the workers that are beeing initialized.
-// We will return whether scheduling is needed or not.
-//
-// Notes:
-// When worker is started for the first time, it will be parked in this function
-// waiting on condition variable. We will later decide whether to proceed with scheduling based
-// on return value. Since only first started worker on scheduler should enter scheduling code
-// (other workers will already be scheduled when it's their turn to run), we will use flag
-// m_workers_started to help us do this. Also, we are going to notify scheduler thread to
-// continue when we are safely parked, since it is blocked on a condition variable waiting for
-// us.
-//
+/**
+ * Synchronization point for the workers that are beeing initialized.
+ * We will return whether scheduling is needed or not.
+ *
+ * Notes:
+ * When worker is started for the first time, it will be parked in this function
+ * waiting on condition variable. We will later decide whether to proceed with scheduling based
+ * on return value. Since only first started worker on scheduler should enter scheduling code
+ * (other workers will already be scheduled when it's their turn to run), we will use flag
+ * m_workers_started to help us do this. Also, we are going to notify scheduler thread to
+ * continue when we are safely parked, since it is blocked on a condition variable waiting for
+ * us.
+ */
 bool Scheduler::sync_init(Worker* worker)
 {
     if (!initializing()) [[likely]]

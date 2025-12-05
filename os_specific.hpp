@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#ifndef OS_SPECIFIC_HPP
-#define OS_SPECIFIC_HPP
+#ifndef UMS_OS_SPECIFIC_HPP
+#define UMS_OS_SPECIFIC_HPP
 
 #include "types.hpp"
 
@@ -96,4 +96,4 @@ void close_file(void* file_handle);
 
 } // namespace ums
 
-#endif // OS_SPECIFIC_HPP
+#endif // UMS_OS_SPECIFIC_HPP

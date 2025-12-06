@@ -92,7 +92,7 @@ Condition_variable_any::Condition_variable_any() : m_mtx{std::make_shared<Mutex>
 void Condition_variable_any::notify_one() noexcept
 {
     {
-        const std::lock_guard<Mutex> lock{*m_mtx};
+        const std::scoped_lock<Mutex> lock{*m_mtx};
     }
 
     m_cv.notify_one();
@@ -101,7 +101,7 @@ void Condition_variable_any::notify_one() noexcept
 void Condition_variable_any::notify_all() noexcept
 {
     {
-        const std::lock_guard<Mutex> lock{*m_mtx};
+        const std::scoped_lock<Mutex> lock{*m_mtx};
     }
 
     m_cv.notify_all();

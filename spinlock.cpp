@@ -16,7 +16,8 @@
 #include "spinlock.hpp"
 
 #include <atomic>
-#include <cstdint>
+
+#include "types.hpp"
 
 namespace ums {
 
@@ -78,11 +79,11 @@ using mo = std::memory_order;
 //
 void Spinlock::lock() noexcept
 {
-    constexpr uint32_t max_backoff = 64;
-    uint32_t backoff = 1;
+    constexpr u32 max_backoff = 64;
+    u32 backoff = 1;
 
     while (m_flag.load(mo::relaxed) != 0 || m_flag.exchange(1, mo::acquire) != 0) {
-        for (uint32_t i = 0; i < backoff; ++i)
+        for (u32 i = 0; i < backoff; ++i)
             cpu_pause();
 
         backoff = backoff < max_backoff ? backoff << 1U : max_backoff;
@@ -98,17 +99,17 @@ bool Spinlock::try_lock() noexcept
 //
 bool Spinlock::lock_with_timeout() noexcept
 {
-    constexpr uint32_t max_try = 256;
-    uint32_t try_count = 0;
+    constexpr u32 max_try = 256;
+    u32 try_count = 0;
 
-    constexpr uint32_t max_backoff = 64;
-    uint32_t backoff = 1;
+    constexpr u32 max_backoff = 64;
+    u32 backoff = 1;
 
     while (m_flag.load(mo::relaxed) != 0 || m_flag.exchange(1, mo::acquire) != 0) {
         if (++try_count == max_try) [[unlikely]]
             return false;
 
-        for (uint32_t i = 0; i < backoff; ++i)
+        for (u32 i = 0; i < backoff; ++i)
             cpu_pause();
 
         backoff = backoff < max_backoff ? backoff << 1U : max_backoff;

@@ -20,7 +20,6 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -39,7 +38,7 @@ class Worker final {
     friend class Scheduler;
 
 public:
-    enum class State : int {
+    enum class State : u8 {
         initializing,
         idle,
         waiting,

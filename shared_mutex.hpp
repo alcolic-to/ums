@@ -29,20 +29,20 @@ namespace ums {
 class Shared_mutex_state {
     // clang-format off
 
-    static constexpr uint32_t readers_bits  = 0b01111111'11111111'11111111'11111111U;
-    static constexpr uint32_t write_bits    = 0b10000000'00000000'00000000'00000000U;
+    static constexpr u32 readers_bits  = 0b01111111'11111111'11111111'11111111U;
+    static constexpr u32 write_bits    = 0b10000000'00000000'00000000'00000000U;
 
-    static constexpr uint32_t readers_offset  = 0U;
-    static constexpr uint32_t write_offset    = 31U;
+    static constexpr u32 readers_offset  = 0U;
+    static constexpr u32 write_offset    = 31U;
 
-    [[nodiscard]] uint32_t readers() const noexcept { return (m_state & readers_bits) >> readers_offset; }
-    [[nodiscard]] uint32_t write() const noexcept { return (m_state & write_bits) >> write_offset; }
+    [[nodiscard]] u32 readers() const noexcept { return (m_state & readers_bits) >> readers_offset; }
+    [[nodiscard]] u32 write() const noexcept { return (m_state & write_bits) >> write_offset; }
 
     // clang-format on
 public:
     void unset_read() noexcept { m_state &= ~readers_bits; }
 
-    [[nodiscard]] uint32_t readers_count() const noexcept { return readers(); }
+    [[nodiscard]] u32 readers_count() const noexcept { return readers(); }
 
     [[nodiscard]] bool has_readers() const noexcept { return bool(readers()); }
 
@@ -64,7 +64,7 @@ public:
     void clear() noexcept { m_state = 0U; }
 
 private:
-    uint32_t m_state{0U};
+    u32 m_state{0U};
 };
 
 class Shared_timed_mutex;

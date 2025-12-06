@@ -19,7 +19,8 @@
 #define UMS_SPINLOCK_HPP
 
 #include <atomic>
-#include <cstdint>
+
+#include "types.hpp"
 
 namespace ums {
 
@@ -40,7 +41,7 @@ public:
     void unlock() noexcept;
 
 private:
-    std::atomic<uint32_t> m_flag{0};
+    std::atomic<u32> m_flag{0};
 };
 
 } // namespace ums

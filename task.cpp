@@ -21,6 +21,7 @@
 #include <utility>
 
 #include "spinlock.hpp"
+#include "types.hpp"
 #include "util.hpp"
 
 namespace ums {

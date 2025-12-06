@@ -137,7 +137,7 @@ private:
     std::atomic<std::thread::id> m_tid;
 };
 
-constexpr uint32_t max_rec_locks = uint32_t(-1);
+constexpr u32 max_rec_locks = u32(-1);
 
 class Recursive_mutex {
 public:
@@ -157,7 +157,7 @@ public:
 private:
     Plain_mutex m_mtx;
     std::atomic<std::thread::id> m_tid;
-    uint32_t m_locks_count{0};
+    u32 m_locks_count{0};
 };
 
 class Timed_mutex {
@@ -230,7 +230,7 @@ private:
     Mutex m_mtx;
     Condition_variable m_cv;
     std::thread::id m_tid;
-    uint32_t m_locks_count{0};
+    u32 m_locks_count{0};
 };
 
 // **** This is the initial mutex implementation which works much slower then current one.

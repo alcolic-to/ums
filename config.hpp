@@ -19,7 +19,6 @@
 #define UMS_CONFIG_HPP
 
 #include <chrono>
-#include <cstdint>
 
 #include "types.hpp"
 
@@ -39,7 +38,7 @@ constexpr bool FS_idle_spinning_allowed = false;
 
 // Maximum number of CPUs that we support.
 //
-constexpr uint32_t CFG_max_supported_cpus = 64;
+constexpr u32 CFG_max_supported_cpus = 64;
 
 // Allowed CPUs mask in the system. Schedulers will be created only on allowed CPUs.
 // CPUs ordinal numbers starts from LSB (rightmost bit).

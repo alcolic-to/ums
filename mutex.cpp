@@ -16,12 +16,12 @@
 #include "mutex.hpp"
 
 #include <atomic>
-#include <cstdint>
 #include <mutex>
 #include <system_error>
 #include <thread>
 
 #include "spinlock.hpp"
+#include "types.hpp"
 #include "util.hpp"
 #include "worker.hpp"
 
@@ -76,7 +76,7 @@ namespace {
 // Otherwise, returns whether number is incresed successfully.
 //
 template<bool throws>
-bool rmtx_inc_lc(uint32_t& locks_count)
+bool rmtx_inc_lc(u32& locks_count)
 {
     ++locks_count;
 
@@ -95,7 +95,7 @@ bool rmtx_inc_lc(uint32_t& locks_count)
 
 // Helper function that decreases locks count for recursive mutexes.
 //
-[[nodiscard]] uint32_t rmtx_dec_lc(uint32_t& locks_count) noexcept
+[[nodiscard]] u32 rmtx_dec_lc(u32& locks_count) noexcept
 {
     return --locks_count;
 }
@@ -178,7 +178,7 @@ bool Timed_mutex::try_lock_until_internal(const Time_point& time_point)
 void Timed_mutex::unlock()
 {
     {
-        const std::lock_guard<Mutex> lock{m_mtx};
+        const std::scoped_lock<Mutex> lock{m_mtx};
         m_locked = false;
     }
 

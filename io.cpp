@@ -15,7 +15,6 @@
  */
 #include "io.hpp"
 
-#include <cstdint>
 #include <memory>
 
 #include "os_specific.hpp"

@@ -78,7 +78,7 @@ public:
     /**
      * Notifies waiter in user space that task is done.
      */
-    void notify() noexcept
+    void notify()
     {
         {
             const std::unique_lock<Mutex> lock{m_mtx};

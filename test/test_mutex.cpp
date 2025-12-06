@@ -13,6 +13,7 @@
 #include "mutex.hpp"
 #include "scheduler.hpp"
 #include "shared_mutex.hpp"
+#include "types.hpp"
 #include "ums.hpp"
 #include "util.hpp"
 #include "worker.hpp"
@@ -273,13 +274,13 @@ TEST(Condition_variable, cv_complex_test_2)
         Condition_variable notifier_cv;
         bool ready = false;
 
-        std::atomic<uint32_t> atomic_counter = 0;
-        uint32_t threads_count = 8;
+        std::atomic<u32> atomic_counter = 0;
+        u32 threads_count = 8;
 
         auto increment = [&] {
             // First round of increments.
             //
-            uint32_t r = ++atomic_counter;
+            u32 r = ++atomic_counter;
             ASSERT_TRUE(r > 0 && r <= threads_count);
 
             std::unique_lock<Mutex> lock{mutex};

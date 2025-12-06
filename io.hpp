@@ -18,7 +18,6 @@
 #ifndef UMS_IO_API_HPP
 #define UMS_IO_API_HPP
 
-#include <cstdint>
 #include <memory>
 
 #include "types.hpp"
@@ -37,8 +36,8 @@ struct IO_Buffer {
 
 class IO_Request final {
 public:
-    enum class Type : int { read, write };
-    enum class State : int { init, error, pending, completed };
+    enum class Type : u8 { read, write };
+    enum class State : u8 { init, error, pending, completed };
 
     IO_Request(void* file_handle, IO_Buffer buffer, u64 offset, Type type) noexcept;
 

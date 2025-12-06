@@ -17,7 +17,7 @@
 
 #include <functional>
 #include <memory>
-#include <util.hpp>
+#include <util.hpp> // NOLINT
 #include <utility>
 
 #include "async.hpp"
@@ -34,7 +34,7 @@ std::unique_ptr<Schedulers> schedulers; // NOLINT
 
 void init_ums(std::function<void()> main, Options opt)
 {
-    TZoneScopedC(tracy::Color::Green1);
+    TZoneScopedC(tracy::Color::Green1); // NOLINT
 
     schedulers = std::make_unique<Schedulers>(opt);
 

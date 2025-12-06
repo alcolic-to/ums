@@ -7,6 +7,7 @@
 
 #include "async.hpp"
 #include "options.hpp"
+#include "types.hpp"
 #include "ums.hpp"
 #include "util.hpp"
 #include "worker.hpp"
@@ -67,12 +68,12 @@ TEST(Scheduler_tests, sanity_test)
 TEST(Scheduler_tests, evenly_scheduled_tasks)
 {
     auto test = [&] {
-        for (uint32_t cpus = 1; cpus <= schedulers->cpus_count(); ++cpus) {
+        for (u32 cpus = 1; cpus <= schedulers->cpus_count(); ++cpus) {
             for (auto task_dur = 1ms; task_dur <= 1024ms; task_dur *= 2) {
                 Stopwatch<false> s;
                 std::vector<Task<void>> tasks;
 
-                for (uint32_t c = 1; c <= cpus; ++c)
+                for (u32 c = 1; c <= cpus; ++c)
                     tasks.push_back(async([=] { hard_work(task_dur); }));
 
                 for (auto task : tasks)
@@ -111,7 +112,7 @@ TEST(Scheduler_tests, parallel_execution)
 
         Stopwatch<false> s;
 
-        for (uint32_t tasks_count = 0; tasks_count <= 100; ++tasks_count)
+        for (u32 tasks_count = 0; tasks_count <= 100; ++tasks_count)
             tasks.emplace_back(async(f));
 
         for (auto task : tasks)
@@ -130,18 +131,18 @@ TEST(Scheduler_tests, work_stealing)
 
         Stopwatch<false> s;
 
-        for (uint32_t cpus = 1; cpus <= schedulers->cpus_count(); ++cpus) {
+        for (u32 cpus = 1; cpus <= schedulers->cpus_count(); ++cpus) {
             auto f = [=] {
-                uint32_t div = std::pow<uint32_t>(2, cpus - 1); // 1, 2, 4, 8, 16...
+                u32 div = std::pow<u32>(2, cpus - 1); // 1, 2, 4, 8, 16...
                 hard_work(1000ms / div);
             };
 
             tasks.push_back(async(f));
         }
 
-        for (uint32_t cpus = 1; cpus <= schedulers->cpus_count(); ++cpus) {
+        for (u32 cpus = 1; cpus <= schedulers->cpus_count(); ++cpus) {
             auto f = [=] {
-                uint32_t div = std::pow<uint32_t>(2, cpus - 1); // 1, 2, 4, 8, 16...
+                u32 div = std::pow<u32>(2, cpus - 1); // 1, 2, 4, 8, 16...
                 hard_work(1000ms / div);
             };
 
@@ -151,7 +152,7 @@ TEST(Scheduler_tests, work_stealing)
         for (auto task : tasks)
             task->wait();
 
-        auto shortest = 1000ms / std::pow<uint32_t>(2, schedulers->cpus_count() - 1);
+        auto shortest = 1000ms / std::pow<u32>(2, schedulers->cpus_count() - 1);
         ASSERT_LE(s.elapsed(), 1000ms + (2 * shortest) + 20ms);
     };
 
@@ -168,7 +169,7 @@ TEST(Scheduler_tests, task_order_execution)
 
         Stopwatch<false> s;
 
-        for (uint32_t c = 1; c <= cpus; ++c) {
+        for (u32 c = 1; c <= cpus; ++c) {
             first_tasks.push_back(async([] {
                 hard_work(100ms);
                 this_worker->yield();
@@ -176,7 +177,7 @@ TEST(Scheduler_tests, task_order_execution)
             }));
         }
 
-        for (uint32_t c = 1; c <= cpus; ++c)
+        for (u32 c = 1; c <= cpus; ++c)
             second_tasks.push_back(async([] { hard_work(1s); }));
 
         for (auto task : first_tasks)
@@ -204,7 +205,7 @@ TEST(Scheduler_tests, task_order_execution_extended)
 
         Stopwatch<false> s;
 
-        for (uint32_t c = 1; c <= cpus; ++c) {
+        for (u32 c = 1; c <= cpus; ++c) {
             first_tasks.push_back(async([] {
                 hard_work(1s);
                 this_worker->yield();
@@ -212,7 +213,7 @@ TEST(Scheduler_tests, task_order_execution_extended)
             }));
         }
 
-        for (uint32_t c = 1; c <= cpus; ++c) {
+        for (u32 c = 1; c <= cpus; ++c) {
             second_tasks.push_back(async([] {
                 hard_work(1s);
                 this_worker->yield();
@@ -220,7 +221,7 @@ TEST(Scheduler_tests, task_order_execution_extended)
             }));
         }
 
-        for (uint32_t c = 1; c <= cpus; ++c)
+        for (u32 c = 1; c <= cpus; ++c)
             third_tasks.push_back(async([] { hard_work(100ms); }));
 
         for (auto task : third_tasks)

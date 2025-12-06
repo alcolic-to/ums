@@ -23,11 +23,13 @@
 #include <exception>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <utility>
 
 #include "config.hpp"
 #include "intrusive_list.hpp"
 #include "io.hpp"
+#include "mutex.hpp"
 #include "options.hpp"
 #include "os_specific.hpp"
 #include "task.hpp"
@@ -70,19 +72,19 @@ Scheduler& Schedulers::min_load_scheduler() const noexcept
 {
     TZoneScopedC(tracy::Color::DarkGreen);
 
-    const auto cmp = [](const auto& left, const auto& right) {
+    const auto cmp = [](const auto& left, const auto& right) noexcept {
         return left->load() < right->load();
     };
 
     return **std::ranges::min_element(m_schedulers, cmp);
 }
 
-[[nodiscard]] uint32_t Schedulers::workers_count() const noexcept
+[[nodiscard]] u32 Schedulers::workers_count() const noexcept
 {
     return m_schedulers.size() * m_schedulers.front()->workers_count();
 }
 
-[[nodiscard]] uint32_t Schedulers::cpus_count() const noexcept
+[[nodiscard]] u32 Schedulers::cpus_count() const noexcept
 {
     return m_schedulers.size();
 }
@@ -106,13 +108,13 @@ bool Schedulers::all_idle() noexcept
 
     using namespace std::ranges;
 
-    if (any_of(m_schedulers, [&](const auto& s) { return s->has_tasks(); }))
+    if (any_of(m_schedulers, [&](const auto& s) noexcept { return s->has_tasks(); }))
         return false;
 
-    for_each(m_schedulers, [](auto& s) { s->m_mtx.lock(); });
+    for_each(m_schedulers, [](auto& s) noexcept { s->m_mtx.lock(); });
     const bool r =
-        all_of(m_schedulers, [&](const auto& s) { return s->idle() && !s->has_tasks(); });
-    for_each(m_schedulers, [](auto& s) { s->m_mtx.unlock(); });
+        all_of(m_schedulers, [&](const auto& s) noexcept { return s->idle() && !s->has_tasks(); });
+    for_each(m_schedulers, [](auto& s) noexcept { s->m_mtx.unlock(); });
 
     return r;
 }
@@ -123,12 +125,12 @@ bool Schedulers::all_idle() noexcept
  */
 void Schedulers::signal_idle() noexcept
 {
-    const uint32_t idle_count = m_idle_schedulers.fetch_add(1, std::memory_order_relaxed) + 1;
+    const u32 idle_count = m_idle_schedulers.fetch_add(1, std::memory_order_relaxed) + 1;
     if (idle_count < m_schedulers.size())
         return;
 
     {
-        std::scoped_lock<std::mutex> lock{m_mtx};
+        const std::scoped_lock<std::mutex> lock{m_mtx};
         m_check_idle = true;
     }
 
@@ -159,7 +161,7 @@ void Schedulers::wait_exit()
         m_check_idle = false;
 
         {
-            Scoped_unlock<std::mutex> unlock{m_mtx};
+            const Scoped_unlock<std::mutex> unlock{m_mtx};
             return all_idle();
         }
     });
@@ -188,7 +190,7 @@ Scheduler::Scheduler(Schedulers* schedulers, u64 cpu_id,
     : m_schedulers{schedulers}
     , m_cpu{cpu_id}
 {
-    for (uint32_t i = 0; i < workers_count; ++i)
+    for (u32 i = 0; i < workers_count; ++i)
         m_workers.push_back(std::make_unique<Worker>(i, this));
 
     {
@@ -410,7 +412,9 @@ void Scheduler::steal_work()
     if (has_runnable_workers() || !has_idle_workers())
         return;
 
-    auto other_with_tasks = [&](auto& other) { return other->id() != id() && other->has_tasks(); };
+    auto other_with_tasks = [&](auto& other) noexcept {
+        return other->id() != id() && other->has_tasks();
+    };
 
     for (const auto& other : m_schedulers->filter(other_with_tasks)) {
         if (auto task{other->next_task()}) {
@@ -459,7 +463,8 @@ void Scheduler::schedule()
 void Scheduler::wait_until(std::unique_lock<std::mutex>& lock, Time_point abs_time)
 {
     m_running = false;
-    [[maybe_unused]] bool wait_res = m_cv.wait_until(lock, abs_time, [&] { return m_running; });
+    [[maybe_unused]] const bool wait_res =
+        m_cv.wait_until(lock, abs_time, [&] { return m_running; });
 
     assert(m_running || !wait_res); // Either someone notified us or we timed out on wait.
     m_running = true;
@@ -738,7 +743,7 @@ bool Scheduler::has_work() const noexcept
 
 bool Scheduler::should_exit() const noexcept
 {
-    bool exit = exit_signaled();
+    const bool exit = exit_signaled();
     assert(!exit || !has_work());
 
     return exit;

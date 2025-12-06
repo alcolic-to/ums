@@ -48,7 +48,7 @@ bool Shared_mutex::try_lock() noexcept
 void Shared_mutex::unlock() noexcept
 {
     {
-        const std::lock_guard<Mutex> lock{m_mutex};
+        const std::scoped_lock<Mutex> lock{m_mutex};
         m_state.unset_write();
     }
 
@@ -80,7 +80,7 @@ void Shared_mutex::unlock_shared() noexcept
     bool has_write = false;
 
     {
-        const std::lock_guard<Mutex> lock{m_mutex};
+        const std::scoped_lock<Mutex> lock{m_mutex};
         max_readers = m_state.max_readers();
         m_state.dec_readers();
         has_readers = m_state.has_readers();

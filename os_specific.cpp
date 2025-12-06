@@ -15,9 +15,7 @@
  */
 #include "os_specific.hpp"
 
-#include <bit>
-#include <cstdint>
-#include <exception>
+// #include <bit> // TODO: revert Topalovic's switch from std::bit_cast to reinterpret_cast.
 #include <filesystem>
 // #include <format>   // NOLINT
 #include <iostream> // NOLINT
@@ -26,12 +24,13 @@
 #include "file.hpp"
 #include "io.hpp"
 #include "types.hpp"
+#include "util.hpp"
 
 // NOLINTBEGIN(misc-include-cleaner)
 
 namespace ums {
 
-#if defined OS_WINDOWS
+#ifdef OS_WINDOWS
 
 // Reduce size of windows.h includes and include windows.
 // NOLINTBEGIN
@@ -233,11 +232,17 @@ File_handle::File_handle(const fs::path& file_path)
 // Destructor closes file handle
 File_handle::~File_handle()
 {
-    os::close_file(m_handle);
+    invoke_noexcept([&] { os::close_file(m_handle); }); // NOLINT: Some mess with clang-tidy.
 }
 
 namespace os {
 
+// NOLINTBEGIN
+
+/* Handle: Class 'IO_uring' defines a non-default destructor but does not define a copy constructor,
+ * a copy assignment operator, a move constructor or a move assignment
+ * operatorclang-tidycppcoreguidelines-special-member-functions
+ */
 class IO_uring {
 public:
     IO_uring()
@@ -417,6 +422,8 @@ void update_io_state(IO_Request& io) noexcept
 {
     uring_update(io);
 }
+
+// NOLINTEND
 
 } // namespace os
 

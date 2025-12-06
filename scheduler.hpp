@@ -21,7 +21,6 @@
 #include <algorithm>
 #include <atomic>
 #include <bitset>
-#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <ranges>
@@ -47,7 +46,7 @@ public:
 
 // Synchronization context for scheduler.
 //
-enum class Sync_context : int { main, yield, wait, io };
+enum class Sync_context : u8 { main, yield, wait, io };
 
 class Schedulers;
 
@@ -56,7 +55,7 @@ class Scheduler final {
     friend class Worker;
 
 public:
-    enum class State : int { initializing, running, idle_wait, idle_sleep, exiting };
+    enum class State : u8 { initializing, running, idle_wait, idle_sleep, exiting };
 
     static std::string state_to_string(State state);
 
@@ -141,7 +140,7 @@ public:
 
     void exit();
 
-    [[nodiscard]] uint32_t workers_count() const noexcept { return m_workers.size(); }
+    [[nodiscard]] u32 workers_count() const noexcept { return m_workers.size(); }
 
     bool has_work() const noexcept;
 
@@ -201,8 +200,8 @@ public:
     explicit Schedulers(Options opt = Options{}) noexcept;
 
     [[nodiscard]] Scheduler& min_load_scheduler() const noexcept;
-    [[nodiscard]] uint32_t workers_count() const noexcept;
-    [[nodiscard]] uint32_t cpus_count() const noexcept;
+    [[nodiscard]] u32 workers_count() const noexcept;
+    [[nodiscard]] u32 cpus_count() const noexcept;
 
     [[nodiscard]] auto begin() const noexcept { return m_schedulers.begin(); }
 
@@ -223,11 +222,11 @@ public:
     void wait_exit();
 
 private:
-    uint32_t m_system_cpus_count;
+    u32 m_system_cpus_count;
     Cpu_Mask m_cpus_avail_mask;
     std::mutex m_mtx;
     std::condition_variable m_cv;
-    std::atomic<uint32_t> m_idle_schedulers{0};
+    std::atomic<u32> m_idle_schedulers{0};
     bool m_check_idle = false;
     std::vector<std::unique_ptr<Scheduler>> m_schedulers;
 };

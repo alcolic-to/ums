@@ -19,11 +19,11 @@
 #define UMS_UTIL_HPP
 
 #include <chrono>
-#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "types.hpp"
@@ -286,6 +286,49 @@ inline std::vector<char> file_to_vector(const std::string& path)
 {
     std::ifstream f{path, std::ios_base::binary};
     return std::vector<char>{std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
+}
+
+/**
+ * Invokes function with arguments inside try/catch block.
+ * Return type is std::optional with derived type from calling function, so user
+ * can check return value for nullopt (or with implicit bool operator).
+ * If function return type is void, std::optional will hold std::monostate.
+ *
+ * Example usage:
+ * std::vector<int> my_fn(int first, int second);
+ *
+ * auto r = invoke_noexcept(my_fn, arg1, arg2);
+ * if (!r)
+ *  ... failed - handle error ....
+ *
+ * or keep going if successful:
+ * std::vector<int>& output = *r;
+ * ...
+ *
+ * Also, you can invoke it with lambda:
+ * auto r = invoke_noexcept([&] { return my_fn(arg1, arg2); });
+ */
+template<class Fn, class... Args, class ReturnType = std::invoke_result_t<Fn, Args...>>
+std::optional<std::conditional_t<std::is_same_v<ReturnType, void>, std::monostate, ReturnType>>
+invoke_noexcept(Fn&& fn, Args&&... args) noexcept
+{
+    try {
+        if constexpr (std::is_same_v<ReturnType, void>) {
+            std::invoke(std::forward<Fn>(fn), std::forward<Args>(args)...);
+            return std::optional{std::monostate{}};
+        }
+        else {
+            return std::optional{std::invoke(std::forward<Fn>(fn), std::forward<Args>(args)...)};
+        }
+    }
+    catch (const std::exception& ex) {
+        std::cout << std::format("Exception: {}\n", ex.what());
+    }
+    catch (...) {
+        std::cout << "Unknown exception.\n";
+    }
+
+    return std::nullopt;
 }
 
 } // namespace ums

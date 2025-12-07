@@ -295,10 +295,14 @@ void Scheduler::enqueue_task(std::shared_ptr<TaskBase> task)
 {
     m_tasks.enque(std::move(task));
     notify();
+
+    TTracyMessageLC(tracy_msg("Enqued task on sch {}", id()), tracy::Color::Green1);
 }
 
 std::shared_ptr<TaskBase> Scheduler::next_task() noexcept
 {
+    TTracyMessageLC(tracy_msg("Dequed (maybe) task from sch {}", id()), tracy::Color::Green1);
+
     return m_tasks.deque();
 }
 
@@ -419,7 +423,8 @@ void Scheduler::steal_work()
     for (const auto& other : m_schedulers->filter(other_with_tasks)) {
         if (auto task{other->next_task()}) {
             schedule_idle_worker(std::move(task));
-            TTracyMessageLC("Stolen work.", tracy::Color::Red1);
+            TTracyMessageLC(tracy_msg("Stolen work {} -> {}", other->id(), id()),
+                            tracy::Color::Red1);
             return;
         }
     }

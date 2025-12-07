@@ -34,7 +34,7 @@ std::unique_ptr<Schedulers> schedulers; // NOLINT
 
 void init_ums(std::function<void()> main, Options opt)
 {
-    TZoneScopedC(tracy::Color::Green1); // NOLINT
+    TZoneScopedC(tracy::Color::LightBlue); // NOLINT
 
     schedulers = std::make_unique<Schedulers>(opt);
 

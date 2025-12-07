@@ -22,7 +22,6 @@
 
 #include "spinlock.hpp"
 #include "types.hpp"
-#include "util.hpp"
 
 namespace ums {
 
@@ -32,7 +31,6 @@ void Tasks::enque(std::shared_ptr<TaskBase> task)
 
     m_tasks.push_back(std::move(task));
     m_size.fetch_add(1, std::memory_order_relaxed);
-    TTracyMessageLC("Enqued task.", tracy::Color::Blue1);
 }
 
 std::shared_ptr<TaskBase> Tasks::deque() noexcept
@@ -46,8 +44,6 @@ std::shared_ptr<TaskBase> Tasks::deque() noexcept
     m_tasks.pop_front();
 
     m_size.fetch_sub(1, std::memory_order_relaxed);
-    TTracyMessageLC("Dequed task.", tracy::Color::Green1);
-
     return t;
 }
 

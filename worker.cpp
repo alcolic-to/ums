@@ -122,6 +122,8 @@ void Worker::notify_waiter() noexcept
 
 void Worker::entry_point()
 {
+    set_tracy_worker(id(), m_scheduler->id());
+
     this_worker = this;
 
     if constexpr (FS_thread_binding_allowed)
@@ -147,7 +149,11 @@ void Worker::main_loop()
 
         try {
             TZoneScopedC(tracy::Color::Green1);
+            TTracyMessageLC(tracy_msg("Task started."), tracy::Color::Green1);
+
             m_task->invoke();
+
+            TTracyMessageLC(tracy_msg("Task done."), tracy::Color::Green1);
         }
         catch (const std::exception& ex) {
             std::cout << "Unhandled user exception: " << ex.what() << "\n";

@@ -154,6 +154,9 @@ void Worker::main_loop()
             m_task->invoke();
 
             TTracyMessageLC(tracy_msg("Task done."), tracy::Color::Green1);
+
+            /* TODO: Maybe it is better to notify that task is done here, because we are going to
+             * sleep anyway now that we don't have idle spinning. */
         }
         catch (const std::exception& ex) {
             std::cout << "Unhandled user exception: " << ex.what() << "\n";

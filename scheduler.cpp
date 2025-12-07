@@ -21,6 +21,7 @@
 #include <atomic>
 #include <cassert>
 #include <exception>
+#include <format>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -312,6 +313,21 @@ bool Scheduler::has_tasks() const noexcept
 }
 
 /**
+ * Returns whether this scheduler has stealable work (work to be stolen from other schedulers).
+ * If we are not running, don't allow others to steal our work. Otherwise, allow work stealing if we
+ * have tasks. Note that this must be thread safe, because it will be called from other schedulers.
+ */
+bool Scheduler::has_stealable_work() const noexcept
+{
+    return state_load() > 0 && m_tasks.size() > 0;
+
+    // i32 sload = state_load();
+    // u64 tasks_size = m_tasks.size();
+
+    // return (sload > 0 && tasks_size > 0) || tasks_size > 1;
+}
+
+/**
  * Schedules idle worker with provided task or with next task from tasks queue if task is empty.
  * We must check whether task exists even if we are getting task from our queue, because someone
  * might have stolen our task in the meantime.
@@ -319,6 +335,7 @@ bool Scheduler::has_tasks() const noexcept
 void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBase> task)
 {
     TZoneScopedC(tracy::Color::Blue1);
+
     if (!task)
         task = next_task();
 
@@ -416,11 +433,11 @@ void Scheduler::steal_work()
     if (has_runnable_workers() || !has_idle_workers())
         return;
 
-    auto other_with_tasks = [&](auto& other) noexcept {
-        return other->id() != id() && other->has_tasks();
+    auto others_with_work = [&](const auto& other) noexcept {
+        return id() != other->id() && other->has_stealable_work();
     };
 
-    for (const auto& other : m_schedulers->filter(other_with_tasks)) {
+    for (const auto& other : m_schedulers->filter(others_with_work)) {
         if (auto task{other->next_task()}) {
             schedule_idle_worker(std::move(task));
             TTracyMessageLC(tracy_msg("Stolen work {} -> {}", other->id(), id()),
@@ -605,43 +622,54 @@ void Scheduler::set_state(State state) noexcept
 
 // NOLINTBEGIN
 
-class Scheduler_loads { /* clang-format off */
+class Load { /* clang-format off */
 public:
-    static constexpr int loads_size = int(Worker::State::exiting) + 1;
+    static constexpr i32 task = 10; // Single task load.
 
-    constexpr inline Scheduler_loads()
+    static constexpr i32 loads_size = i32(Worker::State::exiting) + 1;
+
+    constexpr inline Load()
     {
-        m_loads[int(Worker::State::initializing)] =  0;
-        m_loads[int(Worker::State::idle)]         =  0;
-        m_loads[int(Worker::State::waiting)]      =  1;
-        m_loads[int(Worker::State::pending_io)]   =  2;
-        m_loads[int(Worker::State::yielded)]      = 10;
-        m_loads[int(Worker::State::runnable)]     = 10;
-        m_loads[int(Worker::State::running)]      = 10;
-        m_loads[int(Worker::State::exiting)]      =  0;
+        m_loads[i32(Worker::State::initializing)] =  0;
+        m_loads[i32(Worker::State::idle)]         =  0;
+        m_loads[i32(Worker::State::waiting)]      =  1;
+        m_loads[i32(Worker::State::pending_io)]   =  2;
+        m_loads[i32(Worker::State::yielded)]      = 10;
+        m_loads[i32(Worker::State::runnable)]     = 10;
+        m_loads[i32(Worker::State::running)]      = 10;
+        m_loads[i32(Worker::State::exiting)]      =  0;
     }
 
-    constexpr inline int operator[](const Worker::State state) const { return m_loads[int(state)]; }
+    constexpr inline i32 operator[](const Worker::State state) const noexcept { return m_loads[i32(state)]; }
 
 private:
-    std::array<uint8_t, loads_size> m_loads{};
+    std::array<i32, loads_size> m_loads{};
 }; /* clang-format on */
 
 // NOLINTEND
 
-static constexpr Scheduler_loads Loads;
+static constexpr Load Loads;
 
 // Sets new scheduler load based on previous and new worker state.
 //
 void Scheduler::manage_load(Worker::State prev_state, Worker::State new_state) noexcept
 {
-    m_load.fetch_add(Loads[new_state] - Loads[prev_state], std::memory_order_relaxed);
+    m_state_load.fetch_add(Loads[new_state] - Loads[prev_state], std::memory_order_relaxed);
 }
 
-u64 Scheduler::load() const noexcept
+i32 Scheduler::tasks_load() const noexcept
 {
-    const u64 tasks_load = m_tasks.size() * Loads[Worker::State::runnable];
-    return m_load.load(std::memory_order_relaxed) + tasks_load;
+    return static_cast<i32>(m_tasks.size() * Load::task);
+}
+
+i32 Scheduler::state_load() const noexcept
+{
+    return m_state_load.load(std::memory_order_relaxed);
+}
+
+i32 Scheduler::load() const noexcept
+{
+    return state_load() + tasks_load();
 }
 
 /**

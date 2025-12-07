@@ -95,6 +95,7 @@ public:
     void enqueue_task(std::shared_ptr<TaskBase> task);
     std::shared_ptr<TaskBase> next_task() noexcept;
     bool has_tasks() const noexcept;
+    bool has_stealable_work() const noexcept;
 
     void schedule_idle_worker(std::shared_ptr<TaskBase> task = nullptr);
 
@@ -129,7 +130,9 @@ public:
     void set_state(State state) noexcept;
 
     void manage_load(Worker::State prev_state, Worker::State new_state) noexcept;
-    u64 load() const noexcept;
+    i32 tasks_load() const noexcept;
+    i32 state_load() const noexcept;
+    i32 load() const noexcept;
 
     void context_switch(Worker* prev_worker);
 
@@ -183,7 +186,7 @@ private:
     bool m_running{true}; // Flag used for spurious wakeup check.
     bool m_workers_started{false};
 
-    std::atomic<u64> m_load{0};
+    std::atomic<i32> m_state_load{0};
     std::atomic<bool> m_exit{false};
 
     Time_point m_idle_start_time{Time_point::max()};

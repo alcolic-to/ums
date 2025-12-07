@@ -74,6 +74,8 @@ public:
         sleep_until_internal(time_point);
     }
 
+    /* FIXME: This should be called from Worker::sleep_for (instead of this_worker->sleep_for) and
+     * it should be hidden from user, to avoid sleeping on a worker that scheduled task.*/
     template<class Rep, class Period>
     void sleep_for(const std::chrono::duration<Rep, Period>& time_to_sleep)
     {

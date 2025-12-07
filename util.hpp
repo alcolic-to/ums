@@ -80,7 +80,7 @@ inline void set_tracy_worker(u64 worker_id, u64 scheduler_id)
 #else
 
 // NOLINTBEGIN
-inline void set_tracy_worker([[maybe_unused]] u64 worker_id, [[maybe_unused]] u64 scheduler_id) {}
+inline void set_tracy_worker(u64 worker_id, u64 scheduler_id) {}
 
 // NOLINTEND
 

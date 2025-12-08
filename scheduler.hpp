@@ -203,6 +203,7 @@ public:
     explicit Schedulers(Options opt = Options{}) noexcept;
 
     [[nodiscard]] Scheduler& min_load_scheduler() const noexcept;
+    [[nodiscard]] u32 workers_per_cpu_count() const noexcept;
     [[nodiscard]] u32 workers_count() const noexcept;
     [[nodiscard]] u32 cpus_count() const noexcept;
 
@@ -233,6 +234,19 @@ private:
     bool m_check_idle = false;
     std::vector<std::unique_ptr<Scheduler>> m_schedulers;
 };
+
+namespace sch {
+
+std::unique_ptr<Schedulers>& get() noexcept;
+
+Scheduler& min_load_scheduler() noexcept;
+
+u32 schedulers_count() noexcept;
+u32 cpus_count() noexcept;
+u32 workers_per_cpu_count() noexcept;
+u32 workers_count() noexcept;
+
+}; // namespace sch
 
 } // namespace ums
 

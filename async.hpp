@@ -52,7 +52,7 @@ void enque_task(const auto& task)
 {
     TZoneScopedC(tracy::Color::DarkGreen);
 
-    Scheduler& best_scheduler = schedulers->min_load_scheduler();
+    Scheduler& best_scheduler = sch::min_load_scheduler();
     best_scheduler.enqueue_task(std::static_pointer_cast<TaskBase>(task));
 };
 

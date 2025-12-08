@@ -31,7 +31,7 @@ void Plain_mutex::lock()
 {
     if (!m_spinlock.lock_with_timeout())
         while (!m_spinlock.try_lock())
-            this_worker->yield();
+            worker::get()->yield();
 }
 
 bool Plain_mutex::try_lock() noexcept

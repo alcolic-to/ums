@@ -19,14 +19,10 @@
 #define UMS_UMS_HPP
 
 #include <functional>
-#include <memory>
 
-#include "scheduler.hpp"
+#include "options.hpp"
 
 namespace ums {
-
-// Global Schedulers.
-extern std::unique_ptr<Schedulers> schedulers; // NOLINT
 
 void init_ums(std::function<void()> main, Options opt = Options{});
 

@@ -16,7 +16,7 @@ static void BM_task_exec_all_cpus(benchmark::State& state)
         std::vector<Task<void>> tasks;
 
         for (auto _ : state) {
-            for (int i = 0; i < schedulers->cpus_count(); ++i)
+            for (int i = 0; i < sch::cpus_count(); ++i)
                 tasks.push_back(async([&] { hard_work(microseconds(state.range())); }));
 
             for (auto task : tasks)

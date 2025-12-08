@@ -54,17 +54,18 @@ void Condition_variable::notify_all() noexcept
 void Condition_variable::add_waiter()
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
-    m_waiters.push_back(this_worker);
+    m_waiters.push_back(worker::get());
 }
 
-// Since notify_all wakes up all waiters, we don't know
-// which one will be first awaken, so we must call std::erase
-// to remove worker, instead of pop_front.
-//
+/**
+ * Since notify_all wakes up all waiters, we don't know
+ * which one will be first awaken, so we must call std::erase
+ * to remove worker, instead of pop_front.
+ */
 void Condition_variable::remove_waiter()
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
-    std::erase(m_waiters, this_worker);
+    std::erase(m_waiters, worker::get());
 }
 
 void Condition_variable::wait_internal(std::unique_lock<Mutex>& lock, const Time_point& abs_time)
@@ -72,9 +73,9 @@ void Condition_variable::wait_internal(std::unique_lock<Mutex>& lock, const Time
     add_waiter();
 
     {
-        this_worker->set_wait_info(false, abs_time);
+        worker::get()->set_wait_info(false, abs_time);
         const Scoped_unlock<std::unique_lock<Mutex>> unlock{lock};
-        this_worker->wait_cond_or_sleep();
+        worker::get()->wait_cond_or_sleep();
     }
 
     remove_waiter();

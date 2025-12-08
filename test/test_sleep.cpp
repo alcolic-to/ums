@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "async.hpp"
-#include "config.hpp"
+#include "scheduler.hpp"
 #include "types.hpp"
 #include "ums.hpp"
 #include "util.hpp"
@@ -13,18 +13,20 @@ using namespace std::chrono_literals;
 
 // NOLINTBEGIN
 
-void sleep_test(const u32 iterations, const auto sleep_time)
+/**
+ * Sanity sleep test. Note that this might fail if OS schedule us out at any moment.
+ */
+TEST(Sleep, sanity_test)
 {
     auto test = [&] {
-        auto start = now();
+        for (auto sleep_ms = 1ms; sleep_ms <= 1024ms; sleep_ms *= 2) {
+            auto start = now();
 
-        for (u32 i = 0; i < iterations; ++i)
-            async<true>([&] { this_worker->sleep_for(sleep_time); });
+            worker::sleep_for(sleep_ms);
 
-        auto duration = now() - start;
-        auto expected_duration = iterations * sleep_time;
-
-        ASSERT_LE(std::chrono::abs(expected_duration - duration), 1ms);
+            auto dur = now() - start;
+            ASSERT_TRUE(dur >= sleep_ms && dur <= sleep_ms + 1ms);
+        }
     };
 
     init_ums(test);
@@ -32,15 +34,19 @@ void sleep_test(const u32 iterations, const auto sleep_time)
 
 TEST(Sleep, sleep_test)
 {
-    for (u32 i = 1; i <= 5; ++i) {
-        for (u32 sleep_ms = 1; sleep_ms <= 512; sleep_ms *= 2) {
-            // Only if idle spin is allowed, we can (almost) guarantee sleeps of < 20ms.
-            if (!FS_idle_spinning_allowed && sleep_ms < 16)
-                continue;
+    auto test = [&] {
+        for (auto sleep_ms = 1ms; sleep_ms <= 1024ms; sleep_ms *= 2) {
+            std::vector<Task<void>> tasks;
 
-            sleep_test(i, std::chrono::milliseconds{sleep_ms});
+            auto start = now();
+            async([=] { worker::sleep_for(sleep_ms); })->wait();
+
+            auto dur = now() - start;
+            ASSERT_TRUE(dur >= sleep_ms && dur <= sleep_ms + 1ms);
         }
-    }
+    };
+
+    init_ums(test);
 }
 
 // NOLINTEND

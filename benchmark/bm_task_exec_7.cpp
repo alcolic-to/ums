@@ -17,7 +17,7 @@ static void BM_real_work_simulation(benchmark::State& state)
 
         for (auto _ : state) {
             auto dur = 20ms;
-            for (int i = 0; i < schedulers->cpus_count(); ++i) {
+            for (int i = 0; i < sch::cpus_count(); ++i) {
                 for (int i = 0; i < state.range(0); ++i) {
                     dur = std::max(1ms, dur - 1ms);
                     tasks.push_back(async([&] { hard_work(dur, true); }));

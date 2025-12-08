@@ -29,9 +29,17 @@
 
 namespace ums {
 
-// Creates worker object and starts worker thread on a provided CPU.
-// We will wait for a signal from created thread, so we can continue when it is ready.
-//
+namespace {
+
+/* Thread local worker */
+thread_local Worker* this_worker; // NOLINT
+
+} // namespace
+
+/**
+ * Creates worker object and starts worker thread on a provided CPU.
+ * We will wait for a signal from created thread, so we can continue when it is ready.
+ */
 Worker::Worker(u64 id, Scheduler* scheduler)
     : m_id{id}
     , m_scheduler{scheduler}
@@ -63,8 +71,9 @@ bool Worker::exit() const noexcept
     return m_state == State::exiting;
 }
 
-// Yields current worker and wakes up next worker for execution.
-//
+/**
+ * Yields current worker and wakes up next worker for execution.
+ */
 void Worker::yield()
 {
     m_scheduler->sync<Sync_context::yield>(this);
@@ -112,8 +121,9 @@ void Worker::notify([[maybe_unused]] const std::unique_lock<std::mutex>& lock) n
     m_cv.notify_one();
 }
 
-// We must notify scheduler that our condition is set, because it might be sleeping.
-//
+/**
+ * We must notify scheduler that our condition is set, because it might be sleeping.
+ */
 void Worker::notify_waiter() noexcept
 {
     set_cond();
@@ -169,5 +179,36 @@ void Worker::main_loop()
         // ";
     }
 }
+
+/**
+ * API similar to std::thread::
+ */
+namespace worker {
+
+/**
+ * Returns current (this) worker.
+ */
+Worker* get() noexcept
+{
+    return this_worker;
+}
+
+/**
+ * Returns worker id.l
+ */
+u64 get_id() noexcept
+{
+    return this_worker->id();
+}
+
+/**
+ * Yield this worker.
+ */
+void yield() noexcept
+{
+    this_worker->yield();
+}
+
+}; // namespace worker
 
 } // namespace ums

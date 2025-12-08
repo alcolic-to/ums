@@ -26,22 +26,16 @@
 
 namespace ums {
 
-// Thread local worker.
-thread_local Worker* this_worker; // NOLINT
-
-// Global Schedulers.
-std::unique_ptr<Schedulers> schedulers; // NOLINT
-
 void init_ums(std::function<void()> main, Options opt)
 {
     TZoneScopedC(tracy::Color::LightBlue); // NOLINT
 
-    schedulers = std::make_unique<Schedulers>(opt);
+    sch::get() = std::make_unique<Schedulers>(opt);
 
     async(std::move(main));
 
-    schedulers->wait_exit();
-    schedulers.reset();
+    sch::get()->wait_exit();
+    sch::get().reset();
 }
 
 } // namespace ums

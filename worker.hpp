@@ -74,8 +74,6 @@ public:
         sleep_until_internal(time_point);
     }
 
-    /* FIXME: This should be called from Worker::sleep_for (instead of this_worker->sleep_for) and
-     * it should be hidden from user, to avoid sleeping on a worker that scheduled task.*/
     template<class Rep, class Period>
     void sleep_for(const std::chrono::duration<Rep, Period>& time_to_sleep)
     {
@@ -168,7 +166,30 @@ private:
     std::thread m_thread;
 };
 
-extern thread_local Worker* this_worker; // NOLINT
+/**
+ * API similar to std::thread::
+ */
+namespace worker {
+
+Worker* get() noexcept;
+
+u64 get_id() noexcept;
+
+void yield() noexcept;
+
+template<class Clock, class Duration>
+void sleep_until(const std::chrono::time_point<Clock, Duration>& abs_time)
+{
+    get()->sleep_until(abs_time);
+}
+
+template<class Rep, class Period>
+void sleep_for(const std::chrono::duration<Rep, Period>& rel_time)
+{
+    get()->sleep_for(rel_time);
+}
+
+}; // namespace worker
 
 } // namespace ums
 

@@ -44,12 +44,12 @@ void IO_Request::update() noexcept
 
 void cos_read_file(void* file_handle, IO_Buffer buffer, u64 offset)
 {
-    this_worker->read_file(file_handle, buffer, offset);
+    worker::get()->read_file(file_handle, buffer, offset);
 }
 
 void cos_write_file(void* file_handle, IO_Buffer buffer, u64 offset)
 {
-    this_worker->write_file(file_handle, buffer, offset);
+    worker::get()->write_file(file_handle, buffer, offset);
 }
 
 } // namespace ums

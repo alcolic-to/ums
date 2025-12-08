@@ -74,7 +74,7 @@ STATIC_ASSERT(noexcept(std::declval<Shared_mutex&>().try_lock())); // strengthen
 
 TEST(Condition_variable, cv_sanity_test_1)
 {
-    // if (schedulers->workers_count() < 2)
+    // if (sch::workers_count() < 2)
     //     GTEST_SKIP() << "At least 2 workers needed for this test.";
 
     auto test = [] {
@@ -104,7 +104,7 @@ TEST(Condition_variable, cv_sanity_test_1)
 
 TEST(Condition_variable, cv_sanity_test_2)
 {
-    // if (schedulers->workers_count() < 4)
+    // if (sch::workers_count() < 4)
     //     GTEST_SKIP() << "At least 4 workers needed for this test.";
 
     auto test = [] {
@@ -131,17 +131,17 @@ TEST(Condition_variable, cv_sanity_test_2)
         };
 
         auto notifier = [&] {
-            this_worker->sleep_for(20ms);
+            worker::get()->sleep_for(20ms);
             cv2.notify_one();
 
-            this_worker->sleep_for(20ms);
+            worker::get()->sleep_for(20ms);
             cv1.notify_one();
 
-            this_worker->sleep_for(20ms);
+            worker::get()->sleep_for(20ms);
             cv3.notify_one();
 
             // Wait for the threads to finish.
-            this_worker->sleep_for(100ms);
+            worker::get()->sleep_for(100ms);
         };
 
         asyncs<true>(waiter_1, waiter_2, waiter_3, notifier);
@@ -157,7 +157,7 @@ TEST(Condition_variable, cv_sanity_test_2)
 
 TEST(Condition_variable, cv_producer_consumer_test)
 {
-    // if (schedulers->workers_count() < 2)
+    // if (sch::workers_count() < 2)
     //     GTEST_SKIP() << "At least 2 workers needed for this test.";
 
     auto test = [] {
@@ -167,7 +167,7 @@ TEST(Condition_variable, cv_producer_consumer_test)
         bool ready = false;
 
         auto producer = [&] {
-            this_worker->sleep_for(100ms); // Simulate work
+            worker::get()->sleep_for(100ms); // Simulate work
 
             {
                 std::unique_lock<Mutex> lock(mutex);
@@ -193,7 +193,7 @@ TEST(Condition_variable, cv_producer_consumer_test)
 
 TEST(Condition_variable, cv_spurious_wakeup_test)
 {
-    // if (schedulers->workers_count() < 2)
+    // if (sch::workers_count() < 2)
     //     GTEST_SKIP() << "At least 2 workers needed for this test.";
 
     auto test = [] {
@@ -208,7 +208,7 @@ TEST(Condition_variable, cv_spurious_wakeup_test)
         };
 
         auto notifier = [&] {
-            this_worker->sleep_for(std::chrono::milliseconds(100)); // Simulate some wait
+            worker::get()->sleep_for(std::chrono::milliseconds(100)); // Simulate some wait
             cv.notify_one();
         };
 
@@ -221,7 +221,7 @@ TEST(Condition_variable, cv_spurious_wakeup_test)
 // https://github.com/microsoft/STL/blob/1e312b38db8df1dfbea17adc344454feb8d00dd9/tests/std/include/test_header_units_and_modules.hpp#L150
 TEST(Condition_variable, cv_complex_test_1)
 {
-    // if (schedulers->workers_count() < 2)
+    // if (sch::workers_count() < 2)
     //     GTEST_SKIP() << "At least 2 workers needed for this test.";
 
     auto test = [] {
@@ -265,7 +265,7 @@ TEST(Condition_variable, cv_complex_test_1)
 
 TEST(Condition_variable, cv_complex_test_2)
 {
-    // if (schedulers->workers_count() < 9)
+    // if (sch::workers_count() < 9)
     //     GTEST_SKIP() << "At least 9 workers needed for this test.";
 
     auto test = [] {
@@ -302,7 +302,7 @@ TEST(Condition_variable, cv_complex_test_2)
             std::unique_lock<Mutex> lock{mutex};
             notifier_cv.wait(lock, [&] { return atomic_counter.load() == threads_count; });
 
-            this_worker->sleep_for(100ms);
+            worker::get()->sleep_for(100ms);
             ready = true;
             increment_cv.notify_all();
         };
@@ -819,7 +819,7 @@ private:
 template<typename _Mutex>
 void test_one_writer()
 {
-    if (schedulers->workers_count() < 4)
+    if (sch::workers_count() < 4)
         GTEST_SKIP() << "At least 4 workers needed for this test.";
 
     // One simultaneous writer.
@@ -831,7 +831,7 @@ void test_one_writer()
 
         std::lock_guard<_Mutex> ExclusiveLock(mut);
         const int val = ++atom;
-        this_worker->sleep_for(25ms); // Not a timing assumption.
+        worker::get()->sleep_for(25ms); // Not a timing assumption.
         ASSERT_TRUE(atom == val);
     };
 
@@ -843,7 +843,7 @@ void test_one_writer()
 template<typename _Mutex>
 void test_multiple_readers()
 {
-    if (schedulers->workers_count() < 4)
+    if (sch::workers_count() < 4)
         GTEST_SKIP() << "At least 4 workers needed for this test.";
 
     // Many simultaneous readers.
@@ -874,7 +874,7 @@ void test_writer_blocking_readers()
 
         std::lock_guard<_Mutex> ExclusiveLock(mut);
         ASSERT_TRUE(atom.exchange(1000) == 0);
-        this_worker->sleep_for(50ms); // Not a timing assumption.
+        worker::get()->sleep_for(50ms); // Not a timing assumption.
         ASSERT_TRUE(atom.exchange(1729) == 1000);
     };
 
@@ -1002,7 +1002,7 @@ void test_timed_behavior()
 
     // Test delayed try_lock_for() success. GENEROUS timing assumptions.
     //
-    if (schedulers->cpus_count() >= 5 && schedulers->workers_count() >= 5) {
+    if (sch::cpus_count() >= 5 && sch::workers_count() >= 5) {
         Atomic_wrapper atom{-5};
         Shared_timed_mutex stm;
 
@@ -1012,12 +1012,12 @@ void test_timed_behavior()
             ++atom;
             atom.wait_while_lt(0);
 
-            this_worker->sleep_for(50ms);
+            worker::get()->sleep_for(50ms);
             MainShared.unlock();
         };
 
         auto f2 = [&] {
-            this_worker->sleep_for(50ms);
+            worker::get()->sleep_for(50ms);
 
             ++atom;
             atom.wait_while_lt(0);
@@ -1025,7 +1025,7 @@ void test_timed_behavior()
             std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 1min);
             ASSERT_TRUE(ExclusiveLock.owns_lock());
             const int val = (atom += 100);
-            this_worker->sleep_for(25ms);
+            worker::get()->sleep_for(25ms);
             ASSERT_TRUE(atom == val);
         };
 
@@ -1035,7 +1035,7 @@ void test_timed_behavior()
 
     // Test delayed try_lock_shared_for() success. GENEROUS timing assumptions.
     //
-    if (schedulers->cpus_count() >= 5 && schedulers->workers_count() >= 5) {
+    if (sch::cpus_count() >= 5 && sch::workers_count() >= 5) {
         Atomic_wrapper atom{-5};
         Shared_timed_mutex stm;
 
@@ -1045,12 +1045,12 @@ void test_timed_behavior()
             ++atom;
             atom.wait_while_lt(0);
 
-            this_worker->sleep_for(50ms);
+            worker::get()->sleep_for(50ms);
             MainExclusive.unlock();
         };
 
         auto f2 = [&] {
-            this_worker->sleep_for(50ms);
+            worker::get()->sleep_for(50ms);
 
             ++atom;
             atom.wait_while_lt(0);
@@ -1068,28 +1068,28 @@ void test_timed_behavior()
     // THE GRAND FINALE: If try_lock_for() gives up due to stubborn readers,
     // it needs to deliver notifications. No timing assumptions.
     //
-    if (schedulers->cpus_count() >= 3 && schedulers->workers_count() >= 3) {
+    if (sch::cpus_count() >= 3 && sch::workers_count() >= 3) {
         Atomic_wrapper launch_readers{0};
         Shared_timed_mutex stm;
 
         auto f1 = [&] { launch_readers.wait_while_eq(0); };
 
         auto f2 = [&] {
-            this_worker->sleep_for(50ms);
+            worker::get()->sleep_for(50ms);
             std::unique_lock<Shared_timed_mutex> ExclusiveLock(stm, 100ms);
             ASSERT_TRUE(!ExclusiveLock.owns_lock());
             launch_readers.exchange(1);
         };
 
         auto f3 = [&] {
-            this_worker->sleep_for(50ms);
+            worker::get()->sleep_for(50ms);
             while (!launch_readers) {
                 std::shared_lock<Shared_timed_mutex> SharedLock(stm, std::try_to_lock);
 
                 if (!SharedLock.owns_lock())
                     launch_readers.exchange(1);
 
-                this_worker->yield();
+                worker::get()->yield();
             }
         };
 
@@ -1173,7 +1173,7 @@ TEST(Mutex, mutex_sanity_test_3)
 TEST(Mutex, mutex_sanity_test_4)
 {
     auto test = [] {
-        if (schedulers->cpus_count() < 2)
+        if (sch::cpus_count() < 2)
             GTEST_SKIP() << "At least 2 CPUs needed for this test.";
 
         Condition_variable_any cv;
@@ -1287,7 +1287,7 @@ TEST(Shared_mutex, mutex_sanity_test_3)
 TEST(Shared_mutex, sanity_test_4)
 {
     auto test = [] {
-        if (schedulers->cpus_count() < 2)
+        if (sch::cpus_count() < 2)
             GTEST_SKIP() << "At least 2 CPUs needed for this test.";
 
         Condition_variable_any cv;
@@ -1327,7 +1327,7 @@ TEST(Shared_mutex, sanity_test_4)
 
 TEST(Shared_mutex, mutex_test_fixture)
 {
-    // if (schedulers->workers_count() < 3)
+    // if (sch::workers_count() < 3)
     //     GTEST_SKIP() << "At least 3 workers needed for this test.";
 
     auto test = [] {
@@ -1431,7 +1431,7 @@ TEST(Recursive_mutex, sanity_test_4)
 
 TEST(Recursive_mutex, recursive_mutex_test_fixture)
 {
-    // if (schedulers->workers_count() < 3)
+    // if (sch::workers_count() < 3)
     //     GTEST_SKIP() << "At least 3 workers needed for this test.";
 
     auto test = [] {
@@ -1508,7 +1508,7 @@ TEST(Timed_mutex, mutex_sanity_test_3)
 TEST(Timed_mutex, mutex_sanity_test_4)
 {
     auto test = [] {
-        if (schedulers->cpus_count() < 2)
+        if (sch::cpus_count() < 2)
             GTEST_SKIP() << "At least 2 CPUs needed for this test.";
 
         Condition_variable_any cv;
@@ -1548,7 +1548,7 @@ TEST(Timed_mutex, mutex_sanity_test_4)
 
 TEST(Timed_mutex, timed_mutex_test_fixture)
 {
-    // if (schedulers->workers_count() < 3)
+    // if (sch::workers_count() < 3)
     //     GTEST_SKIP() << "At least 3 workers needed for this test.";
 
     auto test = [] {
@@ -1579,12 +1579,12 @@ TEST(Timed_mutex, timed_mutex_complex_test)
 
         // Test delayed try_lock_for() success. GENEROUS timing assumptions.
         //
-        if (schedulers->cpus_count() >= 4 && schedulers->workers_count() >= 4) {
+        if (sch::cpus_count() >= 4 && sch::workers_count() >= 4) {
             Atomic_wrapper atom{-4};
             Timed_mutex timed_mutex;
 
             auto f = [&] {
-                this_worker->sleep_for(50ms);
+                worker::get()->sleep_for(50ms);
 
                 ++atom;
                 atom.wait_while_lt(0);
@@ -1598,18 +1598,18 @@ TEST(Timed_mutex, timed_mutex_complex_test)
                 std::unique_lock<Timed_mutex> ExclusiveLock(timed_mutex, 1min);
                 ASSERT_TRUE(ExclusiveLock.owns_lock());
                 const int val = (atom += 100);
-                this_worker->sleep_for(25ms);
+                worker::get()->sleep_for(25ms);
                 ASSERT_TRUE(atom == val);
             };
 
             auto f2 = [&] {
                 std::unique_lock<Timed_mutex> MainUnique(timed_mutex);
-                this_worker->sleep_for(50ms);
+                worker::get()->sleep_for(50ms);
 
                 ++atom;
                 atom.wait_while_lt(0);
 
-                this_worker->sleep_for(50ms);
+                worker::get()->sleep_for(50ms);
                 MainUnique.unlock();
             };
 
@@ -1701,7 +1701,7 @@ TEST(Recursive_timed_mutex, mutex_sanity_test_4)
 
 TEST(Recursive_timed_mutex, recursive_timed_mutex_test_fixture)
 {
-    // if (schedulers->workers_count() < 3)
+    // if (sch::workers_count() < 3)
     //     GTEST_SKIP() << "At least 3 workers needed for this test.";
 
     auto test = [] {
@@ -1780,7 +1780,7 @@ TEST(Shared_timed_mutex, mutex_sanity_test_3)
 TEST(Shared_timed_mutex, sanity_test_4)
 {
     auto test = [] {
-        if (schedulers->cpus_count() < 2)
+        if (sch::cpus_count() < 2)
             GTEST_SKIP() << "At least 2 CPUs needed for this test.";
 
         Condition_variable_any cv;
@@ -1820,7 +1820,7 @@ TEST(Shared_timed_mutex, sanity_test_4)
 
 TEST(Shared_timed_mutex, shared_timed_mutex_test_fixture)
 {
-    // if (schedulers->workers_count() < 3)
+    // if (sch::workers_count() < 3)
     //     GTEST_SKIP() << "At least 3 workers needed for this test.";
 
     auto test = [] {
@@ -1852,7 +1852,7 @@ TEST(Shared_timed_mutex, complex_tests_2)
 
 TEST(STL_Mutex, nonmember_lock_test)
 {
-    // if (schedulers->workers_count() < 3)
+    // if (sch::workers_count() < 3)
     //     GTEST_SKIP() << "At least 3 CPUs needed for this test.";
 
     init_ums(test_nonmember_lock);
@@ -1860,7 +1860,7 @@ TEST(STL_Mutex, nonmember_lock_test)
 
 TEST(STL_Mutex, nonmember_try_lock_test)
 {
-    // if (schedulers->workers_count() < 3)
+    // if (sch::workers_count() < 3)
     //     GTEST_SKIP() << "At least 3 CPUs needed for this test.";
 
     init_ums(test_nonmember_try_lock);

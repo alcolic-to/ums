@@ -14,7 +14,7 @@ static void BM_e2e(benchmark::State& state)
 {
     for (auto _ : state) {
         init_ums([&] {
-            u32 cpus = schedulers->cpus_count();
+            u32 cpus = sch::cpus_count();
 
             std::vector<Task<void>> tasks;
             tasks.reserve(cpus);

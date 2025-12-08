@@ -57,7 +57,7 @@ void f1()
         }
 
         if (v[random() % v.size()] == random<u8>() % v.size() && i++ % 100 == 0)
-            this_worker->yield();
+            worker::get()->yield();
     }
 
     return;
@@ -121,8 +121,8 @@ void ums_main(int argc, char* argv[])
     for (int i = 0; i < argc; ++i)
         std::cout << argv[0] << "\n";
 
-    std::cout << "Schedulers count: " << schedulers->cpus_count() << "\n";
-    std::cout << "Workers count: " << schedulers->workers_count() << "\n";
+    std::cout << "Schedulers count: " << sch::cpus_count() << "\n";
+    std::cout << "Workers count: " << sch::workers_count() << "\n";
 
     Stopwatch<true, std::chrono::microseconds> s;
 
@@ -153,6 +153,8 @@ int main(int argc, char* argv[])
     //             async([&] {});
     //     },
     //     Options{sch, wps});
+
+    std::this_thread::sleep_for(1s);
 }
 
 // NOLINTEND

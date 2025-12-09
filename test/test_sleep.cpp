@@ -25,7 +25,8 @@ TEST(Sleep, sanity_test)
             worker::sleep_for(sleep_ms);
 
             auto dur = now() - start;
-            ASSERT_TRUE(dur >= sleep_ms && dur <= sleep_ms + 1ms);
+            ASSERT_GE(dur, sleep_ms);
+            ASSERT_LE(dur, sleep_ms + 1ms);
         }
     };
 
@@ -42,7 +43,8 @@ TEST(Sleep, sleep_test)
             async([=] { worker::sleep_for(sleep_ms); })->wait();
 
             auto dur = now() - start;
-            ASSERT_TRUE(dur >= sleep_ms && dur <= sleep_ms + 1ms);
+            ASSERT_GE(dur, sleep_ms);
+            ASSERT_LE(dur, sleep_ms + 1ms);
         }
     };
 

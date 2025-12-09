@@ -512,17 +512,19 @@ void Scheduler::notify([[maybe_unused]] const std::unique_lock<std::mutex>& lock
     m_cv.notify_one();
 }
 
-// Notify API for other components that should wake up scheduler.
-//
+/**
+ * Notify API for other components that should wake up scheduler.
+ */
 void Scheduler::notify()
 {
     const std::unique_lock<std::mutex> lock{m_mtx};
     notify(lock); // TODO: Unlock before notify to avoid pessimization!
 }
 
-// Returns struct which holds info about workers in a waiting queue (whether any condition is
-// signaled and earliest wait time point for all waiters).
-//
+/**
+ * Returns struct which holds info about workers in a waiting queue (whether any condition is
+ * signaled and earliest wait time point for all waiters).
+ */
 auto Scheduler::waiters_info() const noexcept
 {
     struct waiters_info {
@@ -538,11 +540,12 @@ auto Scheduler::waiters_info() const noexcept
     return result;
 }
 
-// Checks whether scheduler should idle spin.
-// Idle spin is necessary for eficient use of scheduler. After task is done, if we go to sleep
-// immediately, we will miss the oportinity to execute next user task which might come right after
-// the previous task is done if user executes tasks sequentially.
-//
+/**
+ * Checks whether scheduler should idle spin.
+ * Idle spin is necessary for eficient use of scheduler. After task is done, if we go to sleep
+ * immediately, we will miss the oportinity to execute next user task which might come right after
+ * the previous task is done if user executes tasks sequentially.
+ */
 bool Scheduler::should_idle_spin() noexcept
 {
     if constexpr (!FS_idle_spinning_allowed)

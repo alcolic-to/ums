@@ -76,11 +76,16 @@ bool Worker::exit() const noexcept
  */
 void Worker::yield()
 {
+    TZoneScopedC(tracy::Color::Gray);
     m_scheduler->sync<Sync_context::yield>(this);
 }
 
+/**
+ * Waits for event or timer expiration.
+ */
 void Worker::wait_cond_or_sleep()
 {
+    TZoneScopedC(tracy::Color::Gray);
     if (!check_wait_info())
         m_scheduler->sync<Sync_context::wait>(this);
 }

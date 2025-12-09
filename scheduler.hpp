@@ -44,8 +44,9 @@ public:
     Cpu_Mask m_mask;
 };
 
-// Synchronization context for scheduler.
-//
+/**
+ * Synchronization context for scheduler.
+ */
 enum class Sync_context : u8 { main, yield, wait, io };
 
 class Schedulers;
@@ -191,8 +192,9 @@ private:
 
     Time_point m_idle_start_time{Time_point::max()};
 
-    // TODO: Create workers in place next to each other.
-    //
+    /**
+     * TODO: Create workers in place next to each other.
+     */
     std::vector<std::unique_ptr<Worker>> m_workers;
 };
 
@@ -211,9 +213,10 @@ public:
 
     [[nodiscard]] auto end() const noexcept { return m_schedulers.end(); }
 
-    // Returns filtered view of schedulers.
-    // I like this so much, that I am not even going to look at performance costs.
-    //
+    /**
+     * Returns filtered view of schedulers.
+     * I like this so much, that I am not even going to look at performance costs.
+     */
     template<typename Predicate>
     [[nodiscard]] auto filter(Predicate pred) const noexcept
     {

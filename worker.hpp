@@ -156,7 +156,7 @@ private:
     //
     u64 m_id;
     Scheduler* m_scheduler;
-    stl::INode m_node;
+    stl::INode<Worker> m_node;
     std::condition_variable m_cv;
     State m_state{State::initializing};
     bool m_running{true}; // Flag used for spurious wakeup check.

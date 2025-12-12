@@ -137,24 +137,14 @@ void ums_main(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-    u32 a = 0;
-    auto r = invoke_noexcept([&] {
-        throw std::exception{};
-        return a;
-    });
-
-    return *r;
-
-    // Options::Schedulers_count sch{4};
-    // Options::Workers_per_scheduler wps{4};
-    // init_ums(
-    //     [&] {
-    //         for (usize i = 0; i < 1024 * 1024; ++i)
-    //             async([&] {});
-    //     },
-    //     Options{sch, wps});
-
-    std::this_thread::sleep_for(1s);
+    Options::Schedulers_count sch{4};
+    Options::Workers_per_scheduler wps{4};
+    init_ums(
+        [&] {
+            for (usize i = 0; i < 1024 * 1024; ++i)
+                async([&] {});
+        },
+        Options{sch, wps});
 }
 
 // NOLINTEND

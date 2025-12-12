@@ -173,10 +173,10 @@ private:
     CPU m_cpu;
 
     Worker* m_worker{nullptr};
-    stl::IList<Worker, offsetof(Worker, m_node)> m_runnable_queue;
-    stl::IList<Worker, offsetof(Worker, m_node)> m_idle_queue;
-    stl::IList<Worker, offsetof(Worker, m_node)> m_waiting_queue;
-    stl::IList<Worker, offsetof(Worker, m_node)> m_pending_io_queue;
+    stl::IList<Worker, &Worker::m_node> m_runnable_queue;
+    stl::IList<Worker, &Worker::m_node> m_idle_queue;
+    stl::IList<Worker, &Worker::m_node> m_waiting_queue;
+    stl::IList<Worker, &Worker::m_node> m_pending_io_queue;
     Worker* m_yielded_worker{nullptr};
 
     std::mutex m_workers_mtx;

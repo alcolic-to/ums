@@ -60,7 +60,7 @@ public:
     /**
      * Creating 2 refs: 1 for us (WorkerTask) and 1 for user (Task).
      */
-    TaskBase() : SharedState(2) {};
+    TaskBase() : SharedState(2){};
     ~TaskBase() override = default;
 
     TaskBase(const TaskBase&) = delete;
@@ -113,6 +113,8 @@ class TaskResult : public TaskBase {
 public:
     using ResultStorage = std::conditional_t<std::is_same_v<T, void>, u8, T>;
 
+    ~TaskResult() override = default;
+
     /**
      * Extracts result from task storage and returns it.
      */
@@ -158,6 +160,8 @@ template<class Fn, class... Args>
 class TaskExec : public TaskResult<std::invoke_result_t<Fn, Args...>> {
 public:
     using ReturnType = std::invoke_result_t<Fn, Args...>;
+
+    ~TaskExec() override = default;
 
     template<class F, class... A>
     explicit TaskExec(F&& func, A&&... args) noexcept
@@ -250,15 +254,32 @@ class Task {
 public:
     explicit Task(TaskResult<T>* task) noexcept : m_storage{std::move(task)} {}
 
-    ~Task() { m_storage->decrease_refs(); }
+    ~Task() { reset(); }
 
     Task(const Task&) = delete;
     Task& operator=(const Task&) = delete;
 
-    Task(Task&&) noexcept = default;
-    Task& operator=(Task&&) noexcept = default;
+    Task(Task&& other) noexcept : m_storage(other.m_storage) { other.m_storage = nullptr; };
+
+    Task& operator=(Task&& other) noexcept
+    {
+        reset();
+        m_storage = other.m_storage;
+        other.m_storage = nullptr;
+    };
 
     TaskResult<T>* operator->() { return m_storage; }
+
+    [[nodiscard]] bool valid() const noexcept { return m_storage != nullptr; }
+
+    void reset()
+    {
+        if (!valid())
+            return;
+
+        m_storage->decrease_refs();
+        m_storage = nullptr;
+    }
 
 private:
     TaskResult<T>* m_storage;

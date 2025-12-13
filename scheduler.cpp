@@ -264,11 +264,6 @@ void Scheduler::park_idle(Worker* worker)
         m_idle_queue.push_front(*worker);
 
     set_worker_state(worker, Worker::State::idle);
-
-    if (worker->m_task) [[likely]] {
-        worker->m_task->notify();
-        worker->m_task.reset();
-    }
 }
 
 void Scheduler::park_waiting(Worker* worker)

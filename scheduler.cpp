@@ -303,15 +303,15 @@ void Scheduler::set_worker_state(Worker* worker, Worker::State state) noexcept
     worker->set_state(state);
 }
 
-void Scheduler::enqueue_task(std::shared_ptr<TaskBase> task)
+void Scheduler::enqueue_task(TaskBase& task)
 {
-    m_tasks.enque(std::move(task));
+    m_tasks.enque(task);
     notify();
 
     TTracyMessageLC(tracy_msg("Enqued task on sch {}", id()), tracy::Color::Green1);
 }
 
-std::shared_ptr<TaskBase> Scheduler::next_task() noexcept
+TaskBase* Scheduler::next_task() noexcept
 {
     TTracyMessageLC(tracy_msg("Dequed (maybe) task from sch {}", id()), tracy::Color::Green1);
 
@@ -346,20 +346,21 @@ bool Scheduler::has_stealable_work() const noexcept
  * We must check whether task exists even if we are getting task from our queue, because someone
  * might have stolen our task in the meantime.
  */
-void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBase> task)
+void Scheduler::schedule_idle_worker(TaskBase* task)
 {
     TZoneScopedC(tracy::Color::Blue1);
 
-    if (!task)
+    if (task == nullptr)
         task = next_task();
 
-    if (task) {
-        Worker& worker = m_idle_queue.front();
-        m_idle_queue.pop_front();
+    if (task == nullptr)
+        return;
 
-        worker.m_task = std::move(task);
-        park_runnable(&worker);
-    }
+    Worker& worker = m_idle_queue.front();
+    m_idle_queue.pop_front();
+
+    worker.m_task = task;
+    park_runnable(&worker);
 }
 
 /**
@@ -452,8 +453,8 @@ void Scheduler::steal_work()
     };
 
     for (const auto& other : m_schedulers->filter(others_with_work)) {
-        if (auto task{other->next_task()}) {
-            schedule_idle_worker(std::move(task));
+        if (auto* task{other->next_task()}) {
+            schedule_idle_worker(task);
             TTracyMessageLC(tracy_msg("Stolen work {} -> {}", other->id(), id()),
                             tracy::Color::Red1);
             return;

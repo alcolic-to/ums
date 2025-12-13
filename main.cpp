@@ -137,14 +137,20 @@ void ums_main(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-    Options::Schedulers_count sch{4};
+    Options::Schedulers_count sch{1};
     Options::Workers_per_scheduler wps{4};
     init_ums(
         [&] {
-            for (usize i = 0; i < 1024 * 1024; ++i)
-                async([&] {});
+            for (usize i = 0; i < 3; ++i)
+                async([&] {
+                    std::cout << "Some work done here!\n";
+                    return;
+                });
         },
         Options{sch, wps});
 }
+
+static constexpr u32 r = 1;
+static constexpr u32 r2 = 1 + (-r);
 
 // NOLINTEND

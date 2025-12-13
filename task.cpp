@@ -16,6 +16,7 @@
 #include "task.hpp"
 
 #include <atomic>
+#include <cassert>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -25,22 +26,27 @@
 
 namespace ums {
 
-void Tasks::enque(std::shared_ptr<TaskBase> task)
+void Tasks::enque(TaskBase& task)
 {
     const std::scoped_lock<Spinlock> l{m_lock};
 
-    m_tasks.push_back(std::move(task));
+    m_tasks.push_back(task);
     m_size.fetch_add(1, std::memory_order_relaxed);
 }
 
-std::shared_ptr<TaskBase> Tasks::deque() noexcept
+/**
+ * Deques task from queue.
+ * Since this is called concurrently, we must return TaskBase* with nullptr option if queue is
+ * empty.
+ */
+TaskBase* Tasks::deque() noexcept
 {
     const std::scoped_lock<Spinlock> l{m_lock};
 
     if (m_tasks.empty())
         return nullptr;
 
-    std::shared_ptr<TaskBase> t{std::move(m_tasks.front())};
+    TaskBase* t{&m_tasks.front()};
     m_tasks.pop_front();
 
     m_size.fetch_sub(1, std::memory_order_relaxed);

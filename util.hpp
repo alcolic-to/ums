@@ -15,6 +15,7 @@
  */
 #pragma once
 
+#include <atomic>
 #ifndef UMS_UTIL_HPP
 #define UMS_UTIL_HPP
 
@@ -364,6 +365,36 @@ invoke_noexcept(Fn&& fn, Args&&... args) noexcept
 
     return std::nullopt;
 }
+
+/**
+ * Shared state that holds number of references to it.
+ * Similar implementation can be found in libc++ (std::future).
+ */
+class SharedState {
+public:
+    explicit SharedState(i32 refs = 1) : m_refs{refs} {}
+
+    virtual ~SharedState() = default;
+
+    SharedState(const SharedState&) = delete;
+    SharedState(SharedState&&) noexcept = delete;
+
+    SharedState& operator=(const SharedState&) = delete;
+    SharedState& operator=(SharedState&&) noexcept = delete;
+
+    void increase_refs() { m_refs.fetch_add(1, std::memory_order_relaxed); }
+
+    void decrease_refs()
+    {
+        if (m_refs.fetch_add(-1, std::memory_order_acq_rel) == 1)
+            on_zero_refs();
+    }
+
+    virtual void on_zero_refs() = 0;
+
+private:
+    std::atomic<i32> m_refs;
+};
 
 } // namespace ums
 

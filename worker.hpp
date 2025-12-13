@@ -161,7 +161,7 @@ private:
     State m_state{State::initializing};
     bool m_running{true}; // Flag used for spurious wakeup check.
     Wait_info m_wait_info;
-    std::shared_ptr<TaskBase> m_task{nullptr};
+    WorkerTask m_task;
     std::unique_ptr<IO_Request> m_io_request{nullptr};
     std::thread m_thread;
 };

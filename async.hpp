@@ -39,21 +39,23 @@ Task<ReturnType> async(Fn&& t, Args&&... args)
 {
     TZoneScopedC(tracy::Color::DarkGreen);
 
-    auto task{std::make_shared<TaskExecType>(std::forward<Fn>(t), std::forward<Args>(args)...)};
-    enque_task(task);
+    // auto task{std::make_shared<TaskExecType>(std::forward<Fn>(t), std::forward<Args>(args)...)};
+    TaskExecType* task{new TaskExecType{std::forward<Fn>(t), std::forward<Args>(args)...}};
+    enque_task(*task);
 
     if constexpr (wait)
         task->wait();
 
-    return Task{std::static_pointer_cast<TaskResult<ReturnType>>(task)};
+    // return Task{static_cast<TaskResult<ReturnType>*>(task)};
+    return Task{task};
 }
 
-void enque_task(const auto& task)
+void enque_task(auto& task)
 {
     TZoneScopedC(tracy::Color::DarkGreen);
 
     Scheduler& best_scheduler = sch::min_load_scheduler();
-    best_scheduler.enqueue_task(std::static_pointer_cast<TaskBase>(task));
+    best_scheduler.enqueue_task(task);
 };
 
 /**

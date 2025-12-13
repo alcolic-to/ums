@@ -18,6 +18,7 @@
 #ifndef UMS_TASK_HPP
 #define UMS_TASK_HPP
 
+#include <cassert>
 #include <deque>
 #include <memory>
 #include <stdexcept>
@@ -25,6 +26,7 @@
 #include <type_traits>
 
 #include "condition_variable.hpp"
+#include "intrusive_list.hpp"
 #include "mutex.hpp"
 #include "spinlock.hpp"
 #include "types.hpp"
@@ -49,19 +51,23 @@ namespace ums {
  * Task base class.
  * It hold all syncronization primitives shared between user and scheduler space.
  */
-class TaskBase {
-public:
-    enum class State : int { not_started, running, done };
+class TaskBase : public SharedState {
+    friend class Tasks;
 
-    TaskBase() = default;
+public:
+    enum class State : u8 { not_started, running, done };
+
+    /**
+     * Creating 2 refs: 1 for us (WorkerTask) and 1 for user (Task).
+     */
+    TaskBase() : SharedState(2) {};
+    ~TaskBase() override = default;
 
     TaskBase(const TaskBase&) = delete;
     TaskBase(TaskBase&&) noexcept = delete;
 
     TaskBase& operator=(const TaskBase&) = delete;
     TaskBase& operator=(TaskBase&&) noexcept = delete;
-
-    virtual ~TaskBase() = default;
 
     virtual void invoke() = 0;
 
@@ -88,10 +94,13 @@ public:
         m_cv.notify_one();
     }
 
+protected:
+    stl::INode<TaskBase> m_node;
+    State m_state{State::not_started};
+
 private:
     Mutex m_mtx;
     Condition_variable m_cv;
-    State m_state{State::not_started};
 };
 
 /**
@@ -121,6 +130,21 @@ public:
             return std::move(m_result);
     }
 
+private:
+    void on_zero_refs() override
+    {
+        /**
+         * FIXME: Once we implement value construction on task exec done only (with std::byte
+         * storage for result), implement something similar to commented line below.
+         *
+         * if (m_state == State::done)
+         *     std::launder<T*>(std::bit_cast<T*>(std::addressof(m_result)))->~T();
+         */
+
+        delete this;
+    }
+
+protected:
     ResultStorage m_result;
     bool m_taken = false;
 };
@@ -158,17 +182,86 @@ public:
 };
 
 /**
+ * Simple wrapper class for worker task.
+ * It hold pointer to base task class and it calls task::decrease_refs on destruction which will
+ * call on_zero_refs which will call destructor of whole task if there are no more refs.
+ */
+class WorkerTask {
+public:
+    WorkerTask() = default;
+
+    explicit WorkerTask(TaskBase* task) noexcept : m_task{task} {}
+
+    ~WorkerTask()
+    {
+        if (valid())
+            m_task->decrease_refs();
+    }
+
+    WorkerTask(const WorkerTask&) = delete;
+    WorkerTask& operator=(const WorkerTask&) = delete;
+
+    WorkerTask& operator=(TaskBase* task)
+    {
+        reset();
+        m_task = task;
+
+        return *this;
+    }
+
+    WorkerTask(WorkerTask&&) noexcept = default;
+    WorkerTask& operator=(WorkerTask&&) noexcept = default;
+
+    [[nodiscard]] bool valid() const noexcept { return m_task != nullptr; }
+
+    TaskBase* const& operator->() const noexcept
+    {
+        assert(valid());
+        return m_task;
+    }
+
+    TaskBase*& operator->() noexcept
+    {
+        assert(valid());
+        return m_task;
+    }
+
+    explicit operator bool() const noexcept { return valid(); }
+
+    void reset()
+    {
+        if (!valid())
+            return;
+
+        m_task->decrease_refs();
+        m_task = nullptr;
+    }
+
+private:
+    TaskBase* m_task{nullptr};
+};
+
+/**
  * Simple wrapper class for user task.
  * It holds shared pointer to task storage for automatic memory management.
  */
 template<class T>
 class Task {
 public:
-    explicit Task(std::shared_ptr<TaskResult<T>> task) noexcept : m_storage{std::move(task)} {}
+    explicit Task(TaskResult<T>* task) noexcept : m_storage{std::move(task)} {}
 
-    std::shared_ptr<TaskResult<T>> m_storage;
+    ~Task() { m_storage->decrease_refs(); }
 
-    TaskResult<T>* operator->() { return m_storage.get(); }
+    Task(const Task&) = delete;
+    Task& operator=(const Task&) = delete;
+
+    Task(Task&&) noexcept = default;
+    Task& operator=(Task&&) noexcept = default;
+
+    TaskResult<T>* operator->() { return m_storage; }
+
+private:
+    TaskResult<T>* m_storage;
 };
 
 /**
@@ -178,16 +271,18 @@ public:
  */
 class alignas(cache_line_size) Tasks {
 public:
-    void enque(std::shared_ptr<TaskBase> task);
-    std::shared_ptr<TaskBase> deque() noexcept;
+    void enque(TaskBase& task);
+    TaskBase* deque() noexcept;
 
     [[nodiscard]] usize size() const noexcept;
     [[nodiscard]] bool empty() const noexcept;
 
 private:
     Spinlock m_lock;
-    std::deque<std::shared_ptr<TaskBase>> m_tasks;
     std::atomic<usize> m_size{0};
+    // std::deque<std::shared_ptr<TaskBase>> m_tasks;
+
+    stl::IList<TaskBase, &TaskBase::m_node> m_tasks;
 };
 
 } // namespace ums

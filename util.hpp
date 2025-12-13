@@ -19,6 +19,7 @@
 #define UMS_UTIL_HPP
 
 #include <chrono>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <type_traits>

@@ -506,19 +506,17 @@ void Scheduler::wait_until(std::unique_lock<std::mutex>& lock, Time_point abs_ti
     m_running = true;
 }
 
-void Scheduler::notify([[maybe_unused]] const std::unique_lock<std::mutex>& lock) noexcept
-{
-    m_running = true;
-    m_cv.notify_one();
-}
-
 /**
  * Notify API for other components that should wake up scheduler.
  */
 void Scheduler::notify()
 {
-    const std::unique_lock<std::mutex> lock{m_mtx};
-    notify(lock); // TODO: Unlock before notify to avoid pessimization!
+    {
+        const std::unique_lock<std::mutex> lock{m_mtx};
+        m_running = true;
+    }
+
+    m_cv.notify_one();
 }
 
 /**
@@ -621,7 +619,7 @@ void Scheduler::sleep() noexcept
     }
 
     if (initializing()) [[unlikely]]
-        notify(lock); // Notify thread (waiting in scheduler constructor) to continue.
+        m_cv.notify_one(); // Notify thread (waiting in scheduler constructor) to continue.
 
     set_state(State::idle_sleep);
     m_schedulers->signal_idle();

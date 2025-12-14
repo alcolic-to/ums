@@ -19,7 +19,7 @@ static void BM_task_exec_stress(benchmark::State& state)
             for (int i = 0; i < 1024 * 1024; ++i)
                 tasks.push_back(async([&] { return; }));
 
-            for (auto task : tasks)
+            for (auto& task : tasks)
                 task->wait();
         }
     });

@@ -42,8 +42,8 @@ namespace ums {
  * asynchronously.
  *
  * User can retrieve result from task with get() function, which will block current thread until
- * task is done. Also, user can call wait(), which will just block until task is done, but without
- * retieving result from task.
+ * task is done. Also, user can call wait(), which will just block until task is done, but
+ * without retieving result from task.
  */
 
 /**
@@ -52,9 +52,9 @@ namespace ums {
  */
 class TaskBase {
 public:
-    enum class State : u8 { not_started, running, done };
+    enum State : u8 { init = 0, done = 1, taken = 2 };
 
-    TaskBase() = default;
+    TaskBase() noexcept = default;
 
     TaskBase(const TaskBase&) = delete;
     TaskBase(TaskBase&&) noexcept = delete;
@@ -66,6 +66,14 @@ public:
 
     virtual void invoke() = 0;
 
+    bool is_state_done() { return (m_state & State::done) != 0; }
+
+    bool is_state_taken() { return (m_state & State::taken) != 0; }
+
+    void set_state_done() { m_state = State(m_state | State::done); }
+
+    void set_state_taken() { m_state = State(m_state | State::taken); }
+
     /**
      * Waits for task to be done.
      * It should be called from user space and scheduler will signal once task is done.
@@ -73,7 +81,7 @@ public:
     void wait()
     {
         std::unique_lock<Mutex> lock{m_mtx};
-        m_cv.wait(lock, [&] { return m_state == TaskBase::State::done; });
+        m_cv.wait(lock, [&] { return is_state_done(); });
     }
 
     /**
@@ -83,16 +91,16 @@ public:
     {
         {
             const std::unique_lock<Mutex> lock{m_mtx};
-            m_state = State::done;
+            set_state_done();
         }
 
         m_cv.notify_one();
     }
 
-private:
+protected:
     Mutex m_mtx;
     Condition_variable m_cv;
-    State m_state{State::not_started};
+    State m_state{State::init};
 };
 
 /**
@@ -110,18 +118,22 @@ public:
      */
     T get()
     {
-        if (m_taken)
-            throw std::runtime_error{"Result already taken."};
+        if (this->is_state_taken())
+            throw std::logic_error{"Result already taken."};
 
         wait();
-        m_taken = true;
+        this->set_state_taken();
 
         if constexpr (!std::is_same_v<T, void>)
-            return std::move(*std::launder(std::bit_cast<T*>(&m_storage)));
+            return std::move(*std::launder(std::bit_cast<T*>(std::addressof(m_storage))));
     }
 
+    /**
+     * FIXME: Implement exception handling (with storage).
+     * FIXME: Implement specialization for void Task with no storage.
+     */
+protected:
     alignas(Storage) std::byte m_storage[sizeof(Storage)]; // NOLINT (hicpp-avoid-c-arrays)
-    bool m_taken = false;
 };
 
 /**
@@ -149,7 +161,7 @@ public:
     {
         // try {
         if constexpr (!std::is_same_v<ReturnType, void>)
-            new (&this->m_storage) ReturnType{execute()};
+            new (std::addressof(this->m_storage)) ReturnType{execute()};
         else
             execute();
         // }
@@ -162,17 +174,44 @@ public:
 };
 
 /**
+ * FIXME: Implement proper exceptions for get(), wait() etc.
+ */
+enum class task_errc : u8 { no_state, result_already_retrived };
+
+/**
  * Simple wrapper class for user task.
  * It holds shared pointer to task storage for automatic memory management.
  */
 template<class T>
 class Task {
 public:
+    Task() noexcept = default;
+    ~Task() = default;
+
     explicit Task(std::shared_ptr<TaskResult<T>> task) noexcept : m_storage{std::move(task)} {}
 
-    std::shared_ptr<TaskResult<T>> m_storage;
+    Task(const Task& other) = delete;
+    Task& operator=(const Task& other) = delete;
 
-    TaskResult<T>* operator->() { return m_storage.get(); }
+    Task(Task&& other) noexcept = default;
+    Task& operator=(Task&& other) noexcept = default;
+
+    TaskResult<T>* operator->()
+    {
+        if (!valid())
+            throw std::logic_error{"Invalid task."};
+
+        return m_storage.get();
+    }
+
+    /**
+     * FIXME: Expose APIs like std::future.
+     */
+
+    [[nodiscard]] bool valid() const noexcept { return m_storage.operator bool(); }
+
+private:
+    std::shared_ptr<TaskResult<T>> m_storage;
 };
 
 /**

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <stdexcept>
 
 #include "async.hpp"
 #include "options.hpp"
@@ -45,7 +46,7 @@ TEST(Scheduler_tests, sanity_test)
 
         auto tasks{asyncs(f, f, f, f)};
 
-        for (auto task : tasks)
+        for (auto& task : tasks)
             task->wait();
 
         ASSERT_TRUE(b == 0);
@@ -66,6 +67,21 @@ TEST(Scheduler_tests, sanity_test)
     init_ums(test);
 }
 
+TEST(Scheduler_tests, task_type_test)
+{
+    auto test = [&] {
+        Task<std::string> empty;
+        ASSERT_THROW(empty->get(), std::logic_error);
+        ASSERT_THROW(empty->wait(), std::logic_error);
+        ASSERT_FALSE(empty.valid());
+
+        empty = async([] { return std::string{"some string"}; });
+        ASSERT_EQ(empty->get(), "some string");
+    };
+
+    init_ums(test);
+}
+
 TEST(Scheduler_tests, evenly_scheduled_tasks)
 {
     auto test = [&] {
@@ -79,7 +95,7 @@ TEST(Scheduler_tests, evenly_scheduled_tasks)
                 for (u32 c = 1; c <= cpus; ++c)
                     tasks.emplace_back(async([=] { hard_work(task_dur); }));
 
-                for (auto task : tasks)
+                for (auto& task : tasks)
                     task->wait();
 
                 ASSERT_LE(s.elapsed(), task_dur + 2ms);
@@ -117,7 +133,7 @@ TEST(Scheduler_tests, parallel_execution)
         for (u32 tasks_count = 0; tasks_count < 100; ++tasks_count)
             tasks.emplace_back(async([] { hard_work(1ms); }));
 
-        for (auto task : tasks)
+        for (auto& task : tasks)
             task->wait();
 
         ASSERT_LE(s.elapsed(), ((100 * 1ms) / sch::cpus_count()) + 10ms);
@@ -151,7 +167,7 @@ TEST(Scheduler_tests, work_stealing)
             tasks.push_back(async(f));
         }
 
-        for (auto task : tasks)
+        for (auto& task : tasks)
             task->wait();
 
         auto shortest = 1000ms / std::pow<u32>(2, sch::cpus_count() - 1);
@@ -182,7 +198,7 @@ TEST(Scheduler_tests, task_order_execution)
         for (u32 c = 1; c <= cpus; ++c)
             second_tasks.push_back(async([] { hard_work(1s); }));
 
-        for (auto task : first_tasks)
+        for (auto& task : first_tasks)
             task->wait();
 
         ASSERT_GE(s.elapsed(), 100ms + 1s + 100ms);
@@ -222,7 +238,7 @@ TEST(Scheduler_tests, task_order_execution_extended)
         for (u32 c = 1; c <= cpus; ++c)
             third_tasks.push_back(async([] { hard_work(100ms); }));
 
-        for (auto task : third_tasks)
+        for (auto& task : third_tasks)
             task->wait();
 
         /**

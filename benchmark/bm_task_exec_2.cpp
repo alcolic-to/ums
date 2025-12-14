@@ -19,7 +19,7 @@ static void BM_task_exec_all_cpus(benchmark::State& state)
             for (int i = 0; i < sch::cpus_count(); ++i)
                 tasks.push_back(async([&] { hard_work(microseconds(state.range())); }));
 
-            for (auto task : tasks)
+            for (auto& task : tasks)
                 task->wait();
         }
     });

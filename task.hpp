@@ -19,6 +19,7 @@
 #define UMS_TASK_HPP
 
 #include <deque>
+#include <exception>
 #include <memory>
 #include <stdexcept>
 #include <tuple>
@@ -51,7 +52,7 @@ namespace ums {
  */
 class TaskBase {
 public:
-    enum class State : int { not_started, running, done };
+    enum class State : u8 { not_started, running, done };
 
     TaskBase() = default;
 
@@ -100,9 +101,9 @@ private:
  * once.
  */
 template<class T>
-class TaskResult : public TaskBase {
+class TaskResult : public TaskBase { // NOLINT (cppcoreguidelines-pro-type-member-init)
 public:
-    using ResultStorage = std::conditional_t<std::is_same_v<T, void>, u8, T>;
+    using Storage = std::conditional_t<std::is_same_v<T, void>, u8, T>;
 
     /**
      * Extracts result from task storage and returns it.
@@ -115,13 +116,11 @@ public:
         wait();
         m_taken = true;
 
-        if constexpr (std::is_same_v<T, void>)
-            return;
-        else
-            return std::move(m_result);
+        if constexpr (!std::is_same_v<T, void>)
+            return std::move(*std::launder(std::bit_cast<T*>(&m_storage)));
     }
 
-    ResultStorage m_result;
+    alignas(Storage) std::byte m_storage[sizeof(Storage)]; // NOLINT (hicpp-avoid-c-arrays)
     bool m_taken = false;
 };
 
@@ -148,10 +147,15 @@ public:
 
     void invoke() override
     {
+        // try {
         if constexpr (!std::is_same_v<ReturnType, void>)
-            this->m_result = execute();
+            new (&this->m_storage) ReturnType{execute()};
         else
             execute();
+        // }
+        // catch (...) {
+        //     this->set_exception(std::current_exception());
+        // }
     };
 
     std::tuple<std::decay_t<Fn>, std::decay_t<Args>...> m_args;

@@ -87,7 +87,7 @@ std::vector<Task<void>> asyncs(Fns&&... fns)
 
     if constexpr (wait)
         for (auto&& task : tasks)
-            task->wait();
+            task.wait();
 
     return tasks;
 }

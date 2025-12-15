@@ -25,7 +25,7 @@ static void BM_real_work_simulation(benchmark::State& state)
             }
 
             for (auto& task : tasks)
-                task->wait();
+                task.wait();
         }
     });
 }

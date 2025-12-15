@@ -91,6 +91,7 @@ public:
 
     /**
      * Notifies waiter in user space that task is done.
+     * It should be called from scheduler space.
      */
     void notify()
     {
@@ -108,18 +109,6 @@ protected:
      */
     virtual void invoke() = 0;
 
-    bool is_state_done() { return (m_state & State::done) != 0; }
-
-    bool is_state_taken() { return (m_state & State::taken) != 0; }
-
-    bool has_exception() const noexcept { return m_exception != nullptr; }
-
-    void set_state_done() { m_state = State(m_state | State::done); }
-
-    void set_state_taken() { m_state = State(m_state | State::taken); }
-
-    void set_exception(const std::exception_ptr& ex) noexcept { m_exception = ex; }
-
     /**
      * Called from extended classes to prepare getting out result.
      * Checks if result is already taken and handles exceptions logic.
@@ -136,7 +125,20 @@ protected:
             std::rethrow_exception(m_exception);
     }
 
-protected: // NOLINT
+private:
+    bool is_state_done() const noexcept { return (m_state & State::done) != 0; }
+
+    bool is_state_taken() const noexcept { return (m_state & State::taken) != 0; }
+
+    bool has_exception() const noexcept { return m_exception != nullptr; }
+
+    void set_state_done() noexcept { m_state = State(m_state | State::done); }
+
+    void set_state_taken() noexcept { m_state = State(m_state | State::taken); }
+
+    void set_exception(const std::exception_ptr& ex) noexcept { m_exception = ex; }
+
+private: // NOLINT
     Mutex m_mtx;
     Condition_variable m_cv;
     std::exception_ptr m_exception;
@@ -145,36 +147,38 @@ protected: // NOLINT
 
 /**
  * Task with result.
- * It is composed of TaskBase and it holds user's result and taken flag. User can get result only
- * once.
+ * It extends TaskBase and holds user's result (storage).
  */
 template<class T>
 class TaskResult : public TaskBase { // NOLINT (cppcoreguidelines-pro-type-member-init)
 public:
-    using Storage = std::conditional_t<std::is_same_v<T, void>, u8, T>;
-
     /**
-     * Extracts result from task storage and returns it.
+     * Prepares and extracts result from task storage and returns it.
      */
     T get()
     {
         this->prepare_get();
-
-        if constexpr (!std::is_same_v<T, void>)
-            return std::move(*std::launder(std::bit_cast<T*>(std::addressof(m_storage))));
+        return std::move(*std::launder(std::bit_cast<T*>(std::addressof(m_storage))));
     }
 
-    /**
-     * FIXME: Implement specialization for void Task with no storage.
-     */
 protected:
-    alignas(Storage) std::byte m_storage[sizeof(Storage)]; // NOLINT (hicpp-avoid-c-arrays)
+    alignas(T) std::byte m_storage[sizeof(T)]; // NOLINT (hicpp-avoid-c-arrays)
+};
+
+/**
+ * Void task result specialization.
+ * It has no storage and get() just calls BaseTask::prepare_get().
+ */
+template<>
+class TaskResult<void> : public TaskBase {
+public:
+    void get() { this->prepare_get(); }
 };
 
 /**
  * Task execution class.
- * It is composed out of task with result and it contains user function along with provided
- * parameters. It is used for task invokation.
+ * It is composed out of TaskResult and it contains user function along with provided parameters. It
+ * is used for task invokation.
  */
 template<class Fn, class... Args>
 class TaskExec : public TaskResult<std::invoke_result_t<Fn, Args...>> {
@@ -187,19 +191,21 @@ public:
     {
     }
 
-    ReturnType execute()
-    {
-        return std::apply([](auto&& f, auto&&... args) { return f(args...); }, m_args);
-    }
-
+protected:
+    /**
+     * Invokes user function and if return type is not void, emplace constructs return type in a
+     * storage.
+     */
     void invoke() override
     {
         if constexpr (!std::is_same_v<ReturnType, void>)
-            new (std::addressof(this->m_storage)) ReturnType{execute()};
+            new (std::addressof(this->m_storage))
+                ReturnType{std::apply([](auto&& f, auto&&... args) { return f(args...); }, m_args)};
         else
-            execute();
-    };
+            std::apply([](auto&& f, auto&&... args) { return f(args...); }, m_args);
+    }
 
+private:
     std::tuple<std::decay_t<Fn>, std::decay_t<Args>...> m_args;
 };
 
@@ -221,19 +227,23 @@ public:
     Task(Task&& other) noexcept = default;
     Task& operator=(Task&& other) noexcept = default;
 
-    TaskResult<T>* operator->()
+    [[nodiscard]] bool valid() const noexcept { return m_storage.operator bool(); }
+
+    void wait()
     {
         if (!valid())
             throw std::logic_error{"Invalid task."};
 
-        return m_storage.get();
+        return m_storage->wait();
     }
 
-    /**
-     * FIXME: Expose APIs like std::future.
-     */
+    T get()
+    {
+        if (!valid())
+            throw std::logic_error{"Invalid task."};
 
-    [[nodiscard]] bool valid() const noexcept { return m_storage.operator bool(); }
+        return m_storage->get();
+    }
 
 private:
     std::shared_ptr<TaskResult<T>> m_storage;

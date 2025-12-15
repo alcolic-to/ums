@@ -84,7 +84,7 @@ void thread_function()
 {
     for (int i = 0; i < 1000; ++i) {
         auto t = async(f3);
-        t->wait();
+        t.wait();
     }
 }
 
@@ -114,6 +114,40 @@ void ms3_function()
         async(fib, 1);
 }
 
+class A {
+public:
+    A() : s{"default"} { std::cout << "Default constructor\n"; }
+
+    explicit A(std::string value) : s{std::move(value)} { std::cout << "Value constructor\n"; }
+
+    A(const A& other) : s{other.s} { std::cout << "Copy constructor\n"; }
+
+    A(A&& other) noexcept : s{std::move(other.s)} { std::cout << "Move constructor\n"; }
+
+    A& operator=(const A& other)
+    {
+        std::cout << "Copy assignment\n";
+        if (this != &other)
+            s = other.s;
+        return *this;
+    }
+
+    A& operator=(A&& other) noexcept
+    {
+        std::cout << "Move assignment\n";
+        if (this != &other)
+            s = std::move(other.s);
+        return *this;
+    }
+
+    ~A() { std::cout << "Destructor\n"; }
+
+    const std::string& value() const { return s; }
+
+private:
+    std::string s;
+};
+
 void ums_main(int argc, char* argv[])
 {
     std::cout << "argc: " << argc << "\n";
@@ -127,24 +161,27 @@ void ums_main(int argc, char* argv[])
     Stopwatch<true, std::chrono::microseconds> s;
 
     Task<u64> task{async(fib, 10 * 1024 * 1024)};
-    std::cout << task->get() << "\n";
+    std::cout << task.get() << "\n";
 
     std::vector<Task<void>> v;
     v.emplace_back(async([] {}));
 
-    v[0]->wait();
+    v[0].wait();
 }
 
 int main(int argc, char* argv[])
 {
-    Options::Schedulers_count sch{4};
-    Options::Workers_per_scheduler wps{4};
     init_ums(
         [&] {
-            for (usize i = 0; i < 1024 * 1024; ++i)
-                async([&] {});
+            Task<std::string> str_task = async([] { return std::string{"str"}; });
+            auto r = str_task.get();
+
+            Task<void> void_task = async([] { return; });
+            void_task.get();
         },
-        Options{sch, wps});
+        Options{Options::Schedulers_count{1}, Options::Workers_per_scheduler{4}});
+
+    std::future<int> f;
 }
 
 // NOLINTEND

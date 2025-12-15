@@ -20,7 +20,7 @@ static void BM_task_exec_short_tasks(benchmark::State& state)
                 tasks.push_back(async([&] { hard_work(microseconds(state.range())); }));
 
             for (auto& task : tasks)
-                task->wait();
+                task.wait();
         }
     });
 }

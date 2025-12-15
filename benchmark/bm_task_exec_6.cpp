@@ -20,7 +20,7 @@ static void BM_task_exec_stress(benchmark::State& state)
                 tasks.push_back(async([&] { return; }));
 
             for (auto& task : tasks)
-                task->wait();
+                task.wait();
         }
     });
 }

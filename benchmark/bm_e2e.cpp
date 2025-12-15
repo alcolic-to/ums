@@ -23,7 +23,7 @@ static void BM_e2e(benchmark::State& state)
                 tasks.emplace_back(async([&] { hard_work(microseconds(state.range())); }));
 
             for (auto& task : tasks)
-                task->wait();
+                task.wait();
         });
     }
 }

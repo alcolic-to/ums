@@ -44,7 +44,7 @@ void sequential_ios(File_handle& file, std::vector<std::vector<char>>& io_v, boo
 
     if (asynchro)
         for (auto& task : tasks)
-            task->wait();
+            task.wait();
 }
 
 // Creates file and calls sequential_ios.

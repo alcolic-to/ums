@@ -34,7 +34,7 @@ TEST(Scheduler_tests, sanity_test)
         ASSERT_TRUE(a == 1);
 
         auto task{async([&] { a = 0; })};
-        task->wait();
+        task.wait();
         ASSERT_TRUE(a == 0);
 
         std::atomic<int> b{0};
@@ -47,21 +47,21 @@ TEST(Scheduler_tests, sanity_test)
         auto tasks{asyncs(f, f, f, f)};
 
         for (auto& task : tasks)
-            task->wait();
+            task.wait();
 
         ASSERT_TRUE(b == 0);
 
         Task<int> t1 = async([] { return 5; });
 
-        ASSERT_TRUE(t1->get() == 5);
-        ASSERT_ANY_THROW(t1->get());
+        ASSERT_TRUE(t1.get() == 5);
+        ASSERT_ANY_THROW(t1.get());
 
         Task<int> t2 = async([] { return 5; });
-        t2->wait();
+        t2.wait();
 
-        ASSERT_NO_THROW(t2->wait());
-        ASSERT_TRUE(t2->get() == 5);
-        ASSERT_ANY_THROW(t2->get());
+        ASSERT_NO_THROW(t2.wait());
+        ASSERT_TRUE(t2.get() == 5);
+        ASSERT_ANY_THROW(t2.get());
     };
 
     init_ums(test);
@@ -71,14 +71,14 @@ TEST(Scheduler_tests, task_type_test)
 {
     auto test = [&] {
         Task<std::string> empty;
-        ASSERT_THROW(empty->get(), std::logic_error);
-        ASSERT_THROW(empty->wait(), std::logic_error);
+        ASSERT_THROW(empty.get(), std::logic_error);
+        ASSERT_THROW(empty.wait(), std::logic_error);
         ASSERT_FALSE(empty.valid());
 
         empty = async([] { return std::string{"str"}; });
-        empty->wait();
+        empty.wait();
         ASSERT_TRUE(empty.valid());
-        ASSERT_EQ(empty->get(), "str");
+        ASSERT_EQ(empty.get(), "str");
 
         empty = async([] {
             throw std::runtime_error{"a"};
@@ -86,8 +86,8 @@ TEST(Scheduler_tests, task_type_test)
         });
 
         ASSERT_TRUE(empty.valid());
-        ASSERT_THROW(empty->get(), std::runtime_error);
-        ASSERT_THROW(empty->get(), std::logic_error);
+        ASSERT_THROW(empty.get(), std::runtime_error);
+        ASSERT_THROW(empty.get(), std::logic_error);
     };
 
     init_ums(test);
@@ -107,7 +107,7 @@ TEST(Scheduler_tests, evenly_scheduled_tasks)
                     tasks.emplace_back(async([=] { hard_work(task_dur); }));
 
                 for (auto& task : tasks)
-                    task->wait();
+                    task.wait();
 
                 ASSERT_LE(s.elapsed(), task_dur + 2ms);
             }
@@ -145,7 +145,7 @@ TEST(Scheduler_tests, parallel_execution)
             tasks.emplace_back(async([] { hard_work(1ms); }));
 
         for (auto& task : tasks)
-            task->wait();
+            task.wait();
 
         ASSERT_LE(s.elapsed(), ((100 * 1ms) / sch::cpus_count()) + 10ms);
     };
@@ -179,7 +179,7 @@ TEST(Scheduler_tests, work_stealing)
         }
 
         for (auto& task : tasks)
-            task->wait();
+            task.wait();
 
         auto shortest = 1000ms / std::pow<u32>(2, sch::cpus_count() - 1);
         ASSERT_LE(s.elapsed(), 1000ms + (2 * shortest) + 2ms);
@@ -210,7 +210,7 @@ TEST(Scheduler_tests, task_order_execution)
             second_tasks.push_back(async([] { hard_work(1s); }));
 
         for (auto& task : first_tasks)
-            task->wait();
+            task.wait();
 
         ASSERT_GE(s.elapsed(), 100ms + 1s + 100ms);
         ASSERT_LE(s.elapsed(), 100ms + 1s + 100ms + 2ms);
@@ -250,7 +250,7 @@ TEST(Scheduler_tests, task_order_execution_extended)
             third_tasks.push_back(async([] { hard_work(100ms); }));
 
         for (auto& task : third_tasks)
-            task->wait();
+            task.wait();
 
         /**
          * Bug or feature? When we have 2 long running tasks (even if they yield), they will

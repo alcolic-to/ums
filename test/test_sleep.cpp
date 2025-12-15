@@ -40,7 +40,7 @@ TEST(Sleep, sleep_test)
             std::vector<Task<void>> tasks;
 
             auto start = now();
-            async([=] { worker::sleep_for(sleep_ms); })->wait();
+            async([=] { worker::sleep_for(sleep_ms); }).wait();
 
             auto dur = now() - start;
             ASSERT_GE(dur, sleep_ms);

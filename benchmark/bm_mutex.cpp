@@ -109,7 +109,7 @@ static void BM_spinlock(benchmark::State& state)
                 tasks.emplace_back(async(f));
 
             for (auto& task : tasks)
-                task->wait();
+                task.wait();
         }
     });
 }
@@ -137,7 +137,7 @@ static void BM_mutex(benchmark::State& state)
                 tasks.emplace_back(async(f));
 
             for (auto& task : tasks)
-                task->wait();
+                task.wait();
         }
     });
 }
@@ -192,7 +192,7 @@ static void BM_spinlock_with_work(benchmark::State& state)
                 tasks.emplace_back(async(f));
 
             for (auto& task : tasks)
-                task->wait();
+                task.wait();
         }
     });
 }
@@ -219,7 +219,7 @@ static void BM_mutex_with_work(benchmark::State& state)
                 tasks.emplace_back(async(f));
 
             for (auto& task : tasks)
-                task->wait();
+                task.wait();
         }
     });
 }

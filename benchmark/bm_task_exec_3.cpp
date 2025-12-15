@@ -22,7 +22,7 @@ static void BM_task_exec_all_cpus_multiple_tasks(benchmark::State& state)
                     tasks.push_back(async([&] { hard_work(microseconds(state.range(0))); }));
 
             for (auto& task : tasks)
-                task->wait();
+                task.wait();
         }
     });
 }

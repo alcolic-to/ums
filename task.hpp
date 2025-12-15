@@ -69,7 +69,15 @@ public:
 
     virtual ~TaskBase() = default;
 
-    virtual void invoke() noexcept = 0;
+    void invoke_noexcept() noexcept
+    {
+        try {
+            invoke();
+        }
+        catch (...) {
+            this->set_exception(std::current_exception());
+        }
+    }
 
     /**
      * Waits for task to be done.
@@ -95,6 +103,11 @@ public:
     }
 
 protected:
+    /**
+     * All clases extending this one should override invoke().
+     */
+    virtual void invoke() = 0;
+
     bool is_state_done() { return (m_state & State::done) != 0; }
 
     bool is_state_taken() { return (m_state & State::taken) != 0; }
@@ -179,17 +192,12 @@ public:
         return std::apply([](auto&& f, auto&&... args) { return f(args...); }, m_args);
     }
 
-    void invoke() noexcept override
+    void invoke() override
     {
-        try {
-            if constexpr (!std::is_same_v<ReturnType, void>)
-                new (std::addressof(this->m_storage)) ReturnType{execute()};
-            else
-                execute();
-        }
-        catch (...) {
-            this->set_exception(std::current_exception());
-        }
+        if constexpr (!std::is_same_v<ReturnType, void>)
+            new (std::addressof(this->m_storage)) ReturnType{execute()};
+        else
+            execute();
     };
 
     std::tuple<std::decay_t<Fn>, std::decay_t<Args>...> m_args;

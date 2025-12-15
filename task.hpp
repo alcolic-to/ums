@@ -34,6 +34,11 @@
 namespace ums {
 
 /**
+ * FIXME: Implement proper exceptions for get(), wait() etc.
+ */
+enum class task_errc : u8 { no_state, result_already_retrived };
+
+/**
  * Generic task implementation.
  * It allows user to create task which has a generic return type (Task<u64> for example).
  * Task has a single storage composed of TaskBase, TaskResult and TaskExec.
@@ -64,15 +69,7 @@ public:
 
     virtual ~TaskBase() = default;
 
-    virtual void invoke() = 0;
-
-    bool is_state_done() { return (m_state & State::done) != 0; }
-
-    bool is_state_taken() { return (m_state & State::taken) != 0; }
-
-    void set_state_done() { m_state = State(m_state | State::done); }
-
-    void set_state_taken() { m_state = State(m_state | State::taken); }
+    virtual void invoke() noexcept = 0;
 
     /**
      * Waits for task to be done.
@@ -98,8 +95,38 @@ public:
     }
 
 protected:
+    bool is_state_done() { return (m_state & State::done) != 0; }
+
+    bool is_state_taken() { return (m_state & State::taken) != 0; }
+
+    bool has_exception() const noexcept { return m_exception != nullptr; }
+
+    void set_state_done() { m_state = State(m_state | State::done); }
+
+    void set_state_taken() { m_state = State(m_state | State::taken); }
+
+    void set_exception(const std::exception_ptr& ex) noexcept { m_exception = ex; }
+
+    /**
+     * Called from extended classes to prepare getting out result.
+     * Checks if result is already taken and handles exceptions logic.
+     */
+    void prepare_get()
+    {
+        if (is_state_taken())
+            throw std::logic_error{"Result already taken."};
+
+        wait();
+        set_state_taken();
+
+        if (has_exception())
+            std::rethrow_exception(m_exception);
+    }
+
+protected: // NOLINT
     Mutex m_mtx;
     Condition_variable m_cv;
+    std::exception_ptr m_exception;
     State m_state{State::init};
 };
 
@@ -118,18 +145,13 @@ public:
      */
     T get()
     {
-        if (this->is_state_taken())
-            throw std::logic_error{"Result already taken."};
-
-        wait();
-        this->set_state_taken();
+        this->prepare_get();
 
         if constexpr (!std::is_same_v<T, void>)
             return std::move(*std::launder(std::bit_cast<T*>(std::addressof(m_storage))));
     }
 
     /**
-     * FIXME: Implement exception handling (with storage).
      * FIXME: Implement specialization for void Task with no storage.
      */
 protected:
@@ -157,26 +179,21 @@ public:
         return std::apply([](auto&& f, auto&&... args) { return f(args...); }, m_args);
     }
 
-    void invoke() override
+    void invoke() noexcept override
     {
-        // try {
-        if constexpr (!std::is_same_v<ReturnType, void>)
-            new (std::addressof(this->m_storage)) ReturnType{execute()};
-        else
-            execute();
-        // }
-        // catch (...) {
-        //     this->set_exception(std::current_exception());
-        // }
+        try {
+            if constexpr (!std::is_same_v<ReturnType, void>)
+                new (std::addressof(this->m_storage)) ReturnType{execute()};
+            else
+                execute();
+        }
+        catch (...) {
+            this->set_exception(std::current_exception());
+        }
     };
 
     std::tuple<std::decay_t<Fn>, std::decay_t<Args>...> m_args;
 };
-
-/**
- * FIXME: Implement proper exceptions for get(), wait() etc.
- */
-enum class task_errc : u8 { no_state, result_already_retrived };
 
 /**
  * Simple wrapper class for user task.

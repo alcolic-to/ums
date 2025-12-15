@@ -75,8 +75,19 @@ TEST(Scheduler_tests, task_type_test)
         ASSERT_THROW(empty->wait(), std::logic_error);
         ASSERT_FALSE(empty.valid());
 
-        empty = async([] { return std::string{"some string"}; });
-        ASSERT_EQ(empty->get(), "some string");
+        empty = async([] { return std::string{"str"}; });
+        empty->wait();
+        ASSERT_TRUE(empty.valid());
+        ASSERT_EQ(empty->get(), "str");
+
+        empty = async([] {
+            throw std::runtime_error{"a"};
+            return std::string{"str"};
+        });
+
+        ASSERT_TRUE(empty.valid());
+        ASSERT_THROW(empty->get(), std::runtime_error);
+        ASSERT_THROW(empty->get(), std::logic_error);
     };
 
     init_ums(test);

@@ -162,23 +162,15 @@ void Worker::main_loop()
         if (exit()) [[unlikely]]
             return;
 
-        try {
-            TZoneScopedC(tracy::Color::Green1);
-            TTracyMessageLC(tracy_msg("Task started."), tracy::Color::Green1);
+        TZoneScopedC(tracy::Color::Green1);
+        TTracyMessageLC(tracy_msg("Task started."), tracy::Color::Green1);
 
-            m_task->invoke();
+        m_task->invoke();
 
-            TTracyMessageLC(tracy_msg("Task done."), tracy::Color::Green1);
+        TTracyMessageLC(tracy_msg("Task done."), tracy::Color::Green1);
 
-            m_task->notify();
-            m_task.reset();
-        }
-        catch (const std::exception& ex) {
-            std::cout << "Unhandled user exception: " << ex.what() << "\n";
-        }
-        catch (...) {
-            std::cout << "Unhandled user exception.";
-        }
+        m_task->notify();
+        m_task.reset();
 
         // std::cout << "CPU " << m_scheduler.m_cpu.m_id << ": worker id " << id() << " task done.\n
         // ";

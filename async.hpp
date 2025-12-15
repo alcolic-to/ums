@@ -23,7 +23,6 @@
 
 #include "scheduler.hpp"
 #include "task.hpp"
-#include "ums.hpp"
 #include "util.hpp"
 
 namespace ums {
@@ -39,13 +38,15 @@ Task<ReturnType> async(Fn&& t, Args&&... args)
 {
     TZoneScopedC(tracy::Color::DarkGreen);
 
-    auto task{std::make_shared<TaskExecType>(std::forward<Fn>(t), std::forward<Args>(args)...)};
+    std::shared_ptr<TaskResult<ReturnType>> task{
+        std::make_shared<TaskExecType>(std::forward<Fn>(t), std::forward<Args>(args)...)};
+
     enque_task(task);
 
     if constexpr (wait)
         task->wait();
 
-    return Task{std::static_pointer_cast<TaskResult<ReturnType>>(task)};
+    return Task{std::move(task)};
 }
 
 void enque_task(const auto& task)
@@ -62,9 +63,7 @@ void enque_task(const auto& task)
 template<bool wait = false, typename Fn, typename... Fns>
 void asyncs_helper(auto& tasks, Fn&& fn, Fns&&... fns)
 {
-    Task<void> task{async(std::forward<Fn>(fn))};
-    tasks.push_back(std::move(task));
-
+    tasks.emplace_back(async(std::forward<Fn>(fn)));
     asyncs_helper<wait>(tasks, std::forward<Fns>(fns)...);
 }
 
@@ -86,7 +85,7 @@ std::vector<Task<void>> asyncs(Fns&&... fns)
     asyncs_helper<wait>(tasks, std::forward<Fns>(fns)...);
 
     if constexpr (wait)
-        for (auto&& task : tasks)
+        for (auto& task : tasks)
             task.wait();
 
     return tasks;

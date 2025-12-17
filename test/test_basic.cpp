@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cmath>
-#include <cstdint>
 #include <gtest/gtest.h>
 #include <stdexcept>
 
@@ -16,13 +15,49 @@
 using namespace ums;
 using namespace std::chrono_literals;
 
-// Simulates work with specified duration.
-//
+/**
+ * Simulates work with specified duration.
+ */
 void hard_work(std::chrono::steady_clock::duration dur)
 {
     Stopwatch<false> s;
     while (s.elapsed() < dur)
         ;
+}
+
+/**
+ * For easy test debugging.
+ */
+struct opts {
+    usize ops_cpus = 0;
+    usize ops_workers = 0;
+
+    bool inited() { return ops_cpus != 0 && ops_workers != 0; }
+};
+
+void init_ums_for_tests(std::function<void()> test_main, opts opt = {})
+{
+    if (opt.inited()) {
+        init_ums(test_main, Options{Options::Schedulers_count{opt.ops_cpus},
+                                    Options::Workers_per_scheduler{opt.ops_workers}});
+        return;
+    }
+
+    // for (usize cpus = 1; cpus <= CFG_max_supported_cpus; ++cpus) {
+    //     for (usize workers = 2; workers <= CFG_max_workers_per_scheduler; workers *= 2) {
+    //         std::cout << std::format("Testing ums with {} cpus, {} workers\n", cpus, workers);
+    //         init_ums(test_main, Options{Options::Schedulers_count{cpus},
+    //                                     Options::Workers_per_scheduler{workers}});
+    //     }
+    // }
+
+    for (usize cpus = 1; cpus <= CFG_max_supported_cpus; ++cpus) {
+        for (usize workers = 2; workers <= 8; workers *= 2) {
+            std::cout << std::format("Testing ums with {} cpus, {} workers\n", cpus, workers);
+            init_ums(test_main, Options{Options::Schedulers_count{cpus},
+                                        Options::Workers_per_scheduler{workers}});
+        }
+    }
 }
 
 TEST(Scheduler_tests, sanity_test)
@@ -115,6 +150,29 @@ TEST(Scheduler_tests, evenly_scheduled_tasks)
     };
 
     init_ums(test);
+}
+
+TEST(Scheduler_tests, evenly_scheduled_tasks_extended)
+{
+    constexpr auto task_dur = 10ms;
+
+    auto test = [&] {
+        std::vector<Task<void>> tasks;
+        tasks.reserve(sch::cpus_count());
+
+        Stopwatch<false> s;
+
+        for (u32 c = 1; c <= sch::cpus_count(); ++c)
+            tasks.emplace_back(async([=] { hard_work(task_dur); }));
+
+        for (auto& task : tasks)
+            task.wait();
+
+        ASSERT_LE(s.elapsed(), task_dur + 2ms);
+    };
+
+    // init_ums_for_tests(test, opts{.ops_cpus = 14, .ops_workers = 2});
+    init_ums_for_tests(test);
 }
 
 TEST(Scheduler_tests, sequential_task_execution)

@@ -27,15 +27,18 @@
 #include "intrusive_list.hpp"
 #include "io.hpp"
 #include "os_specific.hpp"
-#include "task.hpp"
 #include "types.hpp"
 #include "util.hpp"
 
 namespace ums {
+
 class Scheduler;
+class Condition_variable;
+class TaskBase;
 
 class Worker final {
     friend class Scheduler;
+    friend class Condition_variable;
 
 public:
     enum class State : u8 {
@@ -157,6 +160,7 @@ private:
     u64 m_id;
     Scheduler* m_scheduler;
     stl::INode<Worker> m_node;
+    stl::INode<Worker> m_waiter_node; // Used in Condition_variable waiters list.
     std::condition_variable m_cv;
     State m_state{State::initializing};
     bool m_running{true}; // Flag used for spurious wakeup check.

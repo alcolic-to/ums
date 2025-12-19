@@ -24,6 +24,7 @@
 #include "io.hpp"
 #include "os_specific.hpp"
 #include "scheduler.hpp"
+#include "task.hpp"
 #include "types.hpp"
 #include "util.hpp"
 

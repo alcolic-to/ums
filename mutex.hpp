@@ -22,18 +22,19 @@
 #include <mutex>
 #include <thread>
 
+#include "intrusive_list.hpp"
 #include "spinlock.hpp"
 #include "util.hpp"
+#include "worker.hpp"
 
 namespace ums {
 
 class Mutex;
-class Worker;
 
-// Similar to all c++ libs, this one is also based on Hinnant's implementation:
-// https://github.com/llvm-mirror/libcxx/blob/master/include/condition_variable
-// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2406.html
-//
+/**
+ * Similar to all c++ libs, this one is also based on Hinnant's implementation:
+ * https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2406.html
+ */
 class Condition_variable {
 public:
     Condition_variable() noexcept = default;
@@ -74,8 +75,8 @@ public:
     {
         if (now() >= abs_time)
             return std::cv_status::timeout;
-        else
-            return wait_until_internal(lock, abs_time);
+
+        return wait_until_internal(lock, abs_time);
     }
 
     template<class Clock, class Duration, class Predicate>
@@ -100,7 +101,7 @@ private:
     void remove_waiter();
 
     Spinlock m_waiters_lock;
-    std::vector<Worker*> m_waiters;
+    stl::IList<Worker, &Worker::m_waiter_node> m_waiters;
 };
 
 class Plain_mutex {

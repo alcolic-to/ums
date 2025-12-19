@@ -41,31 +41,26 @@ void Condition_variable::notify_one() noexcept
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
     if (!m_waiters.empty())
-        m_waiters.front()->notify_waiter();
+        m_waiters.front().notify_waiter();
 }
 
 void Condition_variable::notify_all() noexcept
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
-    for (auto&& waiter : m_waiters)
-        waiter->notify_waiter();
+    for (auto& waiter : m_waiters)
+        waiter.notify_waiter();
 }
 
 void Condition_variable::add_waiter()
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
-    m_waiters.push_back(worker::get());
+    m_waiters.push_back(*worker::get());
 }
 
-/**
- * Since notify_all wakes up all waiters, we don't know
- * which one will be first awaken, so we must call std::erase
- * to remove worker, instead of pop_front.
- */
 void Condition_variable::remove_waiter()
 {
     const std::scoped_lock<Spinlock> lock{m_waiters_lock};
-    std::erase(m_waiters, worker::get());
+    m_waiters.remove(*worker::get());
 }
 
 void Condition_variable::wait_internal(std::unique_lock<Mutex>& lock, const Time_point& abs_time)

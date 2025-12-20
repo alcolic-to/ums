@@ -62,19 +62,19 @@ namespace ums {
 #ifdef TRACY_ENABLE
 
 /**
- * Formats message for tracy.
- * Tracy requires that messages lasts for the entire program execution. For that purpose, we will
+ * Formats string for tracy.
+ * Tracy requires that strings lasts for the entire program execution. For that purpose, we will
  * allocate message on a heap and return c string.
  */
 template<class... Args>
-const char* tracy_msg(const std::format_string<Args...>& str, Args&&... args)
+const char* tracy_str(const std::format_string<Args...>& str, Args&&... args)
 {
     return (new std::string{std::format(str, std::forward<Args>(args)...)})->c_str();
 }
 
 inline void set_tracy_worker(u64 worker_id, u64 scheduler_id)
 {
-    tracy::SetThreadNameWithHint(tracy_msg("S{:>3} W{:>3}", scheduler_id, worker_id),
+    tracy::SetThreadNameWithHint(tracy_str("S{:>3} W{:>3}", scheduler_id, worker_id),
                                  static_cast<i32>(scheduler_id));
 }
 

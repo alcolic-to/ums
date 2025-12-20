@@ -164,11 +164,11 @@ void Worker::main_loop()
             return;
 
         TZoneScopedC(tracy::Color::Green1);
-        TTracyMessageLC(tracy_msg("Task started."), tracy::Color::Green1);
+        TTracyMessageLC(tracy_str("Task started."), tracy::Color::Green1);
 
         m_task->invoke_noexcept();
 
-        TTracyMessageLC(tracy_msg("Task done."), tracy::Color::Green1);
+        TTracyMessageLC(tracy_str("Task done."), tracy::Color::Green1);
 
         m_task->notify();
         m_task.reset();

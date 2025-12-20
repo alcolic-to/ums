@@ -32,7 +32,7 @@ using namespace std::chrono_literals;
 
 constexpr bool FS_thread_binding_allowed = true;
 constexpr bool FS_work_stealing_allowed = true;
-constexpr bool FS_idle_spinning_allowed = false;
+constexpr bool FS_idle_spinning_allowed = true;
 
 // Config section.
 
@@ -59,10 +59,14 @@ constexpr u64 CFG_min_workers_per_scheduler     = 1;
 constexpr u64 CFG_max_workers_per_scheduler     = 256;
 constexpr u64 CFG_default_workers_per_scheduler = 64;
 
-// Thresholds.
-//
+/**
+ * Thresholds section.
+ *
+ * TODO: Scale idle spin threshold based on number of schedulers. This is needed because there is
+ * an additional cost of notifying sleeping scheduler (on my machine around 15us).
+ */
 constexpr auto CFG_idle_sleep_threshold = 20ms;
-constexpr auto CFG_idle_spin_threshold  = 20ms;
+constexpr auto CFG_idle_spin_threshold  = 100us;
 
 // clang-format on
 

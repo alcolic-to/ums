@@ -31,7 +31,7 @@ function(add_tracy PROJECT)
     target_include_directories(${PROJECT} SYSTEM PRIVATE ${tracy_SOURCE_DIR}/public)
     target_sources(${PROJECT} PRIVATE ${tracy_SOURCE_DIR}/public/TracyClient.cpp)
     target_link_libraries(${PROJECT} PUBLIC TracyClient)
-    target_compile_definitions(${PROJECT} PRIVATE TRACY_ENABLE TRACY_CALLSTACK)
+    target_compile_definitions(${PROJECT} PRIVATE TRACY_ENABLE TRACY_CALLSTACK TRACY_NO_EXIT)
 
     if(MSVC)
         target_compile_options(${PROJECT} PRIVATE /W0)

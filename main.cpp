@@ -173,15 +173,17 @@ int main(int argc, char* argv[])
 {
     init_ums(
         [&] {
-            Task<std::string> str_task = async([] { return std::string{"str"}; });
-            auto r = str_task.get();
+            constexpr usize tasks_count = 100 * 1024;
+            std::vector<Task<void>> tasks;
+            tasks.reserve(tasks_count);
 
-            Task<void> void_task = async([] { return; });
-            void_task.get();
+            for (usize i = 0; i < tasks_count; ++i)
+                tasks.emplace_back(async([] { return; }));
+
+            for (auto& task : tasks)
+                task.get();
         },
-        Options{Options::Schedulers_count{1}, Options::Workers_per_scheduler{4}});
-
-    std::future<int> f;
+        Options{Options::Schedulers_count{4}, Options::Workers_per_scheduler{4}});
 }
 
 // NOLINTEND

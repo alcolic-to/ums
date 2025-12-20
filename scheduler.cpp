@@ -301,15 +301,14 @@ void Scheduler::set_worker_state(Worker* worker, Worker::State state) noexcept
 void Scheduler::enqueue_task(std::shared_ptr<TaskBase> task)
 {
     m_tasks.enque(std::move(task));
-    notify();
+    TTracyMessageLC(tracy_str("Enqued task on sch {}", id()), tracy::Color::Green1);
 
-    TTracyMessageLC(tracy_msg("Enqued task on sch {}", id()), tracy::Color::Green1);
+    notify();
 }
 
 std::shared_ptr<TaskBase> Scheduler::next_task() noexcept
 {
-    TTracyMessageLC(tracy_msg("Dequed (maybe) task from sch {}", id()), tracy::Color::Green1);
-
+    TTracyMessageLC(tracy_str("Dequed (maybe) task from sch {}", id()), tracy::Color::Green1);
     return m_tasks.deque();
 }
 
@@ -449,7 +448,7 @@ void Scheduler::steal_work()
     for (const auto& other : m_schedulers->filter(others_with_work)) {
         if (auto task{other->next_task()}) {
             schedule_idle_worker(std::move(task));
-            TTracyMessageLC(tracy_msg("Stolen work {} -> {}", other->id(), id()),
+            TTracyMessageLC(tracy_str("Stolen work S{} -> S{}", other->id(), id()),
                             tracy::Color::Red1);
             return;
         }
@@ -506,6 +505,8 @@ void Scheduler::wait_until(std::unique_lock<std::mutex>& lock, Time_point abs_ti
  */
 void Scheduler::notify()
 {
+    TZoneScopedC(tracy::Color::DarkGreen);
+
     {
         const std::unique_lock<std::mutex> lock{m_mtx};
         m_running = true;
@@ -550,7 +551,14 @@ bool Scheduler::should_idle_spin() noexcept
     if (m_idle_start_time == Time_point::max())
         m_idle_start_time = now();
 
-    return now() <= m_idle_start_time + CFG_idle_spin_threshold;
+    if (now() > m_idle_start_time + CFG_idle_spin_threshold)
+        return false;
+
+    /**
+     * TODO: Check whether we should CPU pause here, to lower power consumption.
+     */
+    TTracyMessageLC(tracy_str("Idle spinning."), tracy::Color::Red1);
+    return true;
 }
 
 /**
@@ -575,8 +583,6 @@ bool Scheduler::should_idle_spin() noexcept
  */
 void Scheduler::sleep() noexcept
 {
-    TZoneScopedC(tracy::Color::Gray);
-
     /**
      * For pending I/O workers, we will just keep scheduling until I/O is done.
      * TODO: Check whether we can aford to sleep for I/O operations.
@@ -587,6 +593,7 @@ void Scheduler::sleep() noexcept
     if (should_idle_spin())
         return;
 
+    TZoneScopedC(tracy::Color::Gray);
     std::unique_lock<std::mutex> lock{m_mtx};
 
     if (has_tasks() && has_idle_workers())
@@ -697,6 +704,9 @@ i32 Scheduler::load() const noexcept
  */
 void Scheduler::context_switch(Worker* prev_worker)
 {
+    TTracyMessageLC(tracy_str("Context switch W{} -> W{}", prev_worker->id(), m_worker->id()),
+                    tracy::Color::Green1);
+
     std::unique_lock<std::mutex> lock{m_workers_mtx};
     m_worker->notify(lock);
     prev_worker->wait(lock);

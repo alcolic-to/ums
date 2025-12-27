@@ -201,9 +201,10 @@ Scheduler::Scheduler(Schedulers* schedulers, u64 cpu_id,
                      Options::Workers_per_scheduler workers_count)
     : m_schedulers{schedulers}
     , m_cpu{cpu_id}
+    , m_workers{workers_count}
 {
     for (u32 i = 0; i < workers_count; ++i)
-        m_workers.push_back(std::make_unique<Worker>(i, this));
+        m_workers.emplace_back(i, this);
 
     {
         const std::unique_lock<std::mutex> lock{m_workers_mtx};

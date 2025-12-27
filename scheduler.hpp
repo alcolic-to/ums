@@ -28,6 +28,7 @@
 
 #include "config.hpp"
 #include "options.hpp"
+#include "stable_vector.hpp"
 #include "task.hpp"
 #include "types.hpp"
 #include "worker.hpp"
@@ -192,10 +193,7 @@ private:
 
     Time_point m_idle_start_time{Time_point::max()};
 
-    /**
-     * TODO: Create workers in place next to each other.
-     */
-    std::vector<std::unique_ptr<Worker>> m_workers;
+    stl::StableVector<Worker> m_workers;
 };
 
 class Schedulers final {

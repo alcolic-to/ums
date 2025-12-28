@@ -85,8 +85,12 @@ public:
      */
     void wait()
     {
+        TTracyMessageLC(tracy_str("Waiting on task."), tracy::Color::Green1);
+
         std::unique_lock<Mutex> lock{m_mtx};
         m_cv.wait(lock, [&] { return is_state_done(); });
+
+        TTracyMessageLC(tracy_str("Waiting on task - done."), tracy::Color::Green1);
     }
 
     /**
@@ -95,6 +99,8 @@ public:
      */
     void notify()
     {
+        TTracyMessageLC(tracy_str("Notifing on task."), tracy::Color::Green1);
+
         {
             const std::unique_lock<Mutex> lock{m_mtx};
             set_state_done();

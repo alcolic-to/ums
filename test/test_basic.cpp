@@ -2,12 +2,12 @@
 
 #include <chrono>
 #include <cmath>
-#include <cstdint>
 #include <gtest/gtest.h>
 #include <stdexcept>
 
 #include "async.hpp"
 #include "options.hpp"
+#include "scheduler.hpp"
 #include "types.hpp"
 #include "ums.hpp"
 #include "util.hpp"
@@ -16,8 +16,9 @@
 using namespace ums;
 using namespace std::chrono_literals;
 
-// Simulates work with specified duration.
-//
+/**
+ * Simulates work with specified duration.
+ */
 void hard_work(std::chrono::steady_clock::duration dur)
 {
     Stopwatch<false> s;
@@ -25,7 +26,21 @@ void hard_work(std::chrono::steady_clock::duration dur)
         ;
 }
 
-TEST(Scheduler_tests, sanity_test)
+/**
+ * Schedules async task with provided durtions and executes work with the same duration.
+ * This is done c times.
+ */
+void hard_work_with_async(usize c, std::chrono::steady_clock::duration dur)
+{
+    if (c < 2)
+        return hard_work(dur);
+
+    auto task = async([=] { hard_work_with_async(c - 1, dur); });
+    hard_work(dur);
+    task.wait();
+}
+
+TEST(Scheduler_tests, sanity)
 {
     auto test = [&] {
         int a = 0;
@@ -67,7 +82,7 @@ TEST(Scheduler_tests, sanity_test)
     init_ums(test);
 }
 
-TEST(Scheduler_tests, task_type_test)
+TEST(Scheduler_tests, task_type)
 {
     auto test = [&] {
         Task<std::string> empty;
@@ -262,6 +277,21 @@ TEST(Scheduler_tests, task_order_execution_extended)
          */
         ASSERT_GE(s.elapsed(), 4s + 100ms);
         ASSERT_LE(s.elapsed(), 4s + 100ms + 2ms);
+    };
+
+    init_ums(test);
+}
+
+TEST(Scheduler_tests, chained_execution)
+{
+    auto test = [&] {
+        Stopwatch<false> s;
+
+        hard_work_with_async(sch::workers_count(), 1ms);
+
+        auto per_cpu_dur = sch::workers_per_cpu_count() * 1ms;
+        auto threshold = 50us * sch::workers_count();
+        ASSERT_LE(s.elapsed(), per_cpu_dur + threshold);
     };
 
     init_ums(test);

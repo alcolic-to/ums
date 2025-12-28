@@ -46,6 +46,43 @@ std::unique_ptr<Schedulers> schedulers; // NOLINT
 
 } // namespace
 
+namespace sch {
+
+/**
+ * Returns global schedulers.
+ */
+std::unique_ptr<Schedulers>& get() noexcept
+{
+    return schedulers;
+}
+
+Scheduler& min_load_scheduler() noexcept
+{
+    return get()->min_load_scheduler();
+}
+
+u32 schedulers_count() noexcept
+{
+    return get()->cpus_count();
+}
+
+u32 cpus_count() noexcept
+{
+    return get()->cpus_count();
+}
+
+u32 workers_per_cpu_count() noexcept
+{
+    return get()->workers_per_cpu_count();
+}
+
+u32 workers_count() noexcept
+{
+    return get()->workers_count();
+}
+
+}; // namespace sch
+
 /**
  * Creates new Scheduler for each bit available in CPUs availability mask.
  */
@@ -802,43 +839,6 @@ bool Scheduler::should_exit() const noexcept
 
     return exit;
 }
-
-namespace sch {
-
-/**
- * Returns global schedulers.
- */
-std::unique_ptr<Schedulers>& get() noexcept
-{
-    return schedulers;
-}
-
-Scheduler& min_load_scheduler() noexcept
-{
-    return get()->min_load_scheduler();
-}
-
-u32 schedulers_count() noexcept
-{
-    return get()->cpus_count();
-}
-
-u32 cpus_count() noexcept
-{
-    return get()->cpus_count();
-}
-
-u32 workers_per_cpu_count() noexcept
-{
-    return get()->workers_per_cpu_count();
-}
-
-u32 workers_count() noexcept
-{
-    return get()->workers_count();
-}
-
-}; // namespace sch
 
 template void Scheduler::sync<Sync_context::main>(Worker* worker);
 template void Scheduler::sync<Sync_context::yield>(Worker* worker);

@@ -15,7 +15,6 @@
  */
 #include "worker.hpp"
 
-#include <exception>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -36,6 +35,37 @@ namespace {
 thread_local Worker* this_worker; // NOLINT
 
 } // namespace
+
+/**
+ * API similar to std::thread::
+ */
+namespace worker {
+
+/**
+ * Returns current (this) worker.
+ */
+Worker* get() noexcept
+{
+    return this_worker;
+}
+
+/**
+ * Returns worker id.l
+ */
+u64 get_id() noexcept
+{
+    return this_worker->id();
+}
+
+/**
+ * Yield this worker.
+ */
+void yield() noexcept
+{
+    this_worker->yield();
+}
+
+}; // namespace worker
 
 /**
  * Creates worker object and starts worker thread on a provided CPU.
@@ -177,36 +207,5 @@ void Worker::main_loop()
         // ";
     }
 }
-
-/**
- * API similar to std::thread::
- */
-namespace worker {
-
-/**
- * Returns current (this) worker.
- */
-Worker* get() noexcept
-{
-    return this_worker;
-}
-
-/**
- * Returns worker id.l
- */
-u64 get_id() noexcept
-{
-    return this_worker->id();
-}
-
-/**
- * Yield this worker.
- */
-void yield() noexcept
-{
-    this_worker->yield();
-}
-
-}; // namespace worker
 
 } // namespace ums

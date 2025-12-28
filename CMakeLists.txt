@@ -27,7 +27,7 @@ include(cmake/sanitizers.cmake)
 include(cmake/compiler_options.cmake)
 
 set(CPP_FILES os_specific.cpp task.cpp scheduler.cpp worker.cpp io.cpp spinlock.cpp mutex.cpp shared_mutex.cpp condition_variable.cpp ums.cpp)
-set(HPP_FILES os_specific.hpp task.hpp scheduler.hpp worker.hpp io.hpp spinlock.hpp mutex.hpp shared_mutex.hpp condition_variable.hpp ums.hpp util.hpp config.hpp async.hpp options.hpp)
+set(HPP_FILES os_specific.hpp task.hpp scheduler.hpp worker.hpp io.hpp spinlock.hpp mutex.hpp shared_mutex.hpp condition_variable.hpp ums.hpp config.hpp async.hpp options.hpp)
 set(ALL_FILES ${CPP_FILES} ${HPP_FILES})
 
 add_library(ums STATIC ${CPP_FILES})

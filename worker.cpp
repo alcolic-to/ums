@@ -116,7 +116,7 @@ void Worker::yield()
  */
 void Worker::wait_cond_or_sleep()
 {
-    TZoneScopedC(tracy::Color::Gray);
+    TZoneScopedC(tracy::Color::DimGray);
     if (!check_wait_info())
         m_scheduler->sync<Sync_context::wait>(this);
 }
@@ -193,7 +193,7 @@ void Worker::main_loop()
         if (exit()) [[unlikely]]
             return;
 
-        TZoneScopedC(tracy::Color::Green1);
+        TZoneScopedC(tracy::Color::DarkGreen);
         TTracyMessageLC(tracy_str("Task started."), tracy::Color::Green1);
 
         m_task->invoke_noexcept();

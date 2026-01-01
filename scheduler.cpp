@@ -380,7 +380,7 @@ bool Scheduler::has_stealable_work() const noexcept
  */
 void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBase> task)
 {
-    TZoneScopedC(tracy::Color::Blue1);
+    TZoneScopedC(tracy::Color::CornflowerBlue);
 
     if (!task)
         task = next_task();
@@ -399,7 +399,7 @@ void Scheduler::schedule_idle_worker(std::shared_ptr<TaskBase> task)
  */
 void Scheduler::schedule_io_workers()
 {
-    TZoneScopedC(tracy::Color::Blue1);
+    TZoneScopedC(tracy::Color::CornflowerBlue);
 
     auto io_completed = [](Worker& worker) {
         worker.m_io_request->update();
@@ -422,7 +422,7 @@ void Scheduler::schedule_io_workers()
  */
 void Scheduler::schedule_waiting_workers()
 {
-    TZoneScopedC(tracy::Color::Blue1);
+    TZoneScopedC(tracy::Color::CornflowerBlue);
 
     auto checker = [](Worker& worker) { return worker.check_wait_info(); };
 
@@ -446,7 +446,7 @@ void Scheduler::schedule_waiting_workers()
  */
 void Scheduler::schedule_idle_workers()
 {
-    TZoneScopedC(tracy::Color::Blue1);
+    TZoneScopedC(tracy::Color::CornflowerBlue);
 
     if (!has_runnable_workers() && has_idle_workers() && has_tasks())
         schedule_idle_worker();
@@ -457,7 +457,7 @@ void Scheduler::schedule_idle_workers()
  */
 void Scheduler::schedule_yielded_workers()
 {
-    TZoneScopedC(tracy::Color::Blue1);
+    TZoneScopedC(tracy::Color::CornflowerBlue);
 
     if (m_yielded_worker != nullptr) {
         park_runnable(m_yielded_worker);
@@ -495,7 +495,7 @@ void Scheduler::steal_work()
 
 void Scheduler::schedule_workers()
 {
-    TZoneScopedC(tracy::Color::Blue1);
+    TZoneScopedC(tracy::Color::CornflowerBlue);
 
     schedule_io_workers();
     schedule_waiting_workers();
@@ -513,7 +513,7 @@ void Scheduler::prepare_exec() noexcept
 
 void Scheduler::schedule()
 {
-    TZoneScopedC(tracy::Color::Blue1);
+    TZoneScopedC(tracy::Color::CornflowerBlue);
 
     while (true) {
         schedule_workers();
@@ -631,7 +631,7 @@ void Scheduler::sleep() noexcept
     if (should_idle_spin())
         return;
 
-    TZoneScopedC(tracy::Color::Gray);
+    TZoneScopedC(tracy::Color::DimGray);
     std::unique_lock<std::mutex> lock{m_mtx};
 
     if (has_tasks() && has_idle_workers())
